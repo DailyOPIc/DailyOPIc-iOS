@@ -225,12 +225,12 @@
 			);
 			mainGroup = 1212B2B12FE961E600E59D24;
 			minimizedProjectReferenceProxies = 1;
-			preferredProjectObjectVersion = 77;
-			productRefGroup = 1212B2BB2FE961E700E59D24 /* Products */;
 			packageReferences = (
 				F10000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				F10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
 			);
+			preferredProjectObjectVersion = 77;
+			productRefGroup = 1212B2BB2FE961E700E59D24 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -429,6 +429,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DailyOPIc/DailyOPIc.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DAILYOPIC_API_BASE_URL = "http://127.0.0.1:8000";
@@ -463,6 +464,7 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_ENTITLEMENTS = DailyOPIc/DailyOPIc.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
 				DAILYOPIC_API_BASE_URL = "https://REPLACE_WITH_CLOUD_RUN_URL";
@@ -580,6 +582,45 @@
 		};
 /* End XCBuildConfiguration section */
 
+/* Begin XCConfigurationList section */
+		1212B2B52FE961E600E59D24 /* Build configuration list for PBXProject "DailyOPIc" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1212B2DB2FE961E800E59D24 /* Debug */,
+				1212B2DC2FE961E800E59D24 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1212B2DD2FE961E800E59D24 /* Build configuration list for PBXNativeTarget "DailyOPIc" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1212B2DE2FE961E800E59D24 /* Debug */,
+				1212B2DF2FE961E800E59D24 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1212B2E02FE961E800E59D24 /* Build configuration list for PBXNativeTarget "DailyOPIcTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1212B2E12FE961E800E59D24 /* Debug */,
+				1212B2E22FE961E800E59D24 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		1212B2E32FE961E800E59D24 /* Build configuration list for PBXNativeTarget "DailyOPIcUITests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				1212B2E42FE961E800E59D24 /* Debug */,
+				1212B2E52FE961E800E59D24 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+
 /* Begin XCRemoteSwiftPackageReference section */
 		F10000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */ = {
 			isa = XCRemoteSwiftPackageReference;
@@ -621,45 +662,6 @@
 			productName = GoogleMobileAds;
 		};
 /* End XCSwiftPackageProductDependency section */
-
-/* Begin XCConfigurationList section */
-		1212B2B52FE961E600E59D24 /* Build configuration list for PBXProject "DailyOPIc" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1212B2DB2FE961E800E59D24 /* Debug */,
-				1212B2DC2FE961E800E59D24 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		1212B2DD2FE961E800E59D24 /* Build configuration list for PBXNativeTarget "DailyOPIc" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1212B2DE2FE961E800E59D24 /* Debug */,
-				1212B2DF2FE961E800E59D24 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		1212B2E02FE961E800E59D24 /* Build configuration list for PBXNativeTarget "DailyOPIcTests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1212B2E12FE961E800E59D24 /* Debug */,
-				1212B2E22FE961E800E59D24 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-		1212B2E32FE961E800E59D24 /* Build configuration list for PBXNativeTarget "DailyOPIcUITests" */ = {
-			isa = XCConfigurationList;
-			buildConfigurations = (
-				1212B2E42FE961E800E59D24 /* Debug */,
-				1212B2E52FE961E800E59D24 /* Release */,
-			);
-			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Release;
-		};
-/* End XCConfigurationList section */
 	};
 	rootObject = 1212B2B22FE961E600E59D24 /* Project object */;
 }

@@ -30,7 +30,7 @@ final class AppEnvironment {
         launchState = .launching
         Task { await ads.prepare() }
         do {
-            _ = try await authentication.headers()
+            try await authentication.prepareForLaunch()
             try await Task.sleep(for: .milliseconds(450))
             launchState = .ready
         } catch {

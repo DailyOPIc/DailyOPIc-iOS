@@ -1,31 +1,12 @@
 import SwiftUI
 import SwiftData
 
-#if canImport(FirebaseCore)
-import FirebaseCore
-#endif
-#if canImport(FirebaseAppCheck)
-import FirebaseAppCheck
-#endif
-
 final class AppDelegate: NSObject, UIApplicationDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
-        #if canImport(FirebaseCore)
-        guard Bundle.main.path(forResource: "GoogleService-Info", ofType: "plist") != nil else {
-            return true
-        }
-        #if canImport(FirebaseAppCheck)
-        #if DEBUG
-        AppCheck.setAppCheckProviderFactory(AppCheckDebugProviderFactory())
-        #else
-        AppCheck.setAppCheckProviderFactory(AppAttestProviderFactory())
-        #endif
-        #endif
-        FirebaseApp.configure()
-        #endif
+        FirebaseBootstrap.configure()
         return true
     }
 }

@@ -11,10 +11,27 @@ import FirebaseAppCheck
 actor AuthenticationService {
     enum AuthError: LocalizedError {
         case unavailable
+        case appCheckUnavailable
 
         var errorDescription: String? {
-            "익명 인증을 준비할 수 없습니다. 네트워크와 Firebase 설정을 확인해 주세요."
+            switch self {
+            case .unavailable:
+                "익명 인증을 준비할 수 없습니다. 네트워크와 Firebase 설정을 확인해 주세요."
+            case .appCheckUnavailable:
+                "Firebase App Check 토큰을 발급받지 못했습니다. 실제 기기의 App Attest entitlement와 Firebase Console 설정을 확인해 주세요."
+            }
         }
+    }
+
+    func prepareForLaunch() async throws {
+        #if canImport(FirebaseAuth) && canImport(FirebaseCore)
+        if FirebaseApp.app() != nil {
+            let user = try await firebaseUser()
+            _ = try await idToken(for: user)
+            return
+        }
+        #endif
+        _ = debugInstallationID
     }
 
     func headers() async throws -> [String: String] {
@@ -24,7 +41,12 @@ actor AuthenticationService {
             let idToken = try await idToken(for: user)
             var headers = ["Authorization": "Bearer \(idToken)"]
             #if canImport(FirebaseAppCheck)
-            headers["X-Firebase-AppCheck"] = try await appCheckToken()
+            do {
+                headers["X-Firebase-AppCheck"] = try await appCheckToken()
+            } catch {
+                print("[DailyOPIc][Firebase] App Check header token failed. error=\(error.localizedDescription)")
+                throw AuthError.appCheckUnavailable
+            }
             #endif
             return headers
         }
