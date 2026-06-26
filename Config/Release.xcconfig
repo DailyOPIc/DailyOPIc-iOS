@@ -1,0 +1,3 @@
+// Release must point to the production HTTPS backend.
+// Do not put a Mac local network IP here.
+DAILYOPIC_API_BASE_URL = https:/$()/REPLACE_WITH_CLOUD_RUN_URL

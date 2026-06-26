@@ -22,8 +22,10 @@ final class AppEnvironment {
         self.authentication = authentication
         preferences = AppPreferences()
         persistence = PersistenceService()
-        api = APIClient(authentication: authentication)
+        let apiBaseURL = AppConfiguration.apiBaseURL
+        api = APIClient(baseURL: apiBaseURL, authentication: authentication)
         ads = AdService()
+        print("[DailyOPIc][API] baseURL=\(apiBaseURL.absoluteString) source=\(AppConfiguration.apiBaseURLSource)")
     }
 
     func initialize() async {

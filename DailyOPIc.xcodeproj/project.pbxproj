@@ -31,6 +31,8 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
+		C10000000000000000000001 /* Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
+		C10000000000000000000002 /* Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
 		1212B2BA2FE961E700E59D24 /* DailyOPIc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DailyOPIc.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1212B2C92FE961E800E59D24 /* DailyOPIcTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DailyOPIcTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1212B2D32FE961E800E59D24 /* DailyOPIcUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DailyOPIcUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
@@ -101,6 +103,8 @@
 		1212B2B12FE961E600E59D24 = {
 			isa = PBXGroup;
 			children = (
+				C10000000000000000000001 /* Debug.xcconfig */,
+				C10000000000000000000002 /* Release.xcconfig */,
 				1212B2BC2FE961E700E59D24 /* DailyOPIc */,
 				1212B2CC2FE961E800E59D24 /* DailyOPIcTests */,
 				1212B2D62FE961E800E59D24 /* DailyOPIcUITests */,
@@ -426,13 +430,13 @@
 		};
 		1212B2DE2FE961E800E59D24 /* Debug */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C10000000000000000000001 /* Debug.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DailyOPIc/DailyOPIc.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DAILYOPIC_API_BASE_URL = "http://127.0.0.1:8000";
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_PREVIEWS = YES;
 				GAD_REWARDED_AD_UNIT_ID = "ca-app-pub-3940256099942544/1712485313";
@@ -461,13 +465,13 @@
 		};
 		1212B2DF2FE961E800E59D24 /* Release */ = {
 			isa = XCBuildConfiguration;
+			baseConfigurationReference = C10000000000000000000002 /* Release.xcconfig */;
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DailyOPIc/DailyOPIc.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DAILYOPIC_API_BASE_URL = "https://REPLACE_WITH_CLOUD_RUN_URL";
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_PREVIEWS = YES;
 				GAD_REWARDED_AD_UNIT_ID = REPLACE_WITH_ADMOB_REWARDED_UNIT_ID;
