@@ -22,8 +22,12 @@
 	<string>$(CURRENT_PROJECT_VERSION)</string>
 	<key>DAILYOPIC_API_BASE_URL</key>
 	<string>$(DAILYOPIC_API_BASE_URL)</string>
+	<key>DAILYOPIC_PRIVACY_POLICY_URL</key>
+	<string>$(DAILYOPIC_PRIVACY_POLICY_URL)</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-5460686409666356~8798659058</string>
+	<key>GADBannerAdUnitID</key>
+	<string>$(GAD_BANNER_AD_UNIT_ID)</string>
 	<key>GADRewardedAdUnitID</key>
 	<string>$(GAD_REWARDED_AD_UNIT_ID)</string>
 	<key>NSMicrophoneUsageDescription</key>

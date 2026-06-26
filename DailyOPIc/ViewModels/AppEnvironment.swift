@@ -26,6 +26,11 @@ final class AppEnvironment {
         api = APIClient(baseURL: apiBaseURL, authentication: authentication)
         ads = AdService()
         print("[DailyOPIc][API] baseURL=\(apiBaseURL.absoluteString) source=\(AppConfiguration.apiBaseURLSource)")
+        print("[DailyOPIc][Privacy] privacyPolicyURL=\(AppConfiguration.privacyPolicyURL?.absoluteString ?? "missing")")
+        print(
+            "[DailyOPIc][Ads] bannerAdUnitID=\(AppConfiguration.bannerAdUnitID ?? "missing") "
+            + "rewardedAdUnitID=\(AppConfiguration.rewardedAdUnitID ?? "missing")"
+        )
     }
 
     func initialize() async {

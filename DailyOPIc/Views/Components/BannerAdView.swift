@@ -20,12 +20,13 @@ struct BannerAdView: View {
 private struct GoogleBannerView: UIViewRepresentable {
     func makeUIView(context: Context) -> BannerView {
         let view = BannerView(adSize: AdSizeBanner)
-        #if DEBUG
-        view.adUnitID = "ca-app-pub-3940256099942544/2435281174"
-        #else
-        view.adUnitID = "ca-app-pub-5460686409666356/5124626013"
-        #endif
-        view.load(Request())
+        view.rootViewController = UIApplication.shared.topViewController
+        if let unitID = AppConfiguration.bannerAdUnitID {
+            view.adUnitID = unitID
+            view.load(Request())
+        } else {
+            print("[DailyOPIc][Ads] banner ad unit ID is missing")
+        }
         return view
     }
 

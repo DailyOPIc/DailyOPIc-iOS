@@ -10,9 +10,26 @@ enum AppConfiguration {
     }
 
     nonisolated static var rewardedAdUnitID: String? {
-        let value = Bundle.main.object(forInfoDictionaryKey: "GADRewardedAdUnitID") as? String
-        return value?.isEmpty == false ? value : nil
+        configuredString(Bundle.main.object(forInfoDictionaryKey: "GADRewardedAdUnitID") as? String)
     }
+
+    nonisolated static var bannerAdUnitID: String? {
+        configuredString(Bundle.main.object(forInfoDictionaryKey: "GADBannerAdUnitID") as? String)
+    }
+
+    nonisolated static var privacyPolicyURL: URL? {
+        configuredURL(Bundle.main.object(forInfoDictionaryKey: "DAILYOPIC_PRIVACY_POLICY_URL") as? String)
+    }
+
+    #if DEBUG
+    nonisolated static var gadTestDeviceIdentifiers: [String] {
+        configuredList(ProcessInfo.processInfo.environment["GAD_TEST_DEVICE_IDS"])
+    }
+
+    nonisolated static var umpDebugTestDeviceIdentifiers: [String] {
+        configuredList(ProcessInfo.processInfo.environment["UMP_DEBUG_TEST_DEVICE_IDS"])
+    }
+    #endif
 
     private static var resolvedAPIBaseURL: (url: URL, source: String) {
         if let url = configuredURL(ProcessInfo.processInfo.environment["DAILYOPIC_API_BASE_URL"]) {
@@ -47,7 +64,7 @@ enum AppConfiguration {
     }
 
     private static func configuredURL(_ value: String?) -> URL? {
-        guard let value = cleaned(value),
+        guard let value = configuredString(value),
               !value.contains("$("),
               let url = URL(string: value),
               url.scheme != nil,
@@ -56,6 +73,27 @@ enum AppConfiguration {
         }
         return url
     }
+
+    private static func configuredString(_ value: String?) -> String? {
+        guard let value = cleaned(value), !value.contains("$(") else {
+            return nil
+        }
+        return value
+    }
+
+    #if DEBUG
+    private static func configuredList(_ value: String?) -> [String] {
+        guard let value = configuredString(value) else {
+            return []
+        }
+        return value
+            .split { character in
+                character == "," || character == ";" || character.isWhitespace || character.isNewline
+            }
+            .map(String.init)
+            .filter { !$0.isEmpty }
+    }
+    #endif
 
     private static func cleaned(_ value: String?) -> String? {
         let trimmed = value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""

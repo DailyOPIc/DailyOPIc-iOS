@@ -1,3 +1,8 @@
 // Release must point to the production HTTPS backend.
 // Do not put a Mac local network IP here.
 DAILYOPIC_API_BASE_URL = https:/$()/REPLACE_WITH_CLOUD_RUN_URL
+
+GAD_BANNER_AD_UNIT_ID = ca-app-pub-5460686409666356/5124626013
+GAD_REWARDED_AD_UNIT_ID = ca-app-pub-5460686409666356/7091483531
+
+DAILYOPIC_PRIVACY_POLICY_URL = https:/$()/battle-princess-097.notion.site/2d05d51fd9518084a95ce3b9193eb5ed?source=copy_link

@@ -14,11 +14,13 @@ final class AdService: NSObject, ObservableObject {
     enum AdError: LocalizedError {
         case unavailable
         case notEarned
+        case privacyOptionsUnavailable
 
         var errorDescription: String? {
             switch self {
             case .unavailable: "리워드 광고를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
             case .notEarned: "광고를 끝까지 시청해야 평가를 계속할 수 있습니다."
+            case .privacyOptionsUnavailable: "광고 개인정보 설정을 열 수 없습니다. 잠시 후 다시 시도해 주세요."
             }
         }
     }
@@ -27,43 +29,68 @@ final class AdService: NSObject, ObservableObject {
 
     #if canImport(GoogleMobileAds)
     private var rewardedAd: RewardedAd?
+    private var didStartMobileAds = false
     #endif
 
     func prepare() async {
         #if canImport(UserMessagingPlatform)
-        let parameters = RequestParameters()
+        let parameters = consentRequestParameters()
+        print("[DailyOPIc][UMP] request consent info update")
         await withCheckedContinuation { continuation in
-            ConsentInformation.shared.requestConsentInfoUpdate(with: parameters) { _ in
+            ConsentInformation.shared.requestConsentInfoUpdate(with: parameters) { error in
+                if let error {
+                    print("[DailyOPIc][UMP] consent info update failed. error=\(error.localizedDescription)")
+                } else {
+                    print(
+                        "[DailyOPIc][UMP] consent info updated. "
+                        + "status=\(Self.describe(ConsentInformation.shared.consentStatus)) "
+                        + "formStatus=\(Self.describe(ConsentInformation.shared.formStatus)) "
+                        + "privacyOptions=\(Self.describe(ConsentInformation.shared.privacyOptionsRequirementStatus))"
+                    )
+                }
                 continuation.resume()
             }
         }
-        try? await ConsentForm.loadAndPresentIfRequired(from: nil)
+        do {
+            let wasRequired = ConsentInformation.shared.consentStatus == .required
+            try await ConsentForm.loadAndPresentIfRequired(from: nil)
+            print("[DailyOPIc][UMP] consent form checked. wasRequired=\(wasRequired)")
+        } catch {
+            print("[DailyOPIc][UMP] consent form failed. error=\(error.localizedDescription)")
+        }
         canRequestAds = ConsentInformation.shared.canRequestAds
+        print("[DailyOPIc][UMP] canRequestAds=\(canRequestAds)")
         #else
         canRequestAds = true
+        print("[DailyOPIc][UMP] UserMessagingPlatform unavailable. canRequestAds=true")
         #endif
 
         #if canImport(GoogleMobileAds)
-        guard canRequestAds else { return }
+        configureGADTestDevicesIfNeeded()
+        guard canRequestAds else {
+            print("[DailyOPIc][Ads] Mobile Ads start skipped because canRequestAds=false")
+            return
+        }
+        guard !didStartMobileAds else {
+            print("[DailyOPIc][Ads] Mobile Ads already started")
+            return
+        }
+        didStartMobileAds = true
         await withCheckedContinuation { continuation in
             MobileAds.shared.start { _ in continuation.resume() }
         }
+        print("[DailyOPIc][Ads] Mobile Ads started")
         #endif
     }
 
     func showRewardedAd(userIdentifier: String, customData: String) async throws {
         #if canImport(GoogleMobileAds)
         guard canRequestAds else { throw AdError.unavailable }
-        let unitID: String
-        #if DEBUG
-        unitID = "ca-app-pub-3940256099942544/1712485313"
-        #else
-        guard let configured = AppConfiguration.rewardedAdUnitID else {
+        guard let unitID = AppConfiguration.rewardedAdUnitID else {
             throw AdError.unavailable
         }
-        unitID = configured
-        #endif
 
+        print("[DailyOPIc][Ads] loading rewarded ad. unitID=\(unitID)")
         let ad = try await RewardedAd.load(with: unitID, request: Request())
         let options = ServerSideVerificationOptions()
         options.userIdentifier = userIdentifier
@@ -82,9 +109,75 @@ final class AdService: NSObject, ObservableObject {
         #endif
     }
 
-    func presentPrivacyOptions() async {
+    func presentPrivacyOptions() async throws {
         #if canImport(UserMessagingPlatform)
-        try? await ConsentForm.presentPrivacyOptionsForm(from: nil)
+        try await ConsentForm.presentPrivacyOptionsForm(from: nil)
+        print("[DailyOPIc][UMP] privacy options form presented")
+        #else
+        throw AdError.privacyOptionsUnavailable
         #endif
     }
+
+    #if canImport(UserMessagingPlatform)
+    private func consentRequestParameters() -> RequestParameters {
+        let parameters = RequestParameters()
+
+        #if DEBUG
+        let identifiers = AppConfiguration.umpDebugTestDeviceIdentifiers
+        if !identifiers.isEmpty {
+            let settings = DebugSettings()
+            settings.testDeviceIdentifiers = identifiers
+            settings.geography = .EEA
+            parameters.debugSettings = settings
+            print("[DailyOPIc][UMP] debug test devices configured. count=\(identifiers.count) geography=EEA")
+        } else {
+            print("[DailyOPIc][UMP] debug test devices not configured")
+        }
+        #endif
+
+        return parameters
+    }
+
+    private static func describe(_ status: ConsentStatus) -> String {
+        switch status {
+        case .unknown: "unknown"
+        case .required: "required"
+        case .notRequired: "notRequired"
+        case .obtained: "obtained"
+        @unknown default: "unknown(\(status.rawValue))"
+        }
+    }
+
+    private static func describe(_ status: FormStatus) -> String {
+        switch status {
+        case .unknown: "unknown"
+        case .available: "available"
+        case .unavailable: "unavailable"
+        @unknown default: "unknown(\(status.rawValue))"
+        }
+    }
+
+    private static func describe(_ status: PrivacyOptionsRequirementStatus) -> String {
+        switch status {
+        case .unknown: "unknown"
+        case .required: "required"
+        case .notRequired: "notRequired"
+        @unknown default: "unknown(\(status.rawValue))"
+        }
+    }
+    #endif
+
+    #if canImport(GoogleMobileAds)
+    private func configureGADTestDevicesIfNeeded() {
+        #if DEBUG
+        let identifiers = AppConfiguration.gadTestDeviceIdentifiers
+        if identifiers.isEmpty {
+            print("[DailyOPIc][Ads] GAD test devices not configured")
+        } else {
+            MobileAds.shared.requestConfiguration.testDeviceIdentifiers = identifiers
+            print("[DailyOPIc][Ads] GAD test devices configured. count=\(identifiers.count)")
+        }
+        #endif
+    }
+    #endif
 }
