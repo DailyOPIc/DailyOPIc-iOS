@@ -2,7 +2,9 @@ import SwiftUI
 
 #if canImport(GoogleMobileAds)
 import GoogleMobileAds
+#endif
 
+#if canImport(GoogleMobileAds)
 struct BannerAdView: View {
     @EnvironmentObject private var ads: AdService
 

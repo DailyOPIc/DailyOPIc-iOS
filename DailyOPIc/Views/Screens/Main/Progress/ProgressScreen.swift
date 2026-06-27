@@ -52,8 +52,6 @@ struct ProgressScreen: View {
             }
             .padding(20)
         }
-        .navigationTitle("Progress")
-        .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog("모든 로컬 기록을 삭제할까요?", isPresented: $showsDeleteAll) {
             Button("전체 삭제", role: .destructive, action: deleteAll)
         }

@@ -5,36 +5,43 @@ struct SetupView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var ads: AdService
-    @State private var level: OPIcLevel
     @State private var alert: SetupAlert?
 
     init(preferences: AppPreferences) {
         self.preferences = preferences
-        _level = State(initialValue: preferences.targetLevel ?? .IH)
     }
 
     var body: some View {
         NavigationStack {
             List {
                 Section("목표 등급") {
-                    Picker("목표 등급", selection: $level) {
-                        ForEach(OPIcLevel.allCases) { Text($0.rawValue).tag($0) }
+                    HStack {
+                        Text("현재 목표 등급")
+                        Spacer()
+                        Text(preferences.targetLevel?.rawValue ?? "-")
+                            .fontWeight(.bold)
+                            .foregroundStyle(AppPalette.primary)
                     }
-                    Text(level.description)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    if let targetLevel = preferences.targetLevel {
+                        Text(targetLevel.description)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Button("목표 등급 설정") {
+                        openGoalLevelOnboarding()
+                    }
                 }
                 Section("앱") {
-                    Button("온보딩 다시 보기") {
-                        preferences.resetOnboarding()
-                        dismiss()
-                    }
                     Button("개인정보처리방침") {
                         openPrivacyPolicy()
                     }
                     Button("광고 개인정보 설정") {
                         Task { await presentAdPrivacyOptions() }
                     }
+                    .disabled(!ads.canShowPrivacyOptions)
+                    Text(ads.privacyOptionsStatusText)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
             .navigationTitle("학습 설정")
@@ -46,14 +53,15 @@ struct SetupView: View {
                 )
             }
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("취소") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("저장") {
-                        preferences.targetLevel = level
-                        dismiss()
-                    }
-                }
+                ToolbarItem(placement: .confirmationAction) { Button("닫기") { dismiss() } }
             }
+        }
+    }
+
+    private func openGoalLevelOnboarding() {
+        dismiss()
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+            preferences.resetOnboarding()
         }
     }
 

@@ -15,17 +15,21 @@ final class AdService: NSObject, ObservableObject {
         case unavailable
         case notEarned
         case privacyOptionsUnavailable
+        case privacyOptionsNotRequired
 
         var errorDescription: String? {
             switch self {
             case .unavailable: "리워드 광고를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
             case .notEarned: "광고를 끝까지 시청해야 평가를 계속할 수 있습니다."
             case .privacyOptionsUnavailable: "광고 개인정보 설정을 열 수 없습니다. 잠시 후 다시 시도해 주세요."
+            case .privacyOptionsNotRequired: "현재 지역 또는 AdMob 메시지 설정에서는 광고 개인정보 설정이 필요하지 않습니다."
             }
         }
     }
 
     @Published private(set) var canRequestAds = false
+    @Published private(set) var canShowPrivacyOptions = false
+    @Published private(set) var privacyOptionsStatusText = "광고 개인정보 설정 상태를 확인 중입니다."
 
     #if canImport(GoogleMobileAds)
     private var rewardedAd: RewardedAd?
@@ -51,6 +55,7 @@ final class AdService: NSObject, ObservableObject {
                 continuation.resume()
             }
         }
+        updatePrivacyOptionsStatus()
         do {
             let wasRequired = ConsentInformation.shared.consentStatus == .required
             try await ConsentForm.loadAndPresentIfRequired(from: nil)
@@ -59,9 +64,12 @@ final class AdService: NSObject, ObservableObject {
             print("[DailyOPIc][UMP] consent form failed. error=\(error.localizedDescription)")
         }
         canRequestAds = ConsentInformation.shared.canRequestAds
+        updatePrivacyOptionsStatus()
         print("[DailyOPIc][UMP] canRequestAds=\(canRequestAds)")
         #else
         canRequestAds = true
+        canShowPrivacyOptions = false
+        privacyOptionsStatusText = "User Messaging Platform SDK가 포함되지 않았습니다."
         print("[DailyOPIc][UMP] UserMessagingPlatform unavailable. canRequestAds=true")
         #endif
 
@@ -85,13 +93,20 @@ final class AdService: NSObject, ObservableObject {
 
     func showRewardedAd(userIdentifier: String, customData: String) async throws {
         #if canImport(GoogleMobileAds)
-        guard canRequestAds else { throw AdError.unavailable }
+        guard canRequestAds else {
+            throw AdError.unavailable
+        }
         guard let unitID = AppConfiguration.rewardedAdUnitID else {
             throw AdError.unavailable
         }
 
         print("[DailyOPIc][Ads] loading rewarded ad. unitID=\(unitID)")
-        let ad = try await RewardedAd.load(with: unitID, request: Request())
+        let ad: RewardedAd
+        do {
+            ad = try await RewardedAd.load(with: unitID, request: Request())
+        } catch {
+            throw error
+        }
         let options = ServerSideVerificationOptions()
         options.userIdentifier = userIdentifier
         options.customRewardText = customData
@@ -111,7 +126,16 @@ final class AdService: NSObject, ObservableObject {
 
     func presentPrivacyOptions() async throws {
         #if canImport(UserMessagingPlatform)
-        try await ConsentForm.presentPrivacyOptionsForm(from: nil)
+        updatePrivacyOptionsStatus()
+        guard canShowPrivacyOptions else {
+            print("[DailyOPIc][UMP] privacy options skipped. \(privacyOptionsStatusText)")
+            throw AdError.privacyOptionsNotRequired
+        }
+        guard let viewController = UIApplication.shared.topViewController else {
+            throw AdError.privacyOptionsUnavailable
+        }
+        try await ConsentForm.presentPrivacyOptionsForm(from: viewController)
+        updatePrivacyOptionsStatus()
         print("[DailyOPIc][UMP] privacy options form presented")
         #else
         throw AdError.privacyOptionsUnavailable
@@ -138,7 +162,29 @@ final class AdService: NSObject, ObservableObject {
         return parameters
     }
 
-    private static func describe(_ status: ConsentStatus) -> String {
+    private func updatePrivacyOptionsStatus() {
+        let status = ConsentInformation.shared.privacyOptionsRequirementStatus
+        switch status {
+        case .required:
+            canShowPrivacyOptions = true
+            privacyOptionsStatusText = "광고 개인정보 설정을 열 수 있습니다."
+        case .notRequired:
+            canShowPrivacyOptions = false
+            privacyOptionsStatusText = "현재 지역 또는 AdMob 메시지 설정에서는 광고 개인정보 설정이 필요하지 않습니다."
+        case .unknown:
+            canShowPrivacyOptions = false
+            privacyOptionsStatusText = "광고 개인정보 설정 상태를 확인 중입니다."
+        @unknown default:
+            canShowPrivacyOptions = false
+            privacyOptionsStatusText = "광고 개인정보 설정 상태를 확인할 수 없습니다."
+        }
+        print(
+            "[DailyOPIc][UMP] privacy options status="
+            + "\(Self.describe(status)) canShow=\(canShowPrivacyOptions)"
+        )
+    }
+
+    nonisolated private static func describe(_ status: ConsentStatus) -> String {
         switch status {
         case .unknown: "unknown"
         case .required: "required"
@@ -148,7 +194,7 @@ final class AdService: NSObject, ObservableObject {
         }
     }
 
-    private static func describe(_ status: FormStatus) -> String {
+    nonisolated private static func describe(_ status: FormStatus) -> String {
         switch status {
         case .unknown: "unknown"
         case .available: "available"
@@ -157,7 +203,7 @@ final class AdService: NSObject, ObservableObject {
         }
     }
 
-    private static func describe(_ status: PrivacyOptionsRequirementStatus) -> String {
+    nonisolated private static func describe(_ status: PrivacyOptionsRequirementStatus) -> String {
         switch status {
         case .unknown: "unknown"
         case .required: "required"
@@ -180,4 +226,13 @@ final class AdService: NSObject, ObservableObject {
         #endif
     }
     #endif
+}
+
+private extension UIApplication {
+    var topViewController: UIViewController? {
+        connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first?
+            .rootViewController
+    }
 }

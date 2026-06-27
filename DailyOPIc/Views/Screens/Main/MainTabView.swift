@@ -17,19 +17,19 @@ struct MainTabView: View {
             NavigationStack {
                 PracticeScreen(viewModel: practiceViewModel, preferences: environment.preferences)
             }
-            .tabItem { Label("Practice", systemImage: "mic.fill") }
+            .tabItem { Label("데일리", systemImage: "mic.fill") }
             .tag(0)
 
             NavigationStack {
                 MockExamScreen(viewModel: mockViewModel)
             }
-            .tabItem { Label("Mock", systemImage: "list.number") }
+            .tabItem { Label("모의고사", systemImage: "list.number") }
             .tag(1)
 
             NavigationStack {
                 ProgressScreen(preferences: environment.preferences)
             }
-            .tabItem { Label("Progress", systemImage: "checkmark.circle.fill") }
+            .tabItem { Label("통계", systemImage: "checkmark.circle.fill") }
             .tag(2)
         }
         .environmentObject(environment.ads)

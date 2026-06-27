@@ -25,8 +25,6 @@ struct PracticeScreen: View {
                 practiceBody
             }
         }
-        .navigationTitle("Practice")
-        .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showsSetup = true } label: {
@@ -66,18 +64,7 @@ struct PracticeScreen: View {
                     ProgressView("맞춤 문제를 준비하고 있어요")
                         .frame(maxWidth: .infinity, minHeight: 260)
                 } else if let question = viewModel.currentQuestion {
-                    QuestionCard(question: question)
-                    HStack {
-                        Text("Category")
-                            .foregroundStyle(AppPalette.secondaryInk)
-                        Spacer()
-                        Text(question.topic.uppercased())
-                            .fontWeight(.bold)
-                            .foregroundStyle(AppPalette.primary)
-                    }
-                    .padding(.horizontal, 20)
-                    .frame(height: 54)
-                    .overlay { Capsule().stroke(AppPalette.primary.opacity(0.6), lineWidth: 1.5) }
+                    QuestionCard(question: question, showsRubricFocus: false)
 
                     VStack(spacing: 14) {
                         RecordingButton(

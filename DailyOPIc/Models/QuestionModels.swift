@@ -30,6 +30,18 @@ enum SurveyQuestionType: String, Codable, Sendable {
     case roleplay
     case problemSolving = "problem_solving"
     case opinion
+
+    var label: String {
+        switch self {
+        case .description: "묘사"
+        case .routine: "루틴"
+        case .pastExperience: "경험"
+        case .comparison: "비교"
+        case .roleplay: "롤플레이"
+        case .problemSolving: "문제 해결"
+        case .opinion: "의견"
+        }
+    }
 }
 
 struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {

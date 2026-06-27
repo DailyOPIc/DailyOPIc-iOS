@@ -3,6 +3,7 @@ import SwiftUI
 struct MockExamScreen: View {
     let viewModel: MockExamViewModel
     @ObservedObject private var speech: SpeechRecognitionService
+    @State private var showsResetConfirmation = false
 
     init(viewModel: MockExamViewModel) {
         self.viewModel = viewModel
@@ -32,9 +33,31 @@ struct MockExamScreen: View {
                 }
             }
         }
-        .navigationTitle("Mock Exam")
-        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if canResetExam {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("모의고사 다시하기") {
+                        showsResetConfirmation = true
+                    }
+                }
+            }
+        }
+        .overlay {
+            if showsResetConfirmation {
+                ResetMockExamDialog(
+                    cancel: { showsResetConfirmation = false },
+                    confirm: {
+                        showsResetConfirmation = false
+                        viewModel.resetExam()
+                    }
+                )
+            }
+        }
         .task { viewModel.restoreDraftIfAvailable() }
+    }
+
+    private var canResetExam: Bool {
+        viewModel.questionSet != nil || !viewModel.answers.isEmpty || viewModel.evaluation != nil
     }
 
     private var introduction: some View {
@@ -149,12 +172,7 @@ struct MockExamScreen: View {
     private var answering: some View {
         ScrollView {
             VStack(spacing: 22) {
-                HStack {
-                    Text("\(viewModel.currentIndex + 1) / 15")
-                        .font(.headline)
-                    ProgressView(value: Double(viewModel.currentIndex + 1), total: 15)
-                        .tint(AppPalette.primary)
-                }
+                MockProgressHeader(currentQuestion: viewModel.currentIndex + 1)
                 if let question = viewModel.currentQuestion {
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
                 }
@@ -248,6 +266,100 @@ private struct MultiChoiceSection: View {
             selection.removeAll { $0 == topicId }
         } else if selection.count < 6 {
             selection.append(topicId)
+        }
+    }
+}
+
+private struct MockProgressHeader: View {
+    let currentQuestion: Int
+    private let totalQuestions = 15
+    private let adMarkers = [5, 10]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack {
+                Text("\(currentQuestion) / \(totalQuestions)")
+                    .font(.headline)
+                Spacer()
+                Label("노란 점: 광고 예정", systemImage: "circle.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.yellow)
+            }
+            GeometryReader { proxy in
+                let width = proxy.size.width
+                ZStack(alignment: .leading) {
+                    Capsule()
+                        .fill(Color(.tertiarySystemFill))
+                        .frame(height: 10)
+                    Capsule()
+                        .fill(AppPalette.primary)
+                        .frame(
+                            width: width * CGFloat(currentQuestion) / CGFloat(totalQuestions),
+                            height: 10
+                        )
+                    ForEach(adMarkers, id: \.self) { marker in
+                        Circle()
+                            .fill(Color.yellow)
+                            .frame(width: 14, height: 14)
+                            .overlay {
+                                Circle().stroke(AppPalette.ink.opacity(0.28), lineWidth: 1)
+                            }
+                            .position(
+                                x: width * CGFloat(marker) / CGFloat(totalQuestions),
+                                y: 5
+                            )
+                            .accessibilityLabel("\(marker)번 뒤 광고 예정")
+                    }
+                }
+            }
+            .frame(height: 14)
+        }
+    }
+}
+
+private struct ResetMockExamDialog: View {
+    let cancel: () -> Void
+    let confirm: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.34)
+                .ignoresSafeArea()
+                .onTapGesture(perform: cancel)
+            VStack(spacing: 18) {
+                VStack(spacing: 8) {
+                    Text("모의고사를 다시 시작할까요?")
+                        .font(.headline)
+                        .foregroundStyle(AppPalette.ink)
+                    Text("녹음한 답변과 임시 저장된 모의고사가 삭제됩니다.")
+                        .font(AppTypography.body)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .multilineTextAlignment(.center)
+                }
+                HStack(spacing: 12) {
+                    Button("취소", action: cancel)
+                        .font(.headline)
+                        .foregroundStyle(AppPalette.ink)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(Color(.secondarySystemBackground))
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                    Button("다시 시작", role: .destructive) {
+                        confirm()
+                    }
+                        .font(.headline)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity)
+                        .frame(height: 48)
+                        .background(AppPalette.danger)
+                        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                }
+            }
+            .padding(22)
+            .background(.white)
+            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
+            .padding(.horizontal, 26)
         }
     }
 }

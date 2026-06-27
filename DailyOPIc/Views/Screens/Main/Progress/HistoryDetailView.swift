@@ -7,7 +7,7 @@ struct PracticeHistoryDetailView: View {
         ScrollView {
             if let evaluation = record.evaluation, let question = record.question {
                 VStack(spacing: 20) {
-                    QuestionCard(question: question)
+                    QuestionCard(question: question, showsRubricFocus: false)
                     PracticeResultView(
                         evaluation: evaluation,
                         targetLevel: record.targetLevel,
