@@ -22,6 +22,16 @@ enum QuestionType: String, Codable, Sendable {
     }
 }
 
+enum SurveyQuestionType: String, Codable, Sendable {
+    case description
+    case routine
+    case pastExperience = "past_experience"
+    case comparison
+    case roleplay
+    case problemSolving = "problem_solving"
+    case opinion
+}
+
 struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {
     let number: Int
     let type: QuestionType
@@ -30,8 +40,41 @@ struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {
     let prompt: String
     let difficulty: OPIcLevel
     let rubricFocus: [String]
+    let questionType: SurveyQuestionType?
+    let followUpPrompt: String?
+    let topicId: String?
+    let category: String?
+    let estimatedLevel: OPIcLevel?
 
     var id: String { "\(number)-\(prompt)" }
+
+    init(
+        number: Int,
+        type: QuestionType,
+        comboId: String?,
+        topic: String,
+        prompt: String,
+        difficulty: OPIcLevel,
+        rubricFocus: [String],
+        questionType: SurveyQuestionType? = nil,
+        followUpPrompt: String? = nil,
+        topicId: String? = nil,
+        category: String? = nil,
+        estimatedLevel: OPIcLevel? = nil
+    ) {
+        self.number = number
+        self.type = type
+        self.comboId = comboId
+        self.topic = topic
+        self.prompt = prompt
+        self.difficulty = difficulty
+        self.rubricFocus = rubricFocus
+        self.questionType = questionType
+        self.followUpPrompt = followUpPrompt
+        self.topicId = topicId
+        self.category = category
+        self.estimatedLevel = estimatedLevel
+    }
 }
 
 struct QuestionSet: Codable, Sendable {
@@ -48,15 +91,18 @@ struct QuestionSetRequest: Codable, Sendable {
     let targetLevel: OPIcLevel
     let background: BackgroundProfile
     let recentQuestionHashes: [String]
+    let survey: BackgroundSurvey?
 
     init(
         targetLevel: OPIcLevel,
         background: BackgroundProfile,
-        recentQuestionHashes: [String] = []
+        recentQuestionHashes: [String] = [],
+        survey: BackgroundSurvey? = nil
     ) {
         self.targetLevel = targetLevel
         self.background = background
         self.recentQuestionHashes = recentQuestionHashes
+        self.survey = survey
     }
 }
 

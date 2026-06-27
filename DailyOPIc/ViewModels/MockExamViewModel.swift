@@ -6,6 +6,7 @@ import Observation
 final class MockExamViewModel {
     enum Phase: Equatable {
         case introduction
+        case survey
         case loading
         case answering
         case readyForReward
@@ -25,17 +26,20 @@ final class MockExamViewModel {
     var currentIndex = 0
     var evaluation: MockEvaluation?
     var errorMessage: String?
+    var surveyDraft: BackgroundSurvey
 
     init(environment: AppEnvironment) {
         api = environment.api
         ads = environment.ads
         preferences = environment.preferences
         persistence = environment.persistence
+        surveyDraft = environment.preferences.mockSurvey ?? .defaultSurvey
     }
 
     var targetLevel: OPIcLevel { preferences.targetLevel ?? .IM2 }
     var currentQuestion: GeneratedQuestion? { questionSet?.questions[safe: currentIndex] }
     var progress: Double { Double(answers.count) / 15.0 }
+    var savedSurvey: BackgroundSurvey? { preferences.mockSurvey }
 
     func restoreDraftIfAvailable() {
         guard questionSet == nil,
@@ -47,14 +51,31 @@ final class MockExamViewModel {
         phase = answers.count == 15 ? .readyForReward : .answering
     }
 
-    func startNewExam() async {
+    func showSurvey() {
+        surveyDraft = preferences.mockSurvey ?? .defaultSurvey
+        errorMessage = nil
+        phase = .survey
+    }
+
+    func startWithSavedSurvey() async {
+        await startNewExam(survey: preferences.mockSurvey ?? .defaultSurvey)
+    }
+
+    func startNewExam(survey: BackgroundSurvey) async {
+        guard survey.isValid else {
+            errorMessage = "상태와 거주 형태를 선택하고 관심 주제를 3개 이상 선택해 주세요."
+            phase = .survey
+            return
+        }
         phase = .loading
         errorMessage = nil
         do {
+            preferences.mockSurvey = survey
             let set = try await api.createMockExam(
                 request: QuestionSetRequest(
                     targetLevel: targetLevel,
-                    background: preferences.backgroundProfile
+                    background: preferences.backgroundProfile,
+                    survey: survey
                 )
             )
             questionSet = set

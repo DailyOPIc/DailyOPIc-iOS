@@ -8,6 +8,7 @@ final class AppPreferences {
         static let onboarding = "native_onboarding_completed"
         static let targetLevel = "native_target_level"
         static let background = "native_background_profile"
+        static let mockSurvey = "native_mock_background_survey"
     }
 
     private let defaults: UserDefaults
@@ -25,6 +26,16 @@ final class AppPreferences {
             }
         }
     }
+    var mockSurvey: BackgroundSurvey? {
+        didSet {
+            if let mockSurvey,
+               let data = try? JSONCoding.encoder.encode(mockSurvey) {
+                defaults.set(data, forKey: Key.mockSurvey)
+            } else {
+                defaults.removeObject(forKey: Key.mockSurvey)
+            }
+        }
+    }
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
@@ -35,6 +46,12 @@ final class AppPreferences {
             backgroundProfile = profile
         } else {
             backgroundProfile = BackgroundProfile()
+        }
+        if let data = defaults.data(forKey: Key.mockSurvey),
+           let survey = try? JSONCoding.decoder.decode(BackgroundSurvey.self, from: data) {
+            mockSurvey = survey
+        } else {
+            mockSurvey = nil
         }
     }
 

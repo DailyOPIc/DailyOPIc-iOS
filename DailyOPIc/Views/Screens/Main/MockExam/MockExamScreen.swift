@@ -14,6 +14,8 @@ struct MockExamScreen: View {
             switch viewModel.phase {
             case .introduction:
                 introduction
+            case .survey:
+                survey
             case .loading:
                 ProgressView("15문항을 구성하고 있어요")
             case .answering:
@@ -45,7 +47,7 @@ struct MockExamScreen: View {
                 Text("실전처럼 15문항에 답해보세요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
-                Text("자기소개, 설문형 콤보, 돌발, 롤플레이, 비교·심화 문항을 차례로 진행합니다. 답변 중에는 평가하지 않으며 마지막에 종합 평가합니다.")
+                Text("OPIc 유형 기반 모의고사입니다. Background Survey 선택값을 바탕으로 자기소개, 관심 주제 콤보, 롤플레이, 비교·의견 문항을 차례로 진행합니다.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
@@ -53,10 +55,92 @@ struct MockExamScreen: View {
                 if let message = viewModel.errorMessage {
                     ErrorBanner(message: message)
                 }
-                PrimaryButton(title: "15문항 시작", systemImage: "play.fill") {
-                    Task { await viewModel.startNewExam() }
+                if viewModel.savedSurvey != nil {
+                    PrimaryButton(title: "이전 설문으로 바로 시작", systemImage: "play.fill") {
+                        Task { await viewModel.startWithSavedSurvey() }
+                    }
+                }
+                PrimaryButton(
+                    title: viewModel.savedSurvey == nil ? "Background Survey 선택" : "설문 다시 선택",
+                    systemImage: "slider.horizontal.3"
+                ) {
+                    viewModel.showSurvey()
                 }
                 BannerAdView().frame(height: 50)
+            }
+            .padding(24)
+        }
+    }
+
+    private var survey: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: 20) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("Background Survey")
+                        .font(AppTypography.title)
+                    Text("관심 주제를 바탕으로 15문항을 구성합니다. 상태와 거주 형태를 선택하고, 관심 주제는 전체 3개 이상 선택해 주세요.")
+                        .font(AppTypography.body)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+                if let message = viewModel.errorMessage { ErrorBanner(message: message) }
+                SingleChoiceSection(
+                    title: "현재 상태",
+                    options: BackgroundSurvey.statusOptions,
+                    selection: Binding(
+                        get: { viewModel.surveyDraft.status },
+                        set: { viewModel.surveyDraft.status = $0 }
+                    )
+                )
+                SingleChoiceSection(
+                    title: "거주 형태",
+                    options: BackgroundSurvey.residenceOptions,
+                    selection: Binding(
+                        get: { viewModel.surveyDraft.residence },
+                        set: { viewModel.surveyDraft.residence = $0 }
+                    )
+                )
+                MultiChoiceSection(
+                    title: "여가",
+                    options: BackgroundSurvey.leisureOptions,
+                    selection: Binding(
+                        get: { viewModel.surveyDraft.leisure },
+                        set: { viewModel.surveyDraft.leisure = $0 }
+                    )
+                )
+                MultiChoiceSection(
+                    title: "취미",
+                    options: BackgroundSurvey.hobbyOptions,
+                    selection: Binding(
+                        get: { viewModel.surveyDraft.hobbies },
+                        set: { viewModel.surveyDraft.hobbies = $0 }
+                    )
+                )
+                MultiChoiceSection(
+                    title: "운동",
+                    options: BackgroundSurvey.sportOptions,
+                    selection: Binding(
+                        get: { viewModel.surveyDraft.sports },
+                        set: { viewModel.surveyDraft.sports = $0 }
+                    )
+                )
+                MultiChoiceSection(
+                    title: "여행",
+                    options: BackgroundSurvey.travelOptions,
+                    selection: Binding(
+                        get: { viewModel.surveyDraft.travel },
+                        set: { viewModel.surveyDraft.travel = $0 }
+                    )
+                )
+                Text("선택한 관심 주제 \(viewModel.surveyDraft.selectedTopicCount)개")
+                    .font(.subheadline.weight(.semibold))
+                    .foregroundStyle(viewModel.surveyDraft.isValid ? AppPalette.primary : AppPalette.danger)
+                PrimaryButton(
+                    title: "15문항 시작",
+                    systemImage: "play.fill",
+                    isDisabled: !viewModel.surveyDraft.isValid
+                ) {
+                    Task { await viewModel.startNewExam(survey: viewModel.surveyDraft) }
+                }
             }
             .padding(24)
         }
@@ -72,7 +156,7 @@ struct MockExamScreen: View {
                         .tint(AppPalette.primary)
                 }
                 if let question = viewModel.currentQuestion {
-                    QuestionCard(question: question, showsNumber: true)
+                    QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
                 }
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
                 RecordingButton(isRecording: speech.isListening, isDisabled: false) {
@@ -117,5 +201,151 @@ struct MockExamScreen: View {
             }
             .padding(24)
         }
+    }
+}
+
+private struct SingleChoiceSection: View {
+    let title: String
+    let options: [SurveyOption]
+    @Binding var selection: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            Text(title)
+                .font(.headline)
+            FlexibleChips(options: options, selection: selection) { option in
+                selection = option.topicId
+            }
+        }
+        .cardStyle()
+    }
+}
+
+private struct MultiChoiceSection: View {
+    let title: String
+    let options: [SurveyOption]
+    @Binding var selection: [String]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            HStack {
+                Text(title)
+                    .font(.headline)
+                Spacer()
+                Text("\(selection.count)/6")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            FlexibleChips(options: options, selection: Set(selection)) { option in
+                toggle(option.topicId)
+            }
+        }
+        .cardStyle()
+    }
+
+    private func toggle(_ topicId: String) {
+        if selection.contains(topicId) {
+            selection.removeAll { $0 == topicId }
+        } else if selection.count < 6 {
+            selection.append(topicId)
+        }
+    }
+}
+
+private struct FlexibleChips<Selection: Equatable>: View {
+    let options: [SurveyOption]
+    let selection: Selection
+    let action: (SurveyOption) -> Void
+
+    var body: some View {
+        FlowLayout(spacing: 8) {
+            ForEach(options) { option in
+                Button {
+                    action(option)
+                } label: {
+                    Text(option.label)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(isSelected(option) ? .white : AppPalette.primary)
+                        .padding(.horizontal, 12)
+                        .padding(.vertical, 8)
+                        .background(isSelected(option) ? AppPalette.primary : AppPalette.primarySoft)
+                        .clipShape(Capsule())
+                        .overlay {
+                            Capsule()
+                                .stroke(AppPalette.primary.opacity(isSelected(option) ? 0 : 0.35))
+                        }
+                }
+                .buttonStyle(.plain)
+            }
+        }
+    }
+
+    private func isSelected(_ option: SurveyOption) -> Bool {
+        if let value = selection as? String {
+            return value == option.topicId
+        }
+        if let values = selection as? Set<String> {
+            return values.contains(option.topicId)
+        }
+        return false
+    }
+}
+
+private struct FlowLayout: Layout {
+    var spacing: CGFloat = 8
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        arrange(proposal: proposal, subviews: subviews).size
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let arrangement = arrange(proposal: proposal, subviews: subviews)
+        for item in arrangement.items {
+            subviews[item.index].place(
+                at: CGPoint(x: bounds.minX + item.origin.x, y: bounds.minY + item.origin.y),
+                proposal: ProposedViewSize(width: item.size.width, height: item.size.height)
+            )
+        }
+    }
+
+    private func arrange(proposal: ProposedViewSize, subviews: Subviews) -> Arrangement {
+        let maxWidth = proposal.width ?? 320
+        var x: CGFloat = 0
+        var y: CGFloat = 0
+        var lineHeight: CGFloat = 0
+        var items: [Arrangement.Item] = []
+
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            if x > 0, x + size.width > maxWidth {
+                x = 0
+                y += lineHeight + spacing
+                lineHeight = 0
+            }
+            items.append(.init(index: index, origin: CGPoint(x: x, y: y), size: size))
+            x += size.width + spacing
+            lineHeight = max(lineHeight, size.height)
+        }
+        return Arrangement(items: items, size: CGSize(width: maxWidth, height: y + lineHeight))
+    }
+
+    private struct Arrangement {
+        struct Item {
+            let index: Int
+            let origin: CGPoint
+            let size: CGSize
+        }
+
+        let items: [Item]
+        let size: CGSize
     }
 }
