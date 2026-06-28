@@ -62,6 +62,14 @@ actor APIClient {
         try await sendJSON(path: "/v1/mock-exams", method: "POST", body: payload)
     }
 
+    func applyQuestionSetAdjustment(setId: String, adjustment: DifficultyAdjustment) async throws -> QuestionSet {
+        try await sendJSON(
+            path: "/v1/question-sets/\(setId)/adjustment",
+            method: "POST",
+            body: QuestionSetAdjustmentRequest(adjustment: adjustment)
+        )
+    }
+
     func usage() async throws -> UsageStatus {
         try await send(path: "/v1/usage", method: "GET", body: nil)
     }
@@ -78,11 +86,11 @@ actor APIClient {
         try await send(path: "/v1/ad-rewards/\(nonce)", method: "GET", body: nil)
     }
 
-    func updateTargetLevel(_ targetLevel: OPIcLevel, rewardNonce: String? = nil) async throws -> TargetLevelResponse {
+    func updateInitialLevel(_ initialLevel: SelfAssessmentLevel, rewardNonce: String? = nil) async throws -> TargetLevelResponse {
         try await sendJSON(
             path: "/v1/users/me/target-level",
             method: "PUT",
-            body: TargetLevelRequest(targetLevel: targetLevel, rewardNonce: rewardNonce)
+            body: TargetLevelRequest(initialLevel: initialLevel.rawValue, rewardNonce: rewardNonce)
         )
     }
 
@@ -121,7 +129,7 @@ actor APIClient {
         form.append(name: "setId", value: questionSet.setId)
         form.append(name: "questionNumber", value: String(questionNumber))
         form.append(name: "transcript", value: transcript)
-        form.append(name: "targetLevel", value: targetLevel.rawValue)
+        form.append(name: "targetLevel", value: questionSet.expectedTargetLevel.rawValue)
         try form.append(name: "audio", fileURL: audioURL)
         form.finish()
         return try await sendMultipart(
@@ -139,7 +147,7 @@ actor APIClient {
         requestID: UUID = UUID()
     ) async throws -> MockEvaluation {
         let manifest = MockEvaluationManifest(
-            targetLevel: targetLevel,
+            targetLevel: questionSet.expectedTargetLevel,
             setId: questionSet.setId,
             rewardNonce: rewardNonce,
             answers: answers.sorted { $0.number < $1.number }.map {

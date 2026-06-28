@@ -94,13 +94,18 @@ struct RewardIntentRequest: Codable, Sendable {
 }
 
 struct TargetLevelRequest: Codable, Sendable {
-    let targetLevel: OPIcLevel
+    let initialLevel: Int
     let rewardNonce: String?
 }
 
 struct TargetLevelResponse: Codable, Sendable {
     let targetLevel: OPIcLevel
     let previousTargetLevel: OPIcLevel?
+    let initialLevel: Int
+    let previousInitialLevel: Int?
+    let latestAdjustment: DifficultyAdjustment
+    let effectiveLevel: Int
+    let effectiveLevelCode: String
     let changed: Bool
     let rewardConsumed: Bool
 }
@@ -123,7 +128,7 @@ struct MockEvaluationManifest: Codable, Sendable {
         let transcript: String
     }
 
-    let targetLevel: OPIcLevel
+    let targetLevel: OPIcLevel?
     let setId: String
     let rewardNonce: String
     let answers: [Answer]

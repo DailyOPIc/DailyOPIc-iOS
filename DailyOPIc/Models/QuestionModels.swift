@@ -96,6 +96,46 @@ struct QuestionSet: Codable, Sendable {
     let modelVersion: String
     let generatedAt: Date
     let fallbackUsed: Bool
+    let initialLevel: Int
+    let adjustment: DifficultyAdjustment?
+    let effectiveLevel: Int
+    let effectiveLevelCode: String
+    let expectedTargetLevel: OPIcLevel
+    let status: String
+    let requiresAdjustmentAfter: Int?
+    let isComplete: Bool
+
+    init(
+        setId: String,
+        setHash: String,
+        questions: [GeneratedQuestion],
+        modelVersion: String,
+        generatedAt: Date,
+        fallbackUsed: Bool,
+        initialLevel: Int = 4,
+        adjustment: DifficultyAdjustment? = nil,
+        effectiveLevel: Int = 4,
+        effectiveLevelCode: String = "4-4",
+        expectedTargetLevel: OPIcLevel = .IM2,
+        status: String = "complete",
+        requiresAdjustmentAfter: Int? = nil,
+        isComplete: Bool = true
+    ) {
+        self.setId = setId
+        self.setHash = setHash
+        self.questions = questions
+        self.modelVersion = modelVersion
+        self.generatedAt = generatedAt
+        self.fallbackUsed = fallbackUsed
+        self.initialLevel = initialLevel
+        self.adjustment = adjustment
+        self.effectiveLevel = effectiveLevel
+        self.effectiveLevelCode = effectiveLevelCode
+        self.expectedTargetLevel = expectedTargetLevel
+        self.status = status
+        self.requiresAdjustmentAfter = requiresAdjustmentAfter
+        self.isComplete = isComplete
+    }
 
     var debugTopicIDs: [String] {
         questions.map { $0.topicId ?? "nil" }
@@ -106,6 +146,8 @@ struct QuestionSet: Codable, Sendable {
         print(
             "[DailyOPIc][QuestionSet] mode=\(mode) setId=\(setId) setHash=\(setHash) "
             + "modelVersion=\(modelVersion) fallbackUsed=\(fallbackUsed) "
+            + "initialLevel=\(initialLevel) adjustment=\(adjustment?.rawValue ?? "nil") "
+            + "effectiveLevelCode=\(effectiveLevelCode) isComplete=\(isComplete) "
             + "topicIds=\(debugTopicIDs)"
         )
         if fallbackUsed {
@@ -119,22 +161,26 @@ struct QuestionSet: Codable, Sendable {
 }
 
 struct QuestionSetRequest: Codable, Sendable {
-    let targetLevel: OPIcLevel
+    let initialLevel: Int
     let background: BackgroundProfile
     let recentQuestionHashes: [String]
     let survey: BackgroundSurvey?
 
     init(
-        targetLevel: OPIcLevel,
+        initialLevel: SelfAssessmentLevel,
         background: BackgroundProfile,
         recentQuestionHashes: [String] = [],
         survey: BackgroundSurvey? = nil
     ) {
-        self.targetLevel = targetLevel
+        self.initialLevel = initialLevel.rawValue
         self.background = background
         self.recentQuestionHashes = recentQuestionHashes
         self.survey = survey
     }
+}
+
+struct QuestionSetAdjustmentRequest: Codable, Sendable {
+    let adjustment: DifficultyAdjustment
 }
 
 struct RecordedAnswer: Codable, Identifiable, Sendable {

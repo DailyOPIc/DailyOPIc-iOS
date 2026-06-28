@@ -116,13 +116,14 @@ struct DailyOPIcTests {
         )
 
         preferences.completeOnboarding(
-            level: .IH,
+            initialLevel: .level5,
             profile: BackgroundProfile(interests: ["news"], sports: ["walking"])
         )
         preferences.mockSurvey = survey
 
         let restored = AppPreferences(defaults: defaults)
         #expect(restored.hasCompletedOnboarding)
+        #expect(restored.initialLevel == .level5)
         #expect(restored.targetLevel == .IH)
         #expect(restored.backgroundProfile.interests == ["news"])
         #expect(restored.mockSurvey == survey)
@@ -131,7 +132,7 @@ struct DailyOPIcTests {
     @Test func mockRequestEncodesSurvey() throws {
         let survey = BackgroundSurvey.defaultSurvey
         let request = QuestionSetRequest(
-            targetLevel: .IM2,
+            initialLevel: .level4,
             background: BackgroundProfile(interests: ["music"]),
             survey: survey
         )
@@ -139,6 +140,7 @@ struct DailyOPIcTests {
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
         let encodedSurvey = object?["survey"] as? [String: Any]
 
+        #expect(object?["initialLevel"] as? Int == 4)
         #expect(encodedSurvey?["status"] as? String == "student")
         #expect(encodedSurvey?["residence"] as? String == "family")
         #expect((encodedSurvey?["leisure"] as? [String]) == ["movies", "music", "cafes"])
@@ -213,19 +215,24 @@ struct DailyOPIcTests {
 
     @Test func targetLevelRequestAndResponseRoundTrip() throws {
         let request = TargetLevelRequest(
-            targetLevel: .AL,
+            initialLevel: 6,
             rewardNonce: "target-level-nonce-123456"
         )
         let requestData = try JSONCoding.encoder.encode(request)
         let requestObject = try JSONSerialization.jsonObject(with: requestData) as? [String: Any]
 
-        #expect(requestObject?["targetLevel"] as? String == "AL")
+        #expect(requestObject?["initialLevel"] as? Int == 6)
         #expect(requestObject?["rewardNonce"] as? String == "target-level-nonce-123456")
 
         let responseData = """
         {
           "targetLevel": "AL",
           "previousTargetLevel": "IH",
+          "initialLevel": 6,
+          "previousInitialLevel": 5,
+          "latestAdjustment": "same",
+          "effectiveLevel": 6,
+          "effectiveLevelCode": "6-6",
           "changed": true,
           "rewardConsumed": true
         }
@@ -234,6 +241,10 @@ struct DailyOPIcTests {
 
         #expect(response.targetLevel == .AL)
         #expect(response.previousTargetLevel == .IH)
+        #expect(response.initialLevel == 6)
+        #expect(response.previousInitialLevel == 5)
+        #expect(response.latestAdjustment == .same)
+        #expect(response.effectiveLevelCode == "6-6")
         #expect(response.changed)
         #expect(response.rewardConsumed)
     }

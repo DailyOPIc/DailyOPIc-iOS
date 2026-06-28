@@ -5,7 +5,7 @@ DAILYOPIC_DEBUG_SERVER_HOST = 172.20.10.2
 DAILYOPIC_DEBUG_SERVER_PORT = 8000
 
 // xcconfig treats // as a comment, so https:/$()/ expands to https://.
-DAILYOPIC_API_BASE_URL = https:/$()/additionally-sig-andreas-castle.trycloudflare.com
+DAILYOPIC_API_BASE_URL = https:/$()/carmen-last-helicopter-asking.trycloudflare.com
 
 GAD_BANNER_AD_UNIT_ID = ca-app-pub-5460686409666356/5124626013
 GAD_REWARDED_AD_UNIT_ID = ca-app-pub-5460686409666356/7091483531

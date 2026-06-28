@@ -16,23 +16,23 @@ struct SetupView: View {
         NavigationStack {
             ZStack {
                 List {
-                    Section("목표 등급") {
+                    Section("Self Assessment") {
                         HStack {
-                            Text("현재 목표 등급")
+                            Text("현재 선택 단계")
                             Spacer()
-                            Text(preferences.targetLevel?.rawValue ?? "-")
+                            Text(preferences.initialLevel?.title ?? "-")
                                 .fontWeight(.bold)
                                 .foregroundStyle(AppPalette.primary)
                         }
-                        if let targetLevel = preferences.targetLevel {
-                            Text(targetLevel.description)
+                        if let initialLevel = preferences.initialLevel {
+                            Text("\(initialLevel.estimatedRange) · \(initialLevel.summary)")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
-                        Text("목표 등급을 변경하면 새 문제가 다시 생성되며, 변경 시 보상형 광고를 끝까지 시청해야 합니다.")
+                        Text("Self Assessment 단계를 변경하면 새 문제가 다시 생성되며, 변경 시 보상형 광고를 끝까지 시청해야 합니다.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        Button("목표 등급 설정") {
+                        Button("Self Assessment 설정") {
                             withAnimation(.easeInOut(duration: 0.18)) {
                                 showsGoalLevelDialog = true
                             }
@@ -138,23 +138,23 @@ private struct GoalLevelRoutingDialog: View {
                 Image(systemName: "target")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                Text("목표 등급을 변경할까요?")
+                Text("Self Assessment 단계를 변경할까요?")
                     .font(.title3.bold())
                     .foregroundStyle(AppPalette.ink)
                     .multilineTextAlignment(.center)
                 if let currentLevel {
-                    Text("현재 목표: \(currentLevel.rawValue)")
+                    Text("현재 예상 등급: \(currentLevel.rawValue)")
                         .font(.headline)
                         .foregroundStyle(AppPalette.primary)
                 }
-                Text("목표 등급을 바꾸면 기존 데일리 문제가 새로 생성됩니다. 등급을 최종 변경할 때 보상형 광고를 끝까지 시청해야 합니다.")
+                Text("Self Assessment 단계를 바꾸면 기존 데일리 문제가 새로 생성됩니다. 단계를 최종 변경할 때 보상형 광고를 끝까지 시청해야 합니다.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                 PrimaryButton(
-                    title: "등급 선택으로 이동",
+                    title: "단계 선택으로 이동",
                     systemImage: "arrow.right.circle.fill",
                     action: confirm
                 )

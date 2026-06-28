@@ -9,6 +9,7 @@ final class MockExamViewModel {
         case survey
         case loading
         case answering
+        case adjustment
         case readyForReward
         case analyzing
         case completed
@@ -27,6 +28,7 @@ final class MockExamViewModel {
     var evaluation: MockEvaluation?
     var errorMessage: String?
     var surveyDraft: BackgroundSurvey
+    var isApplyingAdjustment = false
 
     init(environment: AppEnvironment) {
         api = environment.api
@@ -36,9 +38,11 @@ final class MockExamViewModel {
         surveyDraft = environment.preferences.mockSurvey ?? .defaultSurvey
     }
 
-    var targetLevel: OPIcLevel { preferences.targetLevel ?? .IM2 }
+    var initialLevel: SelfAssessmentLevel { preferences.initialLevel ?? .level5 }
+    var targetLevel: OPIcLevel { questionSet?.expectedTargetLevel ?? preferences.targetLevel ?? .IM2 }
     var currentQuestion: GeneratedQuestion? { questionSet?.questions[safe: currentIndex] }
-    var progress: Double { Double(answers.count) / 15.0 }
+    var expectedQuestionCount: Int { questionSet?.questions.count ?? 15 }
+    var progress: Double { Double(answers.count) / Double(max(1, expectedQuestionCount)) }
     var savedSurvey: BackgroundSurvey? { preferences.mockSurvey }
 
     func restoreDraftIfAvailable() {
@@ -47,8 +51,12 @@ final class MockExamViewModel {
               let set = draft.questionSet else { return }
         questionSet = set
         answers = draft.answers.sorted { $0.number < $1.number }
-        currentIndex = min(answers.count, 14)
-        phase = answers.count == 15 ? .readyForReward : .answering
+        currentIndex = min(answers.count, max(0, set.questions.count - 1))
+        if !set.isComplete, answers.count >= (set.requiresAdjustmentAfter ?? 7) {
+            phase = .adjustment
+        } else {
+            phase = answers.count == 15 ? .readyForReward : .answering
+        }
     }
 
     func showSurvey() {
@@ -73,7 +81,7 @@ final class MockExamViewModel {
             preferences.mockSurvey = survey
             let set = try await api.createMockExam(
                 request: QuestionSetRequest(
-                    targetLevel: targetLevel,
+                    initialLevel: initialLevel,
                     background: preferences.backgroundProfile,
                     survey: survey
                 )
@@ -128,10 +136,13 @@ final class MockExamViewModel {
             questionSet: questionSet,
             answers: answers
         )
-        if answers.count == 15 {
+        if questionSet.requiresAdjustmentAfter == question.number,
+           !questionSet.isComplete {
+            phase = .adjustment
+        } else if answers.count == 15 {
             phase = .readyForReward
         } else {
-            currentIndex = min(currentIndex + 1, 14)
+            currentIndex = min(currentIndex + 1, max(0, questionSet.questions.count - 1))
         }
     }
 
@@ -185,6 +196,30 @@ final class MockExamViewModel {
         evaluation = nil
         errorMessage = nil
         phase = .introduction
+    }
+
+    func applyAdjustment(_ adjustment: DifficultyAdjustment) async {
+        guard let questionSet, !isApplyingAdjustment else { return }
+        isApplyingAdjustment = true
+        errorMessage = nil
+        do {
+            let updated = try await api.applyQuestionSetAdjustment(
+                setId: questionSet.setId,
+                adjustment: adjustment
+            )
+            updated.logDebugSummary(mode: "mock")
+            self.questionSet = updated
+            currentIndex = min(answers.count, max(0, updated.questions.count - 1))
+            try? persistence.saveDraft(
+                targetLevel: updated.expectedTargetLevel,
+                questionSet: updated,
+                answers: answers
+            )
+            phase = .answering
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isApplyingAdjustment = false
     }
 }
 

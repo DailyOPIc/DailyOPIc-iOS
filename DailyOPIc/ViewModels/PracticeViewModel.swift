@@ -25,6 +25,8 @@ final class PracticeViewModel {
     var evaluatedTranscript = ""
     var errorMessage: String?
     var pendingRecording: SpeechRecordingResult?
+    var showsAdjustmentDialog = false
+    var isApplyingAdjustment = false
 
     init(environment: AppEnvironment) {
         api = environment.api
@@ -33,7 +35,8 @@ final class PracticeViewModel {
         persistence = environment.persistence
     }
 
-    var targetLevel: OPIcLevel { preferences.targetLevel ?? .IM2 }
+    var initialLevel: SelfAssessmentLevel { preferences.initialLevel ?? .level5 }
+    var targetLevel: OPIcLevel { questionSet?.expectedTargetLevel ?? preferences.targetLevel ?? .IM2 }
     var currentQuestion: GeneratedQuestion? {
         guard let questions = questionSet?.questions, !questions.isEmpty else { return nil }
         return questions[questionIndex % questions.count]
@@ -51,7 +54,7 @@ final class PracticeViewModel {
             async let usageTask = api.usage()
             async let setTask = api.createPracticeSet(
                 request: QuestionSetRequest(
-                    targetLevel: targetLevel,
+                    initialLevel: initialLevel,
                     background: preferences.backgroundProfile
                 )
             )
@@ -141,6 +144,14 @@ final class PracticeViewModel {
         evaluation = nil
         evaluatedTranscript = ""
         errorMessage = nil
+        if let question = currentQuestion,
+           let questionSet,
+           questionSet.requiresAdjustmentAfter == question.number,
+           !questionSet.isComplete {
+            showsAdjustmentDialog = true
+            phase = .idle
+            return
+        }
         if let count = questionSet?.questions.count, count > 0 {
             questionIndex = (questionIndex + 1) % count
         }
@@ -154,6 +165,27 @@ final class PracticeViewModel {
     func reloadQuestions() async {
         questionSet = nil
         questionIndex = 0
+        showsAdjustmentDialog = false
         await load()
+    }
+
+    func applyAdjustment(_ adjustment: DifficultyAdjustment) async {
+        guard let questionSet, !isApplyingAdjustment else { return }
+        isApplyingAdjustment = true
+        errorMessage = nil
+        do {
+            let updated = try await api.applyQuestionSetAdjustment(
+                setId: questionSet.setId,
+                adjustment: adjustment
+            )
+            updated.logDebugSummary(mode: "practice")
+            self.questionSet = updated
+            questionIndex = min(questionIndex + 1, max(0, updated.questions.count - 1))
+            showsAdjustmentDialog = false
+            phase = .idle
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+        isApplyingAdjustment = false
     }
 }

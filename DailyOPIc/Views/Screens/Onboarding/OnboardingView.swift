@@ -2,8 +2,8 @@ import SwiftUI
 
 struct OnboardingView: View {
     let environment: AppEnvironment
-    @State private var visibleLevel: OPIcLevel
-    @State private var selectedLevel: OPIcLevel?
+    @State private var visibleLevel: SelfAssessmentLevel
+    @State private var selectedLevel: SelfAssessmentLevel?
     @State private var showsConfirmation = false
     @State private var isSubmitting = false
     @State private var progressMessage: String?
@@ -13,7 +13,7 @@ struct OnboardingView: View {
 
     init(environment: AppEnvironment) {
         self.environment = environment
-        _visibleLevel = State(initialValue: environment.preferences.targetLevel ?? .IH)
+        _visibleLevel = State(initialValue: environment.preferences.initialLevel ?? .level5)
     }
 
     var body: some View {
@@ -51,7 +51,7 @@ struct OnboardingView: View {
     private var levelSelection: some View {
         VStack(spacing: 22) {
             Spacer(minLength: 32)
-            Text(preferences.targetLevel == nil ? "목표 오픽 등급을 선택하세요" : "변경할 목표 등급을 선택하세요")
+            Text(preferences.initialLevel == nil ? "Self Assessment 단계를 선택하세요" : "변경할 Self Assessment 단계를 선택하세요")
                 .font(AppTypography.title)
                 .multilineTextAlignment(.center)
                 .foregroundStyle(AppPalette.ink)
@@ -82,7 +82,7 @@ struct OnboardingView: View {
             }
 
             TabView(selection: $visibleLevel) {
-                ForEach(OPIcLevel.allCases) { level in
+                ForEach(SelfAssessmentLevel.allCases) { level in
                     levelCard(level)
                     .padding(.horizontal, 28)
                     .tag(level)
@@ -106,27 +106,32 @@ struct OnboardingView: View {
     }
 
     private var guidanceText: String {
-        if preferences.targetLevel == nil {
-            return "선택한 목표 등급을 바탕으로 데일리 문제가 준비됩니다."
+        if preferences.initialLevel == nil {
+            return "선택한 단계로 전반 7문항을 준비하고, Q7 이후 난이도를 다시 선택합니다."
         }
-        return "목표 등급을 바꾸면 새 문제가 다시 생성됩니다. 변경하려면 보상형 광고를 끝까지 시청해야 합니다."
+        return "Self Assessment 단계를 바꾸면 새 문제가 다시 생성됩니다. 변경하려면 보상형 광고를 끝까지 시청해야 합니다."
     }
 
-    private func levelCard(_ level: OPIcLevel) -> some View {
+    private func levelCard(_ level: SelfAssessmentLevel) -> some View {
         let isSelected = selectedLevel == level
         return Button {
             guard !isSubmitting else { return }
             selectedLevel = level
         } label: {
-            VStack(spacing: 26) {
-                Text(level.rawValue)
+            VStack(spacing: 22) {
+                Text(level.title)
                     .font(.system(size: 56, weight: .bold, design: .rounded))
                     .foregroundStyle(AppPalette.primary)
-                Text(level.description)
+                Text(level.estimatedRange)
                     .font(.title3)
                     .foregroundStyle(AppPalette.primary)
                     .multilineTextAlignment(.center)
                     .frame(maxWidth: 280)
+                Text(level.summary)
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: 300)
                 Text(isSelected ? "선택됨" : "선택")
                     .font(.headline)
                     .foregroundStyle(isSelected ? .white : AppPalette.primary)
@@ -155,29 +160,29 @@ struct OnboardingView: View {
         .accessibilityAddTraits(isSelected ? .isSelected : [])
     }
 
-    private func requiresReward(for level: OPIcLevel) -> Bool {
-        guard let current = preferences.targetLevel else { return false }
+    private func requiresReward(for level: SelfAssessmentLevel) -> Bool {
+        guard let current = preferences.initialLevel else { return false }
         return current != level
     }
 
     @MainActor
-    private func submitSelection(_ level: OPIcLevel) async {
+    private func submitSelection(_ level: SelfAssessmentLevel) async {
         guard !isSubmitting else { return }
         isSubmitting = true
         errorMessage = nil
-        progressMessage = "목표 등급을 저장하는 중입니다."
-        print("[DailyOPIc][TargetLevel] update requested level=\(level.rawValue)")
+        progressMessage = "Self Assessment 단계를 저장하는 중입니다."
+        print("[DailyOPIc][TargetLevel] update requested initialLevel=\(level.rawValue)")
         do {
             try await saveTargetLevel(level, rewardNonce: nil)
             finishSelection(level)
         } catch let error as APIClientError where error.isTargetLevelChangeRewardRequired {
             print(
-                "[DailyOPIc][TargetLevel] reward required level=\(level.rawValue) "
+                "[DailyOPIc][TargetLevel] reward required initialLevel=\(level.rawValue) "
                 + "status=\(error.statusCode ?? -1) code=\(error.code ?? "missing")"
             )
             do {
                 let rewardNonce = try await rewardNonceForTargetLevelChange()
-                progressMessage = "광고 검증이 완료됐습니다. 목표 등급 변경을 다시 요청하는 중입니다."
+                progressMessage = "광고 검증이 완료됐습니다. 단계 변경을 다시 요청하는 중입니다."
                 print("[DailyOPIc][TargetLevel] retrying update with reward nonce=\(rewardNonce)")
                 try await saveTargetLevel(level, rewardNonce: rewardNonce)
                 finishSelection(level)
@@ -189,12 +194,12 @@ struct OnboardingView: View {
         }
     }
 
-    private func saveTargetLevel(_ level: OPIcLevel, rewardNonce: String?) async throws {
-        _ = try await environment.api.updateTargetLevel(level, rewardNonce: rewardNonce)
+    private func saveTargetLevel(_ level: SelfAssessmentLevel, rewardNonce: String?) async throws {
+        _ = try await environment.api.updateInitialLevel(level, rewardNonce: rewardNonce)
     }
 
     private func rewardNonceForTargetLevelChange() async throws -> String {
-        progressMessage = "목표 등급 변경 권한을 준비하는 중입니다."
+        progressMessage = "단계 변경 권한을 준비하는 중입니다."
         print("[DailyOPIc][Rewards] creating target_level_change intent")
         let intent = try await environment.api.createRewardIntent(purpose: .targetLevelChange)
         print(
@@ -218,9 +223,9 @@ struct OnboardingView: View {
         return intent.nonce
     }
 
-    private func finishSelection(_ level: OPIcLevel) {
-        print("[DailyOPIc][TargetLevel] update completed level=\(level.rawValue)")
-        preferences.completeOnboarding(level: level, profile: preferences.backgroundProfile)
+    private func finishSelection(_ level: SelfAssessmentLevel) {
+        print("[DailyOPIc][TargetLevel] update completed initialLevel=\(level.rawValue)")
+        preferences.completeOnboarding(initialLevel: level, profile: preferences.backgroundProfile)
         progressMessage = nil
         isSubmitting = false
         withAnimation(.easeOut(duration: 0.18)) {
@@ -258,7 +263,7 @@ private struct ProgressBanner: View {
 }
 
 private struct TargetLevelConfirmationDialog: View {
-    let level: OPIcLevel
+    let level: SelfAssessmentLevel
     let requiresReward: Bool
     let isSubmitting: Bool
     let confirm: () -> Void
@@ -276,11 +281,11 @@ private struct TargetLevelConfirmationDialog: View {
                 Image(systemName: requiresReward ? "play.rectangle.fill" : "checkmark.seal.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                Text(requiresReward ? "목표 등급을 변경할까요?" : "이 등급으로 시작할까요?")
+                Text(requiresReward ? "Self Assessment 단계를 변경할까요?" : "이 단계로 시작할까요?")
                     .font(.title3.bold())
                     .foregroundStyle(AppPalette.ink)
                     .multilineTextAlignment(.center)
-                Text("\(level.rawValue) 목표에 맞춰 새 문제가 준비됩니다.")
+                Text("\(level.title) · \(level.estimatedRange)에 맞춰 새 문제가 준비됩니다.")
                     .font(.headline)
                     .foregroundStyle(AppPalette.primary)
                 Text(message)
@@ -316,8 +321,8 @@ private struct TargetLevelConfirmationDialog: View {
 
     private var message: String {
         if requiresReward {
-            return "목표 등급을 바꾸면 기존 데일리 문제가 새로 생성됩니다. 보상형 광고를 끝까지 시청한 뒤 변경이 적용됩니다."
+            return "Self Assessment 단계를 바꾸면 기존 데일리 문제가 새로 생성됩니다. 보상형 광고를 끝까지 시청한 뒤 변경이 적용됩니다."
         }
-        return "선택한 등급을 기준으로 데일리 문제가 생성됩니다. 나중에 등급을 바꾸려면 보상형 광고 시청이 필요합니다."
+        return "선택한 단계를 기준으로 데일리 문제가 생성됩니다. Q7 이후 후반 난이도를 다시 선택합니다."
     }
 }

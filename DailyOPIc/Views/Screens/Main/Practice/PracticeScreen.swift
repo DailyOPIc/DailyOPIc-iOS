@@ -36,8 +36,15 @@ struct PracticeScreen: View {
         .sheet(isPresented: $showsSetup) {
             SetupView(preferences: preferences)
         }
-        .onChange(of: preferences.targetLevel) {
+        .onChange(of: preferences.initialLevel) {
             Task { await viewModel.reloadQuestions() }
+        }
+        .overlay {
+            if viewModel.showsAdjustmentDialog {
+                DifficultyAdjustmentDialog(isLoading: viewModel.isApplyingAdjustment) { adjustment in
+                    Task { await viewModel.applyAdjustment(adjustment) }
+                }
+            }
         }
         .task { await viewModel.load() }
     }
@@ -46,7 +53,7 @@ struct PracticeScreen: View {
         ScrollView {
             VStack(spacing: 22) {
                 HStack {
-                    Text("목표등급: ") + Text(viewModel.targetLevel.rawValue).foregroundStyle(AppPalette.primary)
+                    Text("Self Assessment: ") + Text(viewModel.initialLevel.title).foregroundStyle(AppPalette.primary)
                     Spacer()
                     Text(viewModel.remainingText)
                         .font(.caption.weight(.semibold))

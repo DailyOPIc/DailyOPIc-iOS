@@ -21,6 +21,8 @@ struct MockExamScreen: View {
                 ProgressView("15문항을 구성하고 있어요")
             case .answering:
                 answering
+            case .adjustment:
+                adjustment
             case .readyForReward:
                 rewardGate
             case .analyzing:
@@ -194,6 +196,24 @@ struct MockExamScreen: View {
             .padding(20)
         }
         .interactiveDismissDisabled(speech.isListening)
+    }
+
+    private var adjustment: some View {
+        ZStack {
+            Color(.systemGroupedBackground)
+                .ignoresSafeArea()
+            DifficultyAdjustmentDialog(isLoading: viewModel.isApplyingAdjustment) { adjustment in
+                Task { await viewModel.applyAdjustment(adjustment) }
+            }
+            if let message = viewModel.errorMessage {
+                VStack {
+                    ErrorBanner(message: message)
+                        .padding(.horizontal, 24)
+                    Spacer()
+                }
+                .padding(.top, 24)
+            }
+        }
     }
 
     private var rewardGate: some View {

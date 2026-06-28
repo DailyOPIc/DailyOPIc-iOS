@@ -6,6 +6,7 @@ import Observation
 final class AppPreferences {
     private enum Key {
         static let onboarding = "native_onboarding_completed"
+        static let initialLevel = "native_initial_level"
         static let targetLevel = "native_target_level"
         static let background = "native_background_profile"
         static let mockSurvey = "native_mock_background_survey"
@@ -15,6 +16,9 @@ final class AppPreferences {
 
     var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.onboarding) }
+    }
+    var initialLevel: SelfAssessmentLevel? {
+        didSet { defaults.set(initialLevel?.rawValue, forKey: Key.initialLevel) }
     }
     var targetLevel: OPIcLevel? {
         didSet { defaults.set(targetLevel?.rawValue, forKey: Key.targetLevel) }
@@ -39,8 +43,16 @@ final class AppPreferences {
 
     init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let storedTargetLevel = defaults.string(forKey: Key.targetLevel).flatMap(OPIcLevel.init(rawValue:))
+        let storedInitialLevel: SelfAssessmentLevel?
+        if let rawInitial = defaults.object(forKey: Key.initialLevel) as? Int {
+            storedInitialLevel = SelfAssessmentLevel(rawValue: rawInitial)
+        } else {
+            storedInitialLevel = SelfAssessmentLevel.from(targetLevel: storedTargetLevel)
+        }
         hasCompletedOnboarding = defaults.bool(forKey: Key.onboarding)
-        targetLevel = defaults.string(forKey: Key.targetLevel).flatMap(OPIcLevel.init(rawValue:))
+        initialLevel = storedInitialLevel
+        targetLevel = storedTargetLevel ?? storedInitialLevel?.expectedTargetLevel
         if let data = defaults.data(forKey: Key.background),
            let profile = try? JSONCoding.decoder.decode(BackgroundProfile.self, from: data) {
             backgroundProfile = profile
@@ -55,8 +67,9 @@ final class AppPreferences {
         }
     }
 
-    func completeOnboarding(level: OPIcLevel, profile: BackgroundProfile) {
-        targetLevel = level
+    func completeOnboarding(initialLevel: SelfAssessmentLevel, profile: BackgroundProfile) {
+        self.initialLevel = initialLevel
+        targetLevel = initialLevel.expectedTargetLevel
         backgroundProfile = profile
         hasCompletedOnboarding = true
     }
