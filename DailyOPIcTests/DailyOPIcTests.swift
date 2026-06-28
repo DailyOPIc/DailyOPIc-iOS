@@ -146,6 +146,22 @@ struct DailyOPIcTests {
         #expect((encodedSurvey?["leisure"] as? [String]) == ["movies", "music", "cafes"])
     }
 
+    @Test func practiceRefreshRequestEncodesSurveyAndAdjustment() throws {
+        let request = PracticeRefreshRequest(
+            initialLevel: .level5,
+            background: BackgroundProfile(interests: ["cafes"]),
+            survey: .defaultSurvey,
+            adjustment: .harder
+        )
+        let data = try JSONCoding.encoder.encode(request)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let encodedSurvey = object?["survey"] as? [String: Any]
+
+        #expect(object?["initialLevel"] as? Int == 5)
+        #expect(object?["adjustment"] as? String == "harder")
+        #expect(encodedSurvey?["status"] as? String == "student")
+    }
+
     @Test func targetLevelChangeRewardPurposeEncodesServerValue() throws {
         let request = RewardIntentRequest(purpose: .targetLevelChange, sessionHash: nil)
         let data = try JSONCoding.encoder.encode(request)
@@ -169,6 +185,22 @@ struct DailyOPIcTests {
         #expect(error.isRewardRequired)
         #expect(error.isTargetLevelChangeRewardRequired)
         #expect(error.code == "target_level_change_reward_required")
+        #expect(error.statusCode == 402)
+    }
+
+    @Test func apiClientClassifiesPracticeQuotaExhausted() throws {
+        let data = """
+        {
+          "detail": {
+            "code": "practice_quota_exhausted",
+            "message": "daily practice quota exhausted"
+          }
+        }
+        """.data(using: .utf8)!
+        let error = APIClient.makeError(status: 402, data: data)
+
+        #expect(error.isPracticeQuotaExhausted)
+        #expect(error.code == "practice_quota_exhausted")
         #expect(error.statusCode == 402)
     }
 

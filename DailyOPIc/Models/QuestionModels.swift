@@ -183,6 +183,28 @@ struct QuestionSetAdjustmentRequest: Codable, Sendable {
     let adjustment: DifficultyAdjustment
 }
 
+struct PracticeRefreshRequest: Codable, Sendable {
+    let initialLevel: Int
+    let background: BackgroundProfile
+    let recentQuestionHashes: [String]
+    let survey: BackgroundSurvey?
+    let adjustment: DifficultyAdjustment
+
+    init(
+        initialLevel: SelfAssessmentLevel,
+        background: BackgroundProfile,
+        recentQuestionHashes: [String] = [],
+        survey: BackgroundSurvey?,
+        adjustment: DifficultyAdjustment
+    ) {
+        self.initialLevel = initialLevel.rawValue
+        self.background = background
+        self.recentQuestionHashes = recentQuestionHashes
+        self.survey = survey
+        self.adjustment = adjustment
+    }
+}
+
 struct RecordedAnswer: Codable, Identifiable, Sendable {
     let number: Int
     let transcript: String

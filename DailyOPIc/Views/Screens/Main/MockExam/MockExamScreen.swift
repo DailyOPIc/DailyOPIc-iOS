@@ -4,6 +4,7 @@ struct MockExamScreen: View {
     let viewModel: MockExamViewModel
     @ObservedObject private var speech: SpeechRecognitionService
     @State private var showsResetConfirmation = false
+    @State private var showsSavedSurveyDialog = false
 
     init(viewModel: MockExamViewModel) {
         self.viewModel = viewModel
@@ -53,6 +54,18 @@ struct MockExamScreen: View {
                         viewModel.resetExam()
                     }
                 )
+            } else if showsSavedSurveyDialog {
+                SavedSurveyDialog(
+                    cancel: { showsSavedSurveyDialog = false },
+                    start: {
+                        showsSavedSurveyDialog = false
+                        Task { await viewModel.startWithSavedSurvey() }
+                    },
+                    edit: {
+                        showsSavedSurveyDialog = false
+                        viewModel.showSurvey()
+                    }
+                )
             }
         }
         .task { viewModel.restoreDraftIfAvailable() }
@@ -72,7 +85,7 @@ struct MockExamScreen: View {
                 Text("실전처럼 15문항에 답해보세요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
-                Text("OPIc 유형 기반 모의고사입니다. Background Survey 선택값을 바탕으로 자기소개, 관심 주제 콤보, 롤플레이, 비교·의견 문항을 차례로 진행합니다.")
+                Text("OPIc 유형 기반 모의고사입니다. Daily와 공통으로 쓰는 Background Survey 선택값을 바탕으로 자기소개, 관심 주제 콤보, 롤플레이, 비교·의견 문항을 차례로 진행합니다.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
@@ -81,8 +94,8 @@ struct MockExamScreen: View {
                     ErrorBanner(message: message)
                 }
                 if viewModel.savedSurvey != nil {
-                    PrimaryButton(title: "이전 설문으로 바로 시작", systemImage: "play.fill") {
-                        Task { await viewModel.startWithSavedSurvey() }
+                    PrimaryButton(title: "공통 Survey로 시작", systemImage: "play.fill") {
+                        showsSavedSurveyDialog = true
                     }
                 }
                 PrimaryButton(
@@ -301,9 +314,9 @@ private struct MockProgressHeader: View {
                 Text("\(currentQuestion) / \(totalQuestions)")
                     .font(.headline)
                 Spacer()
-                Label("노란 점: 광고 예정", systemImage: "circle.fill")
+                Label("AD: 광고 예정", systemImage: "play.rectangle.fill")
                     .font(.caption.weight(.semibold))
-                    .foregroundStyle(.yellow)
+                    .foregroundStyle(.orange)
             }
             GeometryReader { proxy in
                 let width = proxy.size.width
@@ -318,11 +331,16 @@ private struct MockProgressHeader: View {
                             height: 10
                         )
                     ForEach(adMarkers, id: \.self) { marker in
-                        Circle()
-                            .fill(Color.yellow)
-                            .frame(width: 14, height: 14)
+                        Text("AD")
+                            .font(.system(size: 9, weight: .black, design: .rounded))
+                            .foregroundStyle(.white)
+                            .padding(.horizontal, 5)
+                            .padding(.vertical, 2)
+                            .background(Color.orange)
+                            .clipShape(RoundedRectangle(cornerRadius: 4, style: .continuous))
                             .overlay {
-                                Circle().stroke(AppPalette.ink.opacity(0.28), lineWidth: 1)
+                                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                                    .stroke(Color.white.opacity(0.75), lineWidth: 1)
                             }
                             .position(
                                 x: width * CGFloat(marker) / CGFloat(totalQuestions),
@@ -334,6 +352,51 @@ private struct MockProgressHeader: View {
             }
             .frame(height: 14)
         }
+    }
+}
+
+private struct SavedSurveyDialog: View {
+    let cancel: () -> Void
+    let start: () -> Void
+    let edit: () -> Void
+
+    var body: some View {
+        ZStack {
+            Color.black.opacity(0.34)
+                .ignoresSafeArea()
+                .onTapGesture(perform: cancel)
+            VStack(spacing: 18) {
+                Image(systemName: "list.clipboard.fill")
+                    .font(.system(size: 38, weight: .semibold))
+                    .foregroundStyle(AppPalette.primary)
+                VStack(spacing: 8) {
+                    Text("공통 Survey를 그대로 사용할까요?")
+                        .font(.headline)
+                        .foregroundStyle(AppPalette.ink)
+                    Text("Daily와 모의고사는 같은 Background Survey를 사용합니다. 저장된 선택값으로 바로 시작하거나, 시험 전에 다시 수정할 수 있습니다.")
+                        .font(AppTypography.body)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .multilineTextAlignment(.center)
+                }
+                PrimaryButton(title: "그대로 시작", systemImage: "play.fill", action: start)
+                Button("Survey 수정", action: edit)
+                    .font(.headline)
+                    .foregroundStyle(AppPalette.primary)
+                Button("취소", action: cancel)
+                    .font(.headline)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            .padding(22)
+            .frame(maxWidth: 360)
+            .background(.regularMaterial)
+            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                    .stroke(Color.white.opacity(0.35), lineWidth: 1)
+            }
+            .padding(24)
+        }
+        .transition(.opacity)
     }
 }
 

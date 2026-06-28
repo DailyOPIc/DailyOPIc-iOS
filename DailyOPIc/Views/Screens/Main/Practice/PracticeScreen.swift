@@ -40,10 +40,18 @@ struct PracticeScreen: View {
             Task { await viewModel.reloadQuestions() }
         }
         .overlay {
-            if viewModel.showsAdjustmentDialog {
-                DifficultyAdjustmentDialog(isLoading: viewModel.isApplyingAdjustment) { adjustment in
-                    Task { await viewModel.applyAdjustment(adjustment) }
-                }
+            if viewModel.showsRefreshDialog {
+                DailyRefreshDialog(
+                    isLoading: viewModel.isRefreshingQuestions,
+                    progressMessage: viewModel.refreshProgressMessage,
+                    select: { adjustment in
+                        Task { await viewModel.refreshQuestions(adjustment: adjustment) }
+                    },
+                    cancel: {
+                        guard !viewModel.isRefreshingQuestions else { return }
+                        viewModel.showsRefreshDialog = false
+                    }
+                )
             }
         }
         .task { await viewModel.load() }
@@ -71,7 +79,7 @@ struct PracticeScreen: View {
                     ProgressView("맞춤 문제를 준비하고 있어요")
                         .frame(maxWidth: .infinity, minHeight: 260)
                 } else if let question = viewModel.currentQuestion {
-                    QuestionCard(question: question, showsRubricFocus: false)
+                    QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
 
                     VStack(spacing: 14) {
                         RecordingButton(

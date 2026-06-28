@@ -35,6 +35,10 @@ enum APIClientError: LocalizedError {
     var isTargetLevelChangeRewardRequired: Bool {
         isRewardRequired && code == "target_level_change_reward_required"
     }
+
+    var isPracticeQuotaExhausted: Bool {
+        statusCode == 402 && code == "practice_quota_exhausted"
+    }
 }
 
 actor APIClient {
@@ -56,6 +60,10 @@ actor APIClient {
 
     func createPracticeSet(request payload: QuestionSetRequest) async throws -> QuestionSet {
         try await sendJSON(path: "/v1/question-sets/practice", method: "POST", body: payload)
+    }
+
+    func refreshPracticeSet(request payload: PracticeRefreshRequest) async throws -> QuestionSet {
+        try await sendJSON(path: "/v1/question-sets/practice/refresh", method: "POST", body: payload)
     }
 
     func createMockExam(request payload: QuestionSetRequest) async throws -> QuestionSet {

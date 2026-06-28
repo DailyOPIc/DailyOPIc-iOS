@@ -25,8 +25,9 @@ final class PracticeViewModel {
     var evaluatedTranscript = ""
     var errorMessage: String?
     var pendingRecording: SpeechRecordingResult?
-    var showsAdjustmentDialog = false
-    var isApplyingAdjustment = false
+    var showsRefreshDialog = false
+    var isRefreshingQuestions = false
+    var refreshProgressMessage: String?
 
     init(environment: AppEnvironment) {
         api = environment.api
@@ -39,7 +40,7 @@ final class PracticeViewModel {
     var targetLevel: OPIcLevel { questionSet?.expectedTargetLevel ?? preferences.targetLevel ?? .IM2 }
     var currentQuestion: GeneratedQuestion? {
         guard let questions = questionSet?.questions, !questions.isEmpty else { return nil }
-        return questions[questionIndex % questions.count]
+        return questions[min(questionIndex, questions.count - 1)]
     }
     var remainingText: String {
         guard let usage else { return "사용량 확인 중" }
@@ -55,7 +56,8 @@ final class PracticeViewModel {
             async let setTask = api.createPracticeSet(
                 request: QuestionSetRequest(
                     initialLevel: initialLevel,
-                    background: preferences.backgroundProfile
+                    background: preferences.backgroundProfile,
+                    survey: preferences.mockSurvey ?? .defaultSurvey
                 )
             )
             usage = try await usageTask
@@ -144,16 +146,12 @@ final class PracticeViewModel {
         evaluation = nil
         evaluatedTranscript = ""
         errorMessage = nil
-        if let question = currentQuestion,
-           let questionSet,
-           questionSet.requiresAdjustmentAfter == question.number,
-           !questionSet.isComplete {
-            showsAdjustmentDialog = true
-            phase = .idle
-            return
-        }
         if let count = questionSet?.questions.count, count > 0 {
-            questionIndex = (questionIndex + 1) % count
+            if questionIndex >= count - 1 {
+                showsRefreshDialog = true
+            } else {
+                questionIndex += 1
+            }
         }
         phase = .idle
     }
@@ -165,27 +163,61 @@ final class PracticeViewModel {
     func reloadQuestions() async {
         questionSet = nil
         questionIndex = 0
-        showsAdjustmentDialog = false
+        showsRefreshDialog = false
+        refreshProgressMessage = nil
         await load()
     }
 
-    func applyAdjustment(_ adjustment: DifficultyAdjustment) async {
-        guard let questionSet, !isApplyingAdjustment else { return }
-        isApplyingAdjustment = true
+    func refreshQuestions(adjustment: DifficultyAdjustment) async {
+        guard !isRefreshingQuestions else { return }
+        isRefreshingQuestions = true
+        refreshProgressMessage = "새 Daily 문제를 준비하는 중입니다."
         errorMessage = nil
         do {
-            let updated = try await api.applyQuestionSetAdjustment(
-                setId: questionSet.setId,
-                adjustment: adjustment
-            )
-            updated.logDebugSummary(mode: "practice")
-            self.questionSet = updated
-            questionIndex = min(questionIndex + 1, max(0, updated.questions.count - 1))
-            showsAdjustmentDialog = false
-            phase = .idle
+            let updated = try await refreshAfterEnsuringToken(adjustment: adjustment)
+            applyRefreshedQuestionSet(updated)
+        } catch let error as APIClientError where error.isPracticeQuotaExhausted {
+            do {
+                refreshProgressMessage = "토큰이 부족해 리워드 광고를 준비하는 중입니다."
+                try await unlockPracticeCredits()
+                let updated = try await refreshAfterEnsuringToken(adjustment: adjustment)
+                applyRefreshedQuestionSet(updated)
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         } catch {
             errorMessage = error.localizedDescription
         }
-        isApplyingAdjustment = false
+        refreshProgressMessage = nil
+        isRefreshingQuestions = false
+    }
+
+    private func refreshAfterEnsuringToken(adjustment: DifficultyAdjustment) async throws -> QuestionSet {
+        if usage?.totalRemaining == 0 {
+            refreshProgressMessage = "토큰이 부족해 리워드 광고를 준비하는 중입니다."
+            try await unlockPracticeCredits()
+        }
+        refreshProgressMessage = "토큰 1개를 사용해 새 문제를 불러오는 중입니다."
+        let updated = try await api.refreshPracticeSet(
+            request: PracticeRefreshRequest(
+                initialLevel: initialLevel,
+                background: preferences.backgroundProfile,
+                survey: preferences.mockSurvey ?? .defaultSurvey,
+                adjustment: adjustment
+            )
+        )
+        usage = try? await api.usage()
+        return updated
+    }
+
+    private func applyRefreshedQuestionSet(_ updated: QuestionSet) {
+        updated.logDebugSummary(mode: "practice")
+        questionSet = updated
+        questionIndex = 0
+        showsRefreshDialog = false
+        evaluation = nil
+        evaluatedTranscript = ""
+        pendingRecording = nil
+        phase = .idle
     }
 }
