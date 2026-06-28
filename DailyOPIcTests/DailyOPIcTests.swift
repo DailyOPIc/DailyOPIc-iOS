@@ -59,7 +59,6 @@ struct DailyOPIcTests {
         )
         let original = QuestionSet(
             setId: "set-1",
-            setToken: "signed-token",
             setHash: "hash",
             questions: [question],
             modelVersion: "fixture",

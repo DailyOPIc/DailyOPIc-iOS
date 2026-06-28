@@ -84,12 +84,10 @@ actor APIClient {
         requestID: UUID = UUID()
     ) async throws -> PracticeEvaluation {
         var form = MultipartFormData()
-        let questions = try encoder.encode(questionSet.questions)
-        form.append(name: "questionSet", value: String(decoding: questions, as: UTF8.self))
+        form.append(name: "setId", value: questionSet.setId)
         form.append(name: "questionNumber", value: String(questionNumber))
         form.append(name: "transcript", value: transcript)
         form.append(name: "targetLevel", value: targetLevel.rawValue)
-        form.append(name: "setToken", value: questionSet.setToken)
         try form.append(name: "audio", fileURL: audioURL)
         form.finish()
         return try await sendMultipart(
@@ -108,9 +106,8 @@ actor APIClient {
     ) async throws -> MockEvaluation {
         let manifest = MockEvaluationManifest(
             targetLevel: targetLevel,
-            setToken: questionSet.setToken,
+            setId: questionSet.setId,
             rewardNonce: rewardNonce,
-            questions: questionSet.questions,
             answers: answers.sorted { $0.number < $1.number }.map {
                 .init(number: $0.number, transcript: $0.transcript)
             }

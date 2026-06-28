@@ -58,7 +58,7 @@ DAILYOPIC_DEBUG_SERVER_PORT = 8000
 
 ## Release 전에 필요한 외부 값
 
-- Firebase Console에서 `com.mark.opicmobile`의 익명 Auth와 App Check/App Attest를 활성화합니다.
+- Firebase Console에서 `com.mark.opicmobile`의 App Check/App Attest를 활성화합니다.
 - `GoogleService-Info.plist`를 `DailyOPIc/Resources/Firebase/`에 추가합니다.
 - `Config/Release.xcconfig`의 `DAILYOPIC_API_BASE_URL`을 실제 Cloud Run HTTPS URL로 교체합니다. Release에는 로컬 IP를 넣지 않습니다.
 - AdMob Console에서 운영 배너 Unit ID가 `ca-app-pub-5460686409666356/5124626013`인지 확인합니다.
@@ -68,8 +68,9 @@ DAILYOPIC_DEBUG_SERVER_PORT = 8000
 - App Store 등록 후 AdMob 앱과 App Store 앱을 연결합니다.
 - Rewarded SSV callback은 Cloud Run 배포 후 `https://<cloud-run>/v1/admob/ssv`로 설정합니다.
 
-OpenAI 키와 Firestore 관리자 권한은 iOS 앱에 포함하지 않습니다. Release에서 Firebase plist가
-없거나 App Check 토큰을 얻지 못하면 인증 단계에서 앱이 오류를 표시합니다.
+OpenAI 키와 Firestore 관리자 권한은 iOS 앱에 포함하지 않습니다. 사용자 식별은 Keychain에
+저장한 UUID를 서버에 전달하고, 요청 보호는 Firebase App Check 토큰으로 처리합니다.
+Release에서 Firebase plist가 없거나 App Check 토큰을 얻지 못하면 인증 단계에서 앱이 오류를 표시합니다.
 
 ## AdMob과 UMP 설정
 

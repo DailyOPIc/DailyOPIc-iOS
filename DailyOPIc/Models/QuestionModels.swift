@@ -91,7 +91,6 @@ struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {
 
 struct QuestionSet: Codable, Sendable {
     let setId: String
-    let setToken: String
     let setHash: String
     let questions: [GeneratedQuestion]
     let modelVersion: String

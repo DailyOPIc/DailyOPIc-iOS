@@ -110,8 +110,7 @@ struct MockEvaluationManifest: Codable, Sendable {
     }
 
     let targetLevel: OPIcLevel
-    let setToken: String
+    let setId: String
     let rewardNonce: String
-    let questions: [GeneratedQuestion]
     let answers: [Answer]
 }
