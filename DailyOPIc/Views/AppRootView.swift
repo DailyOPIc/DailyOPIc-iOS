@@ -18,7 +18,7 @@ struct AppRootView: View {
                 if environment.preferences.hasCompletedOnboarding {
                     MainTabView(environment: environment)
                 } else {
-                    OnboardingView(preferences: environment.preferences)
+                    OnboardingView(environment: environment)
                 }
             }
         }

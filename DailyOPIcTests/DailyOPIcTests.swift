@@ -117,6 +117,91 @@ struct DailyOPIcTests {
         #expect((encodedSurvey?["leisure"] as? [String]) == ["movies", "music", "cafes"])
     }
 
+    @Test func targetLevelChangeRewardPurposeEncodesServerValue() throws {
+        let request = RewardIntentRequest(purpose: .targetLevelChange, sessionHash: nil)
+        let data = try JSONCoding.encoder.encode(request)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+
+        #expect(object?["purpose"] as? String == "target_level_change")
+        #expect(object?["sessionHash"] == nil)
+    }
+
+    @Test func apiClientClassifiesTargetLevelRewardRequired() throws {
+        let data = """
+        {
+          "detail": {
+            "code": "target_level_change_reward_required",
+            "message": "verified target level change reward is required"
+          }
+        }
+        """.data(using: .utf8)!
+        let error = APIClient.makeError(status: 402, data: data)
+
+        #expect(error.isRewardRequired)
+        #expect(error.isTargetLevelChangeRewardRequired)
+        #expect(error.code == "target_level_change_reward_required")
+        #expect(error.statusCode == 402)
+    }
+
+    @Test func rewardIntentAcceptsVerifiedOrConfirmedStatus() {
+        let verified = RewardIntent(
+            nonce: "verified-nonce",
+            purpose: .targetLevelChange,
+            status: "verified",
+            userIdentifier: "user-id",
+            customData: "verified-nonce",
+            expiresAt: .now
+        )
+        let confirmed = RewardIntent(
+            nonce: "confirmed-nonce",
+            purpose: .targetLevelChange,
+            status: "confirmed",
+            userIdentifier: "user-id",
+            customData: "confirmed-nonce",
+            expiresAt: .now
+        )
+        let pending = RewardIntent(
+            nonce: "pending-nonce",
+            purpose: .targetLevelChange,
+            status: "pending",
+            userIdentifier: "user-id",
+            customData: "pending-nonce",
+            expiresAt: .now
+        )
+
+        #expect(verified.isVerified)
+        #expect(confirmed.isVerified)
+        #expect(pending.isPending)
+        #expect(!pending.isVerified)
+    }
+
+    @Test func targetLevelRequestAndResponseRoundTrip() throws {
+        let request = TargetLevelRequest(
+            targetLevel: .AL,
+            rewardNonce: "target-level-nonce-123456"
+        )
+        let requestData = try JSONCoding.encoder.encode(request)
+        let requestObject = try JSONSerialization.jsonObject(with: requestData) as? [String: Any]
+
+        #expect(requestObject?["targetLevel"] as? String == "AL")
+        #expect(requestObject?["rewardNonce"] as? String == "target-level-nonce-123456")
+
+        let responseData = """
+        {
+          "targetLevel": "AL",
+          "previousTargetLevel": "IH",
+          "changed": true,
+          "rewardConsumed": true
+        }
+        """.data(using: .utf8)!
+        let response = try JSONCoding.decoder.decode(TargetLevelResponse.self, from: responseData)
+
+        #expect(response.targetLevel == .AL)
+        #expect(response.previousTargetLevel == .IH)
+        #expect(response.changed)
+        #expect(response.rewardConsumed)
+    }
+
     private func expectedType(_ number: Int) -> QuestionType {
         switch number {
         case 1: .introduction

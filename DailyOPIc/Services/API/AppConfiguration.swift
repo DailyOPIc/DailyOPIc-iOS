@@ -23,7 +23,9 @@ enum AppConfiguration {
 
     #if DEBUG
     nonisolated static var gadTestDeviceIdentifiers: [String] {
-        configuredList(ProcessInfo.processInfo.environment["GAD_TEST_DEVICE_IDS"])
+        let environment = configuredList(ProcessInfo.processInfo.environment["GAD_TEST_DEVICE_IDS"])
+        if !environment.isEmpty { return environment }
+        return configuredList(Bundle.main.object(forInfoDictionaryKey: "GADTestDeviceIdentifiers") as? String)
     }
 
     nonisolated static var umpDebugTestDeviceIdentifiers: [String] {

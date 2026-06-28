@@ -20,7 +20,7 @@ final class AdService: NSObject, ObservableObject {
         var errorDescription: String? {
             switch self {
             case .unavailable: "리워드 광고를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
-            case .notEarned: "광고를 끝까지 시청해야 평가를 계속할 수 있습니다."
+            case .notEarned: "광고를 끝까지 시청해야 계속할 수 있습니다."
             case .privacyOptionsUnavailable: "광고 개인정보 설정을 열 수 없습니다. 잠시 후 다시 시도해 주세요."
             case .privacyOptionsNotRequired: "현재 지역 또는 AdMob 메시지 설정에서는 광고 개인정보 설정이 필요하지 않습니다."
             }
@@ -33,6 +33,7 @@ final class AdService: NSObject, ObservableObject {
 
     #if canImport(GoogleMobileAds)
     private var rewardedAd: RewardedAd?
+    private var rewardedPresentationDelegate: RewardedAdPresentationDelegate?
     private var didStartMobileAds = false
     #endif
 
@@ -113,10 +114,16 @@ final class AdService: NSObject, ObservableObject {
         ad.serverSideVerificationOptions = options
         rewardedAd = ad
         let earned = await withCheckedContinuation { continuation in
+            let delegate = RewardedAdPresentationDelegate { earned in
+                continuation.resume(returning: earned)
+            }
+            rewardedPresentationDelegate = delegate
+            ad.fullScreenContentDelegate = delegate
             ad.present(from: nil) {
-                continuation.resume(returning: true)
+                delegate.markRewardEarned()
             }
         }
+        rewardedPresentationDelegate = nil
         rewardedAd = nil
         guard earned else { throw AdError.notEarned }
         #else
@@ -227,6 +234,41 @@ final class AdService: NSObject, ObservableObject {
     }
     #endif
 }
+
+#if canImport(GoogleMobileAds)
+@MainActor
+private final class RewardedAdPresentationDelegate: NSObject, FullScreenContentDelegate {
+    private let completion: (Bool) -> Void
+    private var didComplete = false
+    private var didEarnReward = false
+
+    init(completion: @escaping (Bool) -> Void) {
+        self.completion = completion
+    }
+
+    func markRewardEarned() {
+        didEarnReward = true
+    }
+
+    func ad(
+        _ ad: FullScreenPresentingAd,
+        didFailToPresentFullScreenContentWithError error: Error
+    ) {
+        print("[DailyOPIc][Ads] rewarded ad failed to present. error=\(error.localizedDescription)")
+        complete(earned: false)
+    }
+
+    func adDidDismissFullScreenContent(_ ad: FullScreenPresentingAd) {
+        complete(earned: didEarnReward)
+    }
+
+    private func complete(earned: Bool) {
+        guard !didComplete else { return }
+        didComplete = true
+        completion(earned)
+    }
+}
+#endif
 
 private extension UIApplication {
     var topViewController: UIViewController? {

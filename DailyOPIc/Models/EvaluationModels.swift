@@ -85,11 +85,24 @@ struct UsageStatus: Codable, Sendable {
 enum RewardPurpose: String, Codable, Sendable {
     case practiceCredits = "practice_credits"
     case mockResult = "mock_result"
+    case targetLevelChange = "target_level_change"
 }
 
 struct RewardIntentRequest: Codable, Sendable {
     let purpose: RewardPurpose
     let sessionHash: String?
+}
+
+struct TargetLevelRequest: Codable, Sendable {
+    let targetLevel: OPIcLevel
+    let rewardNonce: String?
+}
+
+struct TargetLevelResponse: Codable, Sendable {
+    let targetLevel: OPIcLevel
+    let previousTargetLevel: OPIcLevel?
+    let changed: Bool
+    let rewardConsumed: Bool
 }
 
 struct RewardIntent: Codable, Sendable {
@@ -100,7 +113,8 @@ struct RewardIntent: Codable, Sendable {
     let customData: String
     let expiresAt: Date
 
-    var isVerified: Bool { status == "verified" }
+    var isVerified: Bool { status == "verified" || status == "confirmed" }
+    var isPending: Bool { status == "pending" }
 }
 
 struct MockEvaluationManifest: Codable, Sendable {
