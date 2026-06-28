@@ -88,18 +88,19 @@ actor APIClient {
 
     func waitForReward(
         nonce: String,
-        timeoutSeconds: Double = 60,
+        maxAttempts: Int = 15,
+        pollIntervalSeconds: Double = 2,
         onStatus: (@Sendable (RewardIntent) async -> Void)? = nil
     ) async throws -> RewardIntent {
-        let clock = ContinuousClock()
-        let deadline = clock.now.advanced(by: .seconds(timeoutSeconds))
-        while clock.now < deadline {
+        for attempt in 1...max(1, maxAttempts) {
             let reward = try await rewardStatus(nonce: nonce)
             if let onStatus {
                 await onStatus(reward)
             }
             if reward.isVerified { return reward }
-            try await Task.sleep(for: .seconds(1))
+            if attempt < maxAttempts {
+                try await Task.sleep(for: .seconds(pollIntervalSeconds))
+            }
         }
         throw APIClientError.server(
             status: 408,

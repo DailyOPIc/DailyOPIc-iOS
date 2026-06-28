@@ -113,7 +113,7 @@ struct RewardIntent: Codable, Sendable {
     let customData: String
     let expiresAt: Date
 
-    var isVerified: Bool { status == "verified" || status == "confirmed" }
+    var isVerified: Bool { status == "verified" || status == "confirmed" || status == "completed" }
     var isPending: Bool { status == "pending" }
 }
 

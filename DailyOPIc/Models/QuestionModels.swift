@@ -96,6 +96,26 @@ struct QuestionSet: Codable, Sendable {
     let modelVersion: String
     let generatedAt: Date
     let fallbackUsed: Bool
+
+    var debugTopicIDs: [String] {
+        questions.map { $0.topicId ?? "nil" }
+    }
+
+    func logDebugSummary(mode: String) {
+        #if DEBUG
+        print(
+            "[DailyOPIc][QuestionSet] mode=\(mode) setId=\(setId) setHash=\(setHash) "
+            + "modelVersion=\(modelVersion) fallbackUsed=\(fallbackUsed) "
+            + "topicIds=\(debugTopicIDs)"
+        )
+        if fallbackUsed {
+            print(
+                "[DailyOPIc][QuestionSet][Warning] fallbackUsed=true. "
+                + "This question set did not come from a successful OpenAI generation."
+            )
+        }
+        #endif
+    }
 }
 
 struct QuestionSetRequest: Codable, Sendable {

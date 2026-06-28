@@ -56,7 +56,9 @@ final class PracticeViewModel {
                 )
             )
             usage = try await usageTask
-            questionSet = try await setTask
+            let set = try await setTask
+            set.logDebugSummary(mode: "practice")
+            questionSet = set
             phase = .idle
         } catch {
             phase = .idle

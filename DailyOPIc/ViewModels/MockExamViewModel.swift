@@ -78,6 +78,7 @@ final class MockExamViewModel {
                     survey: survey
                 )
             )
+            set.logDebugSummary(mode: "mock")
             questionSet = set
             answers = []
             currentIndex = 0

@@ -73,6 +73,33 @@ struct DailyOPIcTests {
         #expect(decoded.fallbackUsed == false)
     }
 
+    @Test func questionSetDebugTopicIDsHandleNilValues() {
+        let question = GeneratedQuestion(
+            number: 1,
+            type: .practice,
+            comboId: nil,
+            topic: "custom topic",
+            prompt: "Describe a custom topic with a detailed example.",
+            difficulty: .IM2,
+            rubricFocus: ["organization"],
+            questionType: .description,
+            followUpPrompt: nil,
+            topicId: nil,
+            category: "practice",
+            estimatedLevel: .IM2
+        )
+        let set = QuestionSet(
+            setId: "set-1",
+            setHash: "hash",
+            questions: [question],
+            modelVersion: "test-model",
+            generatedAt: .now,
+            fallbackUsed: false
+        )
+
+        #expect(set.debugTopicIDs == ["nil"])
+    }
+
     @MainActor
     @Test func onboardingAndMockSurveyPersist() {
         let suite = "DailyOPIcTests-\(UUID().uuidString)"
@@ -168,9 +195,18 @@ struct DailyOPIcTests {
             customData: "pending-nonce",
             expiresAt: .now
         )
+        let completed = RewardIntent(
+            nonce: "completed-nonce",
+            purpose: .targetLevelChange,
+            status: "completed",
+            userIdentifier: "user-id",
+            customData: "completed-nonce",
+            expiresAt: .now
+        )
 
         #expect(verified.isVerified)
         #expect(confirmed.isVerified)
+        #expect(completed.isVerified)
         #expect(pending.isPending)
         #expect(!pending.isVerified)
     }
