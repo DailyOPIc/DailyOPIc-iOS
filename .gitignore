@@ -1,0 +1,7 @@
+DerivedData/
+build/
+xcuserdata/
+*.xcuserstate
+
+# Local developer overrides. Keep public templates in Config/*.xcconfig tracked.
+Config/*.local.xcconfig
