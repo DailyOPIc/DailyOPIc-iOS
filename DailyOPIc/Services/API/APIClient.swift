@@ -39,6 +39,10 @@ enum APIClientError: LocalizedError {
     var isPracticeQuotaExhausted: Bool {
         statusCode == 402 && code == "practice_quota_exhausted"
     }
+
+    var isAIUnavailable: Bool {
+        statusCode == 503 && code == "ai_unavailable"
+    }
 }
 
 actor APIClient {

@@ -4,6 +4,11 @@ import Observation
 @MainActor
 @Observable
 final class MockExamViewModel {
+    private struct EvaluationRetryContext {
+        let rewardNonce: String
+        let requestID: UUID
+    }
+
     enum Phase: Equatable {
         case introduction
         case survey
@@ -29,6 +34,7 @@ final class MockExamViewModel {
     var errorMessage: String?
     var surveyDraft: BackgroundSurvey
     var isApplyingAdjustment = false
+    private var evaluationRetryContext: EvaluationRetryContext?
 
     init(environment: AppEnvironment) {
         api = environment.api
@@ -44,6 +50,7 @@ final class MockExamViewModel {
     var expectedQuestionCount: Int { questionSet?.questions.count ?? 15 }
     var progress: Double { Double(answers.count) / Double(max(1, expectedQuestionCount)) }
     var savedSurvey: BackgroundSurvey? { preferences.mockSurvey }
+    var canRetryEvaluation: Bool { evaluationRetryContext != nil }
 
     func restoreDraftIfAvailable() {
         guard questionSet == nil,
@@ -77,6 +84,7 @@ final class MockExamViewModel {
         }
         phase = .loading
         errorMessage = nil
+        evaluationRetryContext = nil
         do {
             preferences.mockSurvey = survey
             let set = try await api.createMockExam(
@@ -91,6 +99,7 @@ final class MockExamViewModel {
             answers = []
             currentIndex = 0
             evaluation = nil
+            evaluationRetryContext = nil
             try persistence.saveDraft(targetLevel: targetLevel, questionSet: set, answers: [])
             phase = .answering
         } catch {
@@ -119,6 +128,7 @@ final class MockExamViewModel {
 
     private func saveAnswer(_ result: SpeechRecordingResult) {
         guard let question = currentQuestion, let questionSet else { return }
+        evaluationRetryContext = nil
         if let existing = answers.first(where: { $0.number == question.number }) {
             AudioFileService.remove(existing.audioURL)
         }
@@ -154,6 +164,10 @@ final class MockExamViewModel {
     func evaluateAfterReward() async {
         guard let questionSet, answers.count == 15 else { return }
         errorMessage = nil
+        if let evaluationRetryContext {
+            await submitEvaluation(context: evaluationRetryContext)
+            return
+        }
         do {
             let intent = try await api.createRewardIntent(
                 purpose: .mockResult,
@@ -164,12 +178,37 @@ final class MockExamViewModel {
                 customData: intent.customData
             )
             _ = try await api.waitForReward(nonce: intent.nonce)
-            phase = .analyzing
+            let context = EvaluationRetryContext(
+                rewardNonce: intent.nonce,
+                requestID: UUID()
+            )
+            evaluationRetryContext = context
+            await submitEvaluation(context: context)
+        } catch {
+            phase = .readyForReward
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    func retryEvaluation() async {
+        guard let evaluationRetryContext else {
+            await evaluateAfterReward()
+            return
+        }
+        await submitEvaluation(context: evaluationRetryContext)
+    }
+
+    private func submitEvaluation(context: EvaluationRetryContext) async {
+        guard let questionSet, answers.count == 15 else { return }
+        phase = .analyzing
+        errorMessage = nil
+        do {
             let result = try await api.evaluateMock(
                 questionSet: questionSet,
                 answers: answers,
                 targetLevel: targetLevel,
-                rewardNonce: intent.nonce
+                rewardNonce: context.rewardNonce,
+                requestID: context.requestID
             )
             evaluation = result
             try persistence.saveMock(
@@ -179,7 +218,15 @@ final class MockExamViewModel {
                 evaluation: result
             )
             AudioFileService.removeAll(answers)
+            evaluationRetryContext = nil
             phase = .completed
+        } catch let error as APIClientError where error.isAIUnavailable {
+            phase = .readyForReward
+            errorMessage = "AI 평가 생성에 실패했습니다. 같은 답변으로 다시 시도해 주세요."
+        } catch let error as APIClientError where error.isRewardRequired {
+            evaluationRetryContext = nil
+            phase = .readyForReward
+            errorMessage = error.localizedDescription
         } catch {
             phase = .readyForReward
             errorMessage = error.localizedDescription
@@ -195,6 +242,7 @@ final class MockExamViewModel {
         currentIndex = 0
         evaluation = nil
         errorMessage = nil
+        evaluationRetryContext = nil
         phase = .introduction
     }
 
@@ -209,6 +257,7 @@ final class MockExamViewModel {
             )
             updated.logDebugSummary(mode: "mock")
             self.questionSet = updated
+            evaluationRetryContext = nil
             currentIndex = min(answers.count, max(0, updated.questions.count - 1))
             try? persistence.saveDraft(
                 targetLevel: updated.expectedTargetLevel,

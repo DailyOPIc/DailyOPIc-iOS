@@ -238,14 +238,27 @@ struct MockExamScreen: View {
                 Text("15개 답변을 모두 녹음했어요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
-                Text("리워드 광고를 끝까지 시청하고 AI 종합 평가를 확인하세요. 광고 검증 전에는 평가 요청이 실행되지 않습니다.")
+                Text(
+                    viewModel.canRetryEvaluation
+                        ? "같은 답변으로 AI 종합 평가를 다시 요청합니다."
+                        : "리워드 광고를 끝까지 시청하고 AI 종합 평가를 확인하세요. 광고 검증 전에는 평가 요청이 실행되지 않습니다."
+                )
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
                     .cardStyle()
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
-                PrimaryButton(title: "광고 시청 후 종합 평가", systemImage: "play.rectangle.fill") {
-                    Task { await viewModel.evaluateAfterReward() }
+                PrimaryButton(
+                    title: viewModel.canRetryEvaluation ? "AI 평가 다시 시도" : "광고 시청 후 종합 평가",
+                    systemImage: viewModel.canRetryEvaluation ? "arrow.clockwise" : "play.rectangle.fill"
+                ) {
+                    Task {
+                        if viewModel.canRetryEvaluation {
+                            await viewModel.retryEvaluation()
+                        } else {
+                            await viewModel.evaluateAfterReward()
+                        }
+                    }
                 }
                 Button("모의고사 삭제") { viewModel.resetExam() }
                     .foregroundStyle(AppPalette.danger)

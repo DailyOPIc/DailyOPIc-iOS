@@ -1,6 +1,6 @@
 // Release must point to the production HTTPS backend.
 // Do not put a Mac local network IP here.
-DAILYOPIC_API_BASE_URL = https:/$()/REPLACE_WITH_CLOUD_RUN_URL
+DAILYOPIC_API_BASE_URL = https:/$()/dailyopic-api-992368032252.asia-northeast3.run.app
 
 GAD_BANNER_AD_UNIT_ID = ca-app-pub-5460686409666356/5124626013
 GAD_REWARDED_AD_UNIT_ID = ca-app-pub-5460686409666356/7091483531

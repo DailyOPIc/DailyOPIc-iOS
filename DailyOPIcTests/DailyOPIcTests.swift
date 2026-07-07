@@ -204,6 +204,22 @@ struct DailyOPIcTests {
         #expect(error.statusCode == 402)
     }
 
+    @Test func apiClientClassifiesAIUnavailable() throws {
+        let data = """
+        {
+          "detail": {
+            "code": "ai_unavailable",
+            "message": "AI feedback is temporarily unavailable. Please try again."
+          }
+        }
+        """.data(using: .utf8)!
+        let error = APIClient.makeError(status: 503, data: data)
+
+        #expect(error.isAIUnavailable)
+        #expect(error.code == "ai_unavailable")
+        #expect(error.statusCode == 503)
+    }
+
     @Test func rewardIntentAcceptsVerifiedOrConfirmedStatus() {
         let verified = RewardIntent(
             nonce: "verified-nonce",
