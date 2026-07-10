@@ -1,6 +1,6 @@
 import Foundation
 
-enum QuestionType: String, Codable, Sendable {
+enum ExamSection: String, Codable, Sendable {
     case introduction
     case survey
     case unexpected
@@ -22,7 +22,7 @@ enum QuestionType: String, Codable, Sendable {
     }
 }
 
-enum SurveyQuestionType: String, Codable, Sendable {
+enum QuestionStyle: String, Codable, Sendable {
     case description
     case routine
     case pastExperience = "past_experience"
@@ -46,13 +46,13 @@ enum SurveyQuestionType: String, Codable, Sendable {
 
 struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {
     let number: Int
-    let type: QuestionType
+    let examSection: ExamSection
     let comboId: String?
     let topic: String
     let prompt: String
     let difficulty: OPIcLevel
     let rubricFocus: [String]
-    let questionType: SurveyQuestionType?
+    let questionStyle: QuestionStyle?
     let followUpPrompt: String?
     let topicId: String?
     let category: String?
@@ -62,30 +62,81 @@ struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {
 
     init(
         number: Int,
-        type: QuestionType,
+        examSection: ExamSection,
         comboId: String?,
         topic: String,
         prompt: String,
         difficulty: OPIcLevel,
         rubricFocus: [String],
-        questionType: SurveyQuestionType? = nil,
+        questionStyle: QuestionStyle? = nil,
         followUpPrompt: String? = nil,
         topicId: String? = nil,
         category: String? = nil,
         estimatedLevel: OPIcLevel? = nil
     ) {
         self.number = number
-        self.type = type
+        self.examSection = examSection
         self.comboId = comboId
         self.topic = topic
         self.prompt = prompt
         self.difficulty = difficulty
         self.rubricFocus = rubricFocus
-        self.questionType = questionType
+        self.questionStyle = questionStyle
         self.followUpPrompt = followUpPrompt
         self.topicId = topicId
         self.category = category
         self.estimatedLevel = estimatedLevel
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case number
+        case examSection
+        case comboId
+        case topic
+        case prompt
+        case difficulty
+        case rubricFocus
+        case questionStyle
+        case followUpPrompt
+        case topicId
+        case category
+        case estimatedLevel
+        case legacyType = "type"
+        case legacyQuestionType = "questionType"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        number = try container.decode(Int.self, forKey: .number)
+        examSection = try container.decodeIfPresent(ExamSection.self, forKey: .examSection)
+            ?? container.decode(ExamSection.self, forKey: .legacyType)
+        comboId = try container.decodeIfPresent(String.self, forKey: .comboId)
+        topic = try container.decode(String.self, forKey: .topic)
+        prompt = try container.decode(String.self, forKey: .prompt)
+        difficulty = try container.decode(OPIcLevel.self, forKey: .difficulty)
+        rubricFocus = try container.decode([String].self, forKey: .rubricFocus)
+        questionStyle = try container.decodeIfPresent(QuestionStyle.self, forKey: .questionStyle)
+            ?? container.decodeIfPresent(QuestionStyle.self, forKey: .legacyQuestionType)
+        followUpPrompt = try container.decodeIfPresent(String.self, forKey: .followUpPrompt)
+        topicId = try container.decodeIfPresent(String.self, forKey: .topicId)
+        category = try container.decodeIfPresent(String.self, forKey: .category)
+        estimatedLevel = try container.decodeIfPresent(OPIcLevel.self, forKey: .estimatedLevel)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(number, forKey: .number)
+        try container.encode(examSection, forKey: .examSection)
+        try container.encodeIfPresent(comboId, forKey: .comboId)
+        try container.encode(topic, forKey: .topic)
+        try container.encode(prompt, forKey: .prompt)
+        try container.encode(difficulty, forKey: .difficulty)
+        try container.encode(rubricFocus, forKey: .rubricFocus)
+        try container.encodeIfPresent(questionStyle, forKey: .questionStyle)
+        try container.encodeIfPresent(followUpPrompt, forKey: .followUpPrompt)
+        try container.encodeIfPresent(topicId, forKey: .topicId)
+        try container.encodeIfPresent(category, forKey: .category)
+        try container.encodeIfPresent(estimatedLevel, forKey: .estimatedLevel)
     }
 }
 

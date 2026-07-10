@@ -101,13 +101,49 @@ struct TargetLevelRequest: Codable, Sendable {
 struct TargetLevelResponse: Codable, Sendable {
     let targetLevel: OPIcLevel
     let previousTargetLevel: OPIcLevel?
-    let initialLevel: Int
-    let previousInitialLevel: Int?
-    let latestAdjustment: DifficultyAdjustment
-    let effectiveLevel: Int
-    let effectiveLevelCode: String
+    let beforeAdjust: Int
+    let previousBeforeAdjust: Int?
+    let afterAdjust: Int
     let changed: Bool
     let rewardConsumed: Bool
+
+    private enum CodingKeys: String, CodingKey {
+        case targetLevel
+        case previousTargetLevel
+        case beforeAdjust
+        case previousBeforeAdjust
+        case afterAdjust
+        case changed
+        case rewardConsumed
+        case legacyInitialLevel = "initialLevel"
+        case legacyPreviousInitialLevel = "previousInitialLevel"
+        case legacyEffectiveLevel = "effectiveLevel"
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        targetLevel = try container.decode(OPIcLevel.self, forKey: .targetLevel)
+        previousTargetLevel = try container.decodeIfPresent(OPIcLevel.self, forKey: .previousTargetLevel)
+        beforeAdjust = try container.decodeIfPresent(Int.self, forKey: .beforeAdjust)
+            ?? container.decode(Int.self, forKey: .legacyInitialLevel)
+        previousBeforeAdjust = try container.decodeIfPresent(Int.self, forKey: .previousBeforeAdjust)
+            ?? container.decodeIfPresent(Int.self, forKey: .legacyPreviousInitialLevel)
+        afterAdjust = try container.decodeIfPresent(Int.self, forKey: .afterAdjust)
+            ?? container.decode(Int.self, forKey: .legacyEffectiveLevel)
+        changed = try container.decode(Bool.self, forKey: .changed)
+        rewardConsumed = try container.decode(Bool.self, forKey: .rewardConsumed)
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(targetLevel, forKey: .targetLevel)
+        try container.encodeIfPresent(previousTargetLevel, forKey: .previousTargetLevel)
+        try container.encode(beforeAdjust, forKey: .beforeAdjust)
+        try container.encodeIfPresent(previousBeforeAdjust, forKey: .previousBeforeAdjust)
+        try container.encode(afterAdjust, forKey: .afterAdjust)
+        try container.encode(changed, forKey: .changed)
+        try container.encode(rewardConsumed, forKey: .rewardConsumed)
+    }
 }
 
 struct RewardIntent: Codable, Sendable {

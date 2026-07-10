@@ -13,13 +13,13 @@ struct DailyOPIcTests {
         let questions = (1...15).map { number in
             GeneratedQuestion(
                 number: number,
-                type: expectedType(number),
+                examSection: expectedType(number),
                 comboId: combo(number),
                 topic: "topic-\(number)",
                 prompt: "Question \(number)",
                 difficulty: .IH,
                 rubricFocus: ["detail", "fluency"],
-                questionType: .description,
+                questionStyle: .description,
                 followUpPrompt: "Follow up \(number)",
                 topicId: topicId(number),
                 category: number == 1 ? "introduction" : "mock",
@@ -29,12 +29,12 @@ struct DailyOPIcTests {
 
         #expect(questions.count == 15)
         #expect(questions.map(\.number) == Array(1...15))
-        #expect(questions[0].type == .introduction)
-        #expect(questions[1...9].allSatisfy { $0.type == .survey })
-        #expect(questions[10...11].allSatisfy { $0.type == .roleplay })
-        #expect(questions[12].type == .unexpected)
-        #expect(questions[13].type == .comparison)
-        #expect(questions[14].type == .advanced)
+        #expect(questions[0].examSection == .introduction)
+        #expect(questions[1...9].allSatisfy { $0.examSection == .survey })
+        #expect(questions[10...11].allSatisfy { $0.examSection == .roleplay })
+        #expect(questions[12].examSection == .unexpected)
+        #expect(questions[13].examSection == .comparison)
+        #expect(questions[14].examSection == .advanced)
         #expect(Set(questions[1...3].compactMap(\.comboId)).count == 1)
         #expect(Set(questions[4...6].compactMap(\.comboId)).count == 1)
         #expect(Set(questions[7...9].compactMap(\.comboId)).count == 1)
@@ -45,13 +45,13 @@ struct DailyOPIcTests {
     @Test func questionSetRoundTripsThroughLocalJSON() throws {
         let question = GeneratedQuestion(
             number: 1,
-            type: .introduction,
+            examSection: .introduction,
             comboId: nil,
             topic: "introduction",
             prompt: "Please introduce yourself.",
             difficulty: .IM2,
             rubricFocus: ["organization"],
-            questionType: .description,
+            questionStyle: .description,
             followUpPrompt: "Add one detail.",
             topicId: "self_introduction",
             category: "introduction",
@@ -67,22 +67,28 @@ struct DailyOPIcTests {
         )
         let data = try JSONCoding.encoder.encode(original)
         let decoded = try JSONCoding.decoder.decode(QuestionSet.self, from: data)
+        let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
+        let encodedQuestion = (object?["questions"] as? [[String: Any]])?.first
 
         #expect(decoded.setId == original.setId)
         #expect(decoded.questions == original.questions)
         #expect(decoded.fallbackUsed == false)
+        #expect(encodedQuestion?["examSection"] as? String == "introduction")
+        #expect(encodedQuestion?["questionStyle"] as? String == "description")
+        #expect(encodedQuestion?["type"] == nil)
+        #expect(encodedQuestion?["questionType"] == nil)
     }
 
     @Test func questionSetDebugTopicIDsHandleNilValues() {
         let question = GeneratedQuestion(
             number: 1,
-            type: .practice,
+            examSection: .practice,
             comboId: nil,
             topic: "custom topic",
             prompt: "Describe a custom topic with a detailed example.",
             difficulty: .IM2,
             rubricFocus: ["organization"],
-            questionType: .description,
+            questionStyle: .description,
             followUpPrompt: nil,
             topicId: nil,
             category: "practice",
@@ -276,11 +282,9 @@ struct DailyOPIcTests {
         {
           "targetLevel": "AL",
           "previousTargetLevel": "IH",
-          "initialLevel": 6,
-          "previousInitialLevel": 5,
-          "latestAdjustment": "same",
-          "effectiveLevel": 6,
-          "effectiveLevelCode": "6-6",
+          "beforeAdjust": 6,
+          "previousBeforeAdjust": 5,
+          "afterAdjust": 6,
           "changed": true,
           "rewardConsumed": true
         }
@@ -289,15 +293,55 @@ struct DailyOPIcTests {
 
         #expect(response.targetLevel == .AL)
         #expect(response.previousTargetLevel == .IH)
-        #expect(response.initialLevel == 6)
-        #expect(response.previousInitialLevel == 5)
-        #expect(response.latestAdjustment == .same)
-        #expect(response.effectiveLevelCode == "6-6")
+        #expect(response.beforeAdjust == 6)
+        #expect(response.previousBeforeAdjust == 5)
+        #expect(response.afterAdjust == 6)
         #expect(response.changed)
         #expect(response.rewardConsumed)
     }
 
-    private func expectedType(_ number: Int) -> QuestionType {
+    @Test func renamedResponseFieldsDecodeLegacyPayloadsDuringDeployment() throws {
+        let targetLevelData = """
+        {
+          "targetLevel": "IH",
+          "previousTargetLevel": null,
+          "initialLevel": 5,
+          "previousInitialLevel": null,
+          "latestAdjustment": "same",
+          "effectiveLevel": 5,
+          "effectiveLevelCode": "5-5",
+          "changed": false,
+          "rewardConsumed": false
+        }
+        """.data(using: .utf8)!
+        let targetLevel = try JSONCoding.decoder.decode(TargetLevelResponse.self, from: targetLevelData)
+
+        let questionData = """
+        {
+          "number": 2,
+          "type": "survey",
+          "comboId": "survey-1",
+          "topic": "movies",
+          "prompt": "Tell me about the kinds of movies you like.",
+          "difficulty": "IH",
+          "rubricFocus": ["detail"],
+          "questionType": "description",
+          "followUpPrompt": null,
+          "topicId": "movies",
+          "category": "leisure",
+          "estimatedLevel": "IH"
+        }
+        """.data(using: .utf8)!
+        let question = try JSONCoding.decoder.decode(GeneratedQuestion.self, from: questionData)
+
+        #expect(targetLevel.beforeAdjust == 5)
+        #expect(targetLevel.previousBeforeAdjust == nil)
+        #expect(targetLevel.afterAdjust == 5)
+        #expect(question.examSection == .survey)
+        #expect(question.questionStyle == .description)
+    }
+
+    private func expectedType(_ number: Int) -> ExamSection {
         switch number {
         case 1: .introduction
         case 2...10: .survey

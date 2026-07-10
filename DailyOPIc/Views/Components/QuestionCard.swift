@@ -21,7 +21,7 @@ struct QuestionCard: View {
                     .padding(.vertical, 5)
                     .background(AppPalette.primary)
                     .clipShape(Capsule())
-                Text(question.questionType?.label ?? question.type.label)
+                Text(question.questionStyle?.label ?? question.examSection.label)
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(AppPalette.secondaryInk)
             }
