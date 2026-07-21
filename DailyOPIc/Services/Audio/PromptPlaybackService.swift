@@ -5,29 +5,25 @@ import Foundation
 @MainActor
 final class PromptPlaybackService: NSObject, ObservableObject, AVSpeechSynthesizerDelegate {
     @Published private(set) var isSpeaking = false
+    /// Question numbers whose prompt has been played at least once, so the UI can
+    /// toggle the button label between "질문 듣기" and "다시 듣기".
+    @Published private(set) var startedNumbers: Set<Int> = []
     private let synthesizer = AVSpeechSynthesizer()
-    private var playedQuestionNumbers: Set<Int> = []
-    private var replayedQuestionNumbers: Set<Int> = []
 
     override init() {
         super.init()
         synthesizer.delegate = self
     }
 
-    func playAutomatically(_ question: GeneratedQuestion) {
-        guard !playedQuestionNumbers.contains(question.number) else { return }
-        playedQuestionNumbers.insert(question.number)
+    /// Play the prompt on demand. No auto-play; callers invoke this from a button.
+    /// Replayable without limit.
+    func play(_ question: GeneratedQuestion) {
+        startedNumbers.insert(question.number)
         speak(question.prompt)
     }
 
-    func replayOnce(_ question: GeneratedQuestion) {
-        guard !replayedQuestionNumbers.contains(question.number) else { return }
-        replayedQuestionNumbers.insert(question.number)
-        speak(question.prompt)
-    }
-
-    func canReplay(_ question: GeneratedQuestion) -> Bool {
-        !replayedQuestionNumbers.contains(question.number) && !isSpeaking
+    func hasStarted(_ question: GeneratedQuestion) -> Bool {
+        startedNumbers.contains(question.number)
     }
 
     func stop() {

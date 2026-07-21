@@ -103,16 +103,26 @@ struct MockExamScreen: View {
                 if let message = viewModel.errorMessage {
                     ErrorBanner(message: message)
                 }
-                if viewModel.savedSurvey != nil {
-                    PrimaryButton(title: "저장된 설문으로 시작", systemImage: "play.fill") {
-                        showsSavedSurveyDialog = true
+                if viewModel.canResume {
+                    PrimaryButton(title: "이어서 하기", systemImage: "arrow.uturn.forward") {
+                        Task { await viewModel.resume() }
                     }
-                }
-                PrimaryButton(
-                    title: viewModel.savedSurvey == nil ? "설문 선택하고 시작" : "설문 다시 선택",
-                    systemImage: "slider.horizontal.3"
-                ) {
-                    viewModel.showSurvey()
+                    Text("진행 중인 오늘의 모의고사를 이어서 볼 수 있어요.")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .multilineTextAlignment(.center)
+                } else {
+                    if viewModel.savedSurvey != nil {
+                        PrimaryButton(title: "저장된 설문으로 시작", systemImage: "play.fill") {
+                            showsSavedSurveyDialog = true
+                        }
+                    }
+                    PrimaryButton(
+                        title: viewModel.savedSurvey == nil ? "설문 선택하고 시작" : "설문 다시 선택",
+                        systemImage: "slider.horizontal.3"
+                    ) {
+                        viewModel.showSurvey()
+                    }
                 }
                 BannerAdView().frame(height: 50)
             }
@@ -200,17 +210,13 @@ struct MockExamScreen: View {
                 MockProgressHeader(currentQuestion: viewModel.currentIndex + 1)
                 if let question = viewModel.currentQuestion {
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
-                    HStack {
-                        Label(
-                            viewModel.promptPlayback.isSpeaking ? "질문 듣는 중" : "질문 듣기",
-                            systemImage: viewModel.promptPlayback.isSpeaking ? "speaker.wave.2.fill" : "speaker.fill"
-                        )
-                        .foregroundStyle(AppPalette.secondaryInk)
-                        Spacer()
-                        Button("다시 듣기") { viewModel.replayCurrentPrompt() }
-                            .disabled(!viewModel.promptPlayback.canReplay(question) || speech.isListening)
+                    PromptPlayButton(
+                        isSpeaking: promptPlayback.isSpeaking,
+                        hasStarted: promptPlayback.hasStarted(question),
+                        isDisabled: speech.isListening
+                    ) {
+                        viewModel.playPrompt()
                     }
-                    .font(.subheadline)
                 }
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
                 RecordingButton(isRecording: speech.isListening, isDisabled: false) {
@@ -232,9 +238,6 @@ struct MockExamScreen: View {
             .padding(20)
         }
         .interactiveDismissDisabled(speech.isListening)
-        .task(id: viewModel.currentQuestion?.number) {
-            viewModel.playCurrentPromptAutomatically()
-        }
     }
 
     private var adjustment: some View {

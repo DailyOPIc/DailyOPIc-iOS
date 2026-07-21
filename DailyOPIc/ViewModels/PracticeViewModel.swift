@@ -53,6 +53,54 @@ final class PracticeViewModel {
     }
     var dailyTokenCount: Int? { usage?.totalRemaining }
 
+    /// Analysis result for a single question, kept so the user can navigate back
+    /// to an already-analyzed question and see its saved result (read-only).
+    struct AnalyzedResult {
+        let evaluation: PracticeEvaluation
+        let transcript: String
+    }
+    private var analyzedResults: [Int: AnalyzedResult] = [:]
+
+    var questionCount: Int { questionSet?.questions.count ?? 0 }
+    var analyzedNumbers: Set<Int> { Set(analyzedResults.keys) }
+    func isAnalyzed(_ number: Int) -> Bool { analyzedResults[number] != nil }
+    /// Saved result for the currently displayed question, if it was analyzed.
+    var currentResult: AnalyzedResult? {
+        guard let number = currentQuestion?.number else { return nil }
+        return analyzedResults[number]
+    }
+    var canGoPrevious: Bool { questionIndex > 0 }
+    var canGoNext: Bool { questionIndex < max(0, questionCount - 1) }
+
+    func goToQuestion(_ index: Int) {
+        guard index >= 0, index < questionCount, index != questionIndex else { return }
+        clearTransientAnswerState()
+        questionIndex = index
+        phase = .idle
+    }
+
+    func goToPrevious() {
+        guard canGoPrevious else { return }
+        goToQuestion(questionIndex - 1)
+    }
+
+    func goToNext() {
+        if canGoNext {
+            goToQuestion(questionIndex + 1)
+        } else if questionCount > 0 {
+            // Past the last question → offer a fresh set via the refresh dialog.
+            showsRefreshDialog = true
+        }
+    }
+
+    private func clearTransientAnswerState() {
+        speech.cancel()
+        promptPlayback.stop()
+        AudioFileService.remove(pendingRecording?.audioURL)
+        pendingRecording = nil
+        errorMessage = nil
+    }
+
     func load() async {
         guard questionSet == nil else { return }
         if let loadTask {
@@ -103,14 +151,9 @@ final class PracticeViewModel {
         }
     }
 
-    func playCurrentPromptAutomatically() {
+    func playPrompt() {
         guard let currentQuestion else { return }
-        promptPlayback.playAutomatically(currentQuestion)
-    }
-
-    func replayCurrentPrompt() {
-        guard let currentQuestion else { return }
-        promptPlayback.replayOnce(currentQuestion)
+        promptPlayback.play(currentQuestion)
     }
 
     func toggleRecording() async {
@@ -168,6 +211,10 @@ final class PracticeViewModel {
             )
             evaluation = result
             evaluatedTranscript = pendingRecording.transcript
+            analyzedResults[question.number] = AnalyzedResult(
+                evaluation: result,
+                transcript: pendingRecording.transcript
+            )
             try persistence.savePractice(
                 targetLevel: targetLevel,
                 question: question,
@@ -225,12 +272,14 @@ final class PracticeViewModel {
     }
 
     func nextQuestion() {
-        skipQuestion()
+        goToNext()
     }
 
     func reloadQuestions() async {
         questionSet = nil
         questionIndex = 0
+        analyzedResults = [:]
+        evaluation = nil
         showsRefreshDialog = false
         refreshProgressMessage = nil
         await load()
@@ -311,6 +360,7 @@ final class PracticeViewModel {
         updated.logDebugSummary(mode: "practice")
         questionSet = updated
         questionIndex = 0
+        analyzedResults = [:]
         showsRefreshDialog = false
         evaluation = nil
         evaluatedTranscript = ""

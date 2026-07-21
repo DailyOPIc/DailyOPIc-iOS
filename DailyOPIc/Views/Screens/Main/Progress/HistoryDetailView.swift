@@ -6,17 +6,17 @@ struct PracticeHistoryDetailView: View {
     var body: some View {
         ScrollView {
             if let evaluation = record.evaluation, let question = record.question {
-                VStack(spacing: 20) {
+                VStack(spacing: AppSpacing.md) {
                     QuestionCard(question: question, showsRubricFocus: false)
                     PracticeResultView(
                         evaluation: evaluation,
                         targetLevel: record.targetLevel,
                         transcript: record.transcript,
                         showsNextButton: false,
-                        next: {}
+                        isEmbedded: true
                     )
                 }
-                .padding(.horizontal, 20)
+                .padding(AppSpacing.lg)
             } else {
                 ContentUnavailableView("기록을 읽을 수 없어요", systemImage: "exclamationmark.triangle")
             }
@@ -30,14 +30,15 @@ struct MockHistoryDetailView: View {
     let record: MockHistoryRecord
 
     var body: some View {
-        Group {
+        ScrollView {
             if let evaluation = record.evaluation {
                 MockResultView(
                     evaluation: evaluation,
                     targetLevel: record.targetLevel,
                     showsResetButton: false,
-                    reset: {}
+                    isEmbedded: true
                 )
+                .padding(AppSpacing.lg)
             } else {
                 ContentUnavailableView("기록을 읽을 수 없어요", systemImage: "exclamationmark.triangle")
             }

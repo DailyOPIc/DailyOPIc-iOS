@@ -15,58 +15,47 @@ struct PracticeScreen: View {
     }
 
     var body: some View {
-        Group {
-            if viewModel.phase == .completed, let evaluation = viewModel.evaluation {
-                PracticeResultView(
-                    evaluation: evaluation,
-                    targetLevel: viewModel.targetLevel,
-                    transcript: viewModel.evaluatedTranscript,
-                    next: viewModel.nextQuestion
-                )
-            } else {
-                practiceBody
-            }
-        }
-        .toolbar {
-            ToolbarItem(placement: .topBarLeading) {
-                GuideEntryButton(preferences: preferences)
-            }
-            ToolbarItem(placement: .topBarTrailing) {
-                Button { showsSetup = true } label: {
-                    Image(systemName: "slider.horizontal.3")
+        practiceBody
+            .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    GuideEntryButton(preferences: preferences)
                 }
-                .accessibilityLabel("학습 설정")
-            }
-        }
-        .sheet(isPresented: $showsSetup) {
-            SetupView(preferences: preferences)
-        }
-        .onChange(of: preferences.initialLevel) {
-            Task { await viewModel.reloadQuestions() }
-        }
-        .overlay {
-            if viewModel.operationState.isRunning,
-               viewModel.phase == .analyzing || viewModel.isRefreshingQuestions {
-                AILoadingOverlay(
-                    kind: viewModel.operationKind,
-                    blocksInteraction: true,
-                    canContinueInBackground: true
-                )
-            } else if viewModel.showsRefreshDialog {
-                DailyRefreshDialog(
-                    isLoading: viewModel.isRefreshingQuestions,
-                    progressMessage: viewModel.refreshProgressMessage,
-                    select: { adjustment in
-                        Task { await viewModel.refreshQuestions(adjustment: adjustment) }
-                    },
-                    cancel: {
-                        guard !viewModel.isRefreshingQuestions else { return }
-                        viewModel.showsRefreshDialog = false
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showsSetup = true } label: {
+                        Image(systemName: "slider.horizontal.3")
                     }
-                )
+                    .accessibilityLabel("학습 설정")
+                }
             }
-        }
-        .task { await viewModel.load() }
+            .sheet(isPresented: $showsSetup) {
+                SetupView(preferences: preferences)
+            }
+            .onChange(of: preferences.initialLevel) {
+                Task { await viewModel.reloadQuestions() }
+            }
+            .overlay {
+                if viewModel.operationState.isRunning,
+                   viewModel.phase == .analyzing || viewModel.isRefreshingQuestions {
+                    AILoadingOverlay(
+                        kind: viewModel.operationKind,
+                        blocksInteraction: true,
+                        canContinueInBackground: true
+                    )
+                } else if viewModel.showsRefreshDialog {
+                    DailyRefreshDialog(
+                        isLoading: viewModel.isRefreshingQuestions,
+                        progressMessage: viewModel.refreshProgressMessage,
+                        select: { adjustment in
+                            Task { await viewModel.refreshQuestions(adjustment: adjustment) }
+                        },
+                        cancel: {
+                            guard !viewModel.isRefreshingQuestions else { return }
+                            viewModel.showsRefreshDialog = false
+                        }
+                    )
+                }
+            }
+            .task { await viewModel.load() }
     }
 
     private var practiceBody: some View {
@@ -92,6 +81,8 @@ struct PracticeScreen: View {
                     }
                     .frame(maxWidth: .infinity, minHeight: 260)
                 } else if let question = viewModel.currentQuestion {
+                    questionProgressBar
+
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
                         .id(question.number)
                         .transition(.asymmetric(
@@ -99,33 +90,13 @@ struct PracticeScreen: View {
                             removal: .opacity
                         ))
 
-                    promptControls(for: question)
-
-                    VStack(spacing: AppSpacing.md) {
-                        RecordingButton(
-                            isRecording: speech.isListening,
-                            isDisabled: viewModel.phase == .analyzing
-                        ) {
-                            Task { await viewModel.toggleRecording() }
-                        }
-                        Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
-                            .font(.title3.bold())
-                        AnswerPanel(
-                            finalText: speech.finalTranscript,
-                            partialText: speech.partialTranscript,
-                            isRecording: speech.isListening
-                        )
+                    if let result = viewModel.currentResult {
+                        savedResult(result)
+                    } else {
+                        recorder(for: question)
                     }
-                    .padding(.vertical, AppSpacing.xl)
 
-                    if viewModel.pendingRecording != nil, viewModel.phase != .analyzing {
-                        PrimaryButton(title: "분석 다시 시도", systemImage: "arrow.clockwise") {
-                            Task { await viewModel.retryEvaluation() }
-                        }
-                    }
-                    Button("다른 질문 받기") { viewModel.skipQuestion() }
-                        .buttonStyle(.bordered)
-                        .controlSize(.large)
+                    navigationControls
                 }
                 BannerAdView()
                     .frame(height: 50)
@@ -134,23 +105,114 @@ struct PracticeScreen: View {
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.currentQuestion?.number)
         }
         .refreshable { await viewModel.reloadQuestions() }
-        .task(id: viewModel.currentQuestion?.number) {
-            viewModel.playCurrentPromptAutomatically()
+    }
+
+    // MARK: - Question progress chips
+
+    private var questionProgressBar: some View {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: AppSpacing.xs) {
+                ForEach(0..<viewModel.questionCount, id: \.self) { index in
+                    let number = index + 1
+                    let isCurrent = index == viewModel.questionIndex
+                    let done = viewModel.isAnalyzed(number)
+                    Button {
+                        viewModel.goToQuestion(index)
+                    } label: {
+                        HStack(spacing: 4) {
+                            if done {
+                                Image(systemName: "checkmark.circle.fill")
+                                    .font(.caption2)
+                            }
+                            Text("Q\(number)")
+                                .font(.caption.weight(.bold))
+                        }
+                        .padding(.horizontal, AppSpacing.sm)
+                        .padding(.vertical, 6)
+                        .foregroundStyle(isCurrent ? .white : (done ? AppPalette.primary : AppPalette.secondaryInk))
+                        .background(
+                            isCurrent ? AppPalette.primary
+                                : (done ? AppPalette.primarySoft : AppPalette.surface),
+                            in: Capsule()
+                        )
+                    }
+                    .buttonStyle(PressableButtonStyle())
+                }
+            }
+            .padding(.vertical, 2)
         }
     }
 
+    // MARK: - Recorder
+
     @ViewBuilder
-    private func promptControls(for question: GeneratedQuestion) -> some View {
-        HStack {
-            Label(
-                promptPlayback.isSpeaking ? "질문 듣는 중" : "질문 듣기",
-                systemImage: promptPlayback.isSpeaking ? "speaker.wave.2.fill" : "speaker.fill"
+    private func recorder(for question: GeneratedQuestion) -> some View {
+        VStack(spacing: AppSpacing.md) {
+            PromptPlayButton(
+                isSpeaking: promptPlayback.isSpeaking,
+                hasStarted: promptPlayback.hasStarted(question),
+                isDisabled: speech.isListening
+            ) {
+                viewModel.playPrompt()
+            }
+
+            RecordingButton(
+                isRecording: speech.isListening,
+                isDisabled: viewModel.phase == .analyzing
+            ) {
+                Task { await viewModel.toggleRecording() }
+            }
+            Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
+                .font(.title3.bold())
+            AnswerPanel(
+                finalText: speech.finalTranscript,
+                partialText: speech.partialTranscript,
+                isRecording: speech.isListening
             )
-            .foregroundStyle(AppPalette.secondaryInk)
-            Spacer()
-            Button("다시 듣기") { viewModel.replayCurrentPrompt() }
-                .disabled(!promptPlayback.canReplay(question) || speech.isListening)
+
+            if viewModel.pendingRecording != nil, viewModel.phase != .analyzing {
+                PrimaryButton(title: "분석 다시 시도", systemImage: "arrow.clockwise") {
+                    Task { await viewModel.retryEvaluation() }
+                }
+            }
         }
-        .font(.subheadline)
+        .padding(.vertical, AppSpacing.md)
+    }
+
+    @ViewBuilder
+    private func savedResult(_ result: PracticeViewModel.AnalyzedResult) -> some View {
+        PracticeResultView(
+            evaluation: result.evaluation,
+            targetLevel: viewModel.targetLevel,
+            transcript: result.transcript,
+            showsNextButton: false,
+            isEmbedded: true
+        )
+    }
+
+    // MARK: - Navigation
+
+    private var navigationControls: some View {
+        HStack(spacing: AppSpacing.sm) {
+            Button {
+                viewModel.goToPrevious()
+            } label: {
+                Label("이전", systemImage: "chevron.left")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(!viewModel.canGoPrevious || speech.isListening)
+
+            Button {
+                viewModel.goToNext()
+            } label: {
+                Label(viewModel.canGoNext ? "다음" : "새 질문", systemImage: "chevron.right")
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.bordered)
+            .controlSize(.large)
+            .disabled(speech.isListening)
+        }
     }
 }

@@ -63,34 +63,74 @@ final class MockExamViewModel {
     var savedSurvey: BackgroundSurvey? { preferences.mockSurvey }
     var canRetryEvaluation: Bool { evaluationRetryContext != nil }
 
+    /// True when we're sitting on the intro but the server has an in-progress
+    /// session — used to show an explicit "이어서 하기" button.
+    var canResume: Bool {
+        phase == .introduction && session != nil && session?.stage != .completed
+    }
+
     func restoreDraftIfAvailable() async {
         guard questionSet == nil else { return }
         if let current = try? await api.currentMockSession() {
             session = current
-            questionSet = current.questionSet
             if current.stage == .completed {
-                questionSet = nil
                 errorMessage = "오늘 모의고사를 이미 완료했어요. 내일 새 모의고사가 열려요."
                 return
             }
+            await enterResume(current)
+            return
         }
+        // Offline fallback: resume purely from a valid local draft.
         guard let draft = try? persistence.latestDraft() else { return }
         guard draft.updatedAt >= Date.now.addingTimeInterval(-86_400),
               let draftSet = draft.questionSet else {
             AudioFileService.removeAll(draft.answers)
             try? persistence.clearDraft()
-            errorMessage = "24시간이 지났거나 손상된 임시 답변을 정리했습니다."
             return
         }
-        if let serverSet = questionSet,
-           serverSet.setId != draftSet.setId || serverSet.setHash != draftSet.setHash {
-            AudioFileService.removeAll(draft.answers)
-            try? persistence.clearDraft()
-            errorMessage = "이전에 저장된 답변을 정리했어요. 다시 시작해 주세요."
+        restore(set: draftSet, from: draft.answers)
+    }
+
+    /// Continue an in-progress server session. Recovers locally-saved answers when
+    /// a matching draft exists; otherwise resumes from the server's question set
+    /// (previously recorded audio can't be recovered, e.g. after reinstall).
+    func resume() async {
+        var current = session
+        if current == nil { current = try? await api.currentMockSession() }
+        guard let session = current else {
+            errorMessage = "이어서 진행할 모의고사를 찾지 못했어요."
             return
         }
-        let set = questionSet ?? draftSet
-        let validAnswers = draft.answers
+        self.session = session
+        guard session.stage != .completed else {
+            errorMessage = "오늘 모의고사를 이미 완료했어요. 내일 새 모의고사가 열려요."
+            return
+        }
+        await enterResume(session)
+    }
+
+    private func enterResume(_ session: MockSession) async {
+        var set = session.questionSet
+        if set == nil { set = (try? await api.currentMockSession())?.questionSet }
+        guard let set else {
+            phase = .introduction
+            errorMessage = "이어서 진행할 문제를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            return
+        }
+        var recovered: [RecordedAnswer] = []
+        if let draft = try? persistence.latestDraft(),
+           draft.updatedAt >= Date.now.addingTimeInterval(-86_400),
+           let ds = draft.questionSet,
+           ds.setId == set.setId, ds.setHash == set.setHash {
+            recovered = draft.answers
+        }
+        restore(set: set, from: recovered)
+    }
+
+    /// Shared restore: install the set, keep only valid recovered answers, and pick
+    /// the resume phase from how far along the answers are.
+    private func restore(set: QuestionSet, from rawAnswers: [RecordedAnswer]) {
+        let validAnswers = rawAnswers
             .filter { FileManager.default.fileExists(atPath: $0.audioPath) }
             .filter { (1...15).contains($0.number) }
             .filter { number in set.questions.contains { $0.number == number.number } }
@@ -99,11 +139,13 @@ final class MockExamViewModel {
             .compactMap { $0.value.first }
             .sorted { $0.number < $1.number }
         currentIndex = min(answers.count, max(0, set.questions.count - 1))
+        errorMessage = nil
         if !set.isComplete, answers.count >= (set.requiresAdjustmentAfter ?? 7) {
             phase = .adjustment
         } else {
             phase = answers.count == 15 ? .readyForReward : .answering
         }
+        try? persistence.saveDraft(targetLevel: targetLevel, questionSet: set, answers: answers)
     }
 
     func showSurvey() {
@@ -153,12 +195,14 @@ final class MockExamViewModel {
                 ),
                 requestID: UUID()
             )
+            // An in-progress session already exists today → resume it instead of
+            // dead-ending with a 409 error banner.
             guard session.stage == .awaitingStartAd else {
-                throw APIClientError.server(
-                    status: 409,
-                    code: "mock_session_resume_required",
-                    message: "오늘 진행 중인 모의고사가 있어요. 이어서 진행해 주세요."
-                )
+                self.session = session
+                await enterResume(session)
+                operationState = .completed
+                startOperationID = nil
+                return
             }
             let intent = try await api.createRewardIntent(
                 purpose: .mockStart,
@@ -223,14 +267,9 @@ final class MockExamViewModel {
         }
     }
 
-    func playCurrentPromptAutomatically() {
+    func playPrompt() {
         guard let currentQuestion else { return }
-        promptPlayback.playAutomatically(currentQuestion)
-    }
-
-    func replayCurrentPrompt() {
-        guard let currentQuestion else { return }
-        promptPlayback.replayOnce(currentQuestion)
+        promptPlayback.play(currentQuestion)
     }
 
     private func startAnswerTimer() {

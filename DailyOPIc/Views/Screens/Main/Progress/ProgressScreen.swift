@@ -53,7 +53,7 @@ struct ProgressScreen: View {
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 26) {
+            VStack(alignment: .leading, spacing: AppSpacing.xl) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("통계").font(AppTypography.title)
                     Text("이 기기에 저장된 나의 연습 기록이에요.")
@@ -64,89 +64,91 @@ struct ProgressScreen: View {
                     ForEach(Period.allCases) { Text($0.rawValue).tag($0) }
                 }
                 .pickerStyle(.segmented)
+
                 summary
                 if corruptRecordCount > 0 {
                     ErrorBanner(message: "불러올 수 없는 기록 \(corruptRecordCount)개가 있어요.")
                 }
                 if !distribution.isEmpty { distributionView }
+
                 HStack {
-                    VStack(alignment: .leading) {
-                        Text("최근 기록").font(.title2.bold())
-                        Text("최대 50개 연습 기록")
-                            .font(.footnote)
-                            .foregroundStyle(AppPalette.secondaryInk)
-                    }
+                    Text("최근 기록").font(AppTypography.cardTitle)
                     Spacer()
                     if !practiceRecords.isEmpty || !mockRecords.isEmpty {
                         Button("전체 삭제", role: .destructive) { showsDeleteAll = true }
-                            .buttonStyle(.bordered)
+                            .font(.subheadline.weight(.semibold))
                     }
                 }
                 records
                 BannerAdView().frame(height: 50)
             }
-            .padding(20)
+            .padding(AppSpacing.lg)
+            .animation(.easeInOut(duration: 0.25), value: period)
         }
-        .confirmationDialog("모든 로컬 기록을 삭제할까요?", isPresented: $showsDeleteAll) {
+        .confirmationDialog("모든 기록을 삭제할까요?", isPresented: $showsDeleteAll) {
             Button("전체 삭제", role: .destructive, action: deleteAll)
         }
     }
 
     private var summary: some View {
-        VStack(spacing: 12) {
-            Text("요약")
-                .font(.headline)
-                .foregroundStyle(AppPalette.primary)
-                .padding(.horizontal, 22)
-                .padding(.vertical, 9)
-                .background(AppPalette.elevatedSurface)
-                .overlay { Capsule().stroke(AppPalette.primary.opacity(0.5)) }
-                .offset(y: -22)
-            HStack(spacing: 12) {
-                summaryCell(title: "총 시도", value: "\(visiblePractice.count + visibleMock.count)회")
-                summaryCell(title: "최근 등급", value: latestLevel?.rawValue ?? "-")
+        VStack(spacing: AppSpacing.sm) {
+            HStack(spacing: AppSpacing.sm) {
+                summaryCell(title: "총 시도", value: "\(visiblePractice.count + visibleMock.count)", unit: "회")
+                summaryCell(title: "최근 등급", value: latestLevel?.rawValue ?? "-", unit: "", highlight: true)
             }
-            HStack(spacing: 12) {
-                summaryCell(title: "연습", value: "\(visiblePractice.count)회")
-                summaryCell(title: "모의고사", value: "\(visibleMock.count)회")
+            HStack(spacing: AppSpacing.sm) {
+                summaryCell(title: "연습", value: "\(visiblePractice.count)", unit: "회")
+                summaryCell(title: "모의고사", value: "\(visibleMock.count)", unit: "회")
             }
         }
-        .padding(16)
-        .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .stroke(AppPalette.primary.opacity(0.35), lineWidth: 1.5)
-        }
-        .padding(.top, 16)
     }
 
-    private func summaryCell(title: String, value: String) -> some View {
-        VStack(alignment: .leading, spacing: 10) {
+    private func summaryCell(title: String, value: String, unit: String, highlight: Bool = false) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text(title)
-                .font(.caption.weight(.semibold))
+                .font(AppTypography.caption)
                 .foregroundStyle(AppPalette.secondaryInk)
-            Text(value)
-                .font(.title2.bold())
-                .foregroundStyle(value == latestLevel?.rawValue ? AppPalette.primary : AppPalette.ink)
+            HStack(alignment: .firstTextBaseline, spacing: 2) {
+                Text(value)
+                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .foregroundStyle(highlight ? AppPalette.primary : AppPalette.ink)
+                    .contentTransition(.numericText())
+                if !unit.isEmpty {
+                    Text(unit)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+            }
         }
-        .padding(18)
-        .frame(maxWidth: .infinity, minHeight: 105, alignment: .leading)
-        .background(value == latestLevel?.rawValue ? AppPalette.primarySoft : Color(.secondarySystemBackground))
-        .clipShape(RoundedRectangle(cornerRadius: 18, style: .continuous))
+        .padding(AppSpacing.md)
+        .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
+        .background(highlight ? AppPalette.primarySoft : AppPalette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
     }
 
     private var distributionView: some View {
-        VStack(alignment: .leading, spacing: 14) {
+        let total = Double(max(1, visiblePractice.count + visibleMock.count))
+        return VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text("등급 분포").font(.headline)
             ForEach(distribution, id: \.0) { level, count in
-                HStack {
+                HStack(spacing: AppSpacing.sm) {
                     Text(level.rawValue)
                         .font(.subheadline.bold())
                         .frame(width: 40, alignment: .leading)
-                    ProgressView(value: Double(count), total: Double(max(1, visiblePractice.count + visibleMock.count)))
-                        .tint(AppPalette.primary)
+                    GeometryReader { proxy in
+                        ZStack(alignment: .leading) {
+                            Capsule().fill(Color(.tertiarySystemFill))
+                            Capsule()
+                                .fill(AppPalette.primary)
+                                .frame(width: max(8, proxy.size.width * CGFloat(Double(count) / total)))
+                                .animation(.spring(response: 0.5, dampingFraction: 0.85), value: count)
+                        }
+                    }
+                    .frame(height: 10)
                     Text("\(count)회")
                         .font(.caption.weight(.semibold))
                         .foregroundStyle(AppPalette.secondaryInk)
+                        .frame(width: 36, alignment: .trailing)
                 }
             }
         }

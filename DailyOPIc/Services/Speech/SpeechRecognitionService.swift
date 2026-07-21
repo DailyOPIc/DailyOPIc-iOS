@@ -107,12 +107,18 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
 
         do {
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+            // `.default` mode keeps Apple's speech signal processing (AGC, noise
+            // suppression) enabled, which improves recognition accuracy vs
+            // `.measurement` (which disables that processing).
+            try session.setCategory(.record, mode: .default, options: [.duckOthers])
             try session.setActive(true, options: .notifyOthersOnDeactivation)
 
             let request = SFSpeechAudioBufferRecognitionRequest()
             request.shouldReportPartialResults = true
             request.taskHint = .dictation
+            // Add sentence punctuation so the transcript reads naturally and the
+            // downstream AI evaluation gets proper sentence boundaries.
+            request.addsPunctuation = true
             recognitionRequest = request
 
             let rawURL = FileManager.default.temporaryDirectory
