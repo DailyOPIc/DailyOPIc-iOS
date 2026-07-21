@@ -1,19 +1,30 @@
 import SwiftUI
 
 struct OnboardingView: View {
+    private enum Step { case firstQuestion, guide, level }
     let environment: AppEnvironment
-    @State private var visibleLevel: SelfAssessmentLevel
     @State private var selectedLevel: SelfAssessmentLevel?
     @State private var showsConfirmation = false
     @State private var isSubmitting = false
     @State private var progressMessage: String?
     @State private var errorMessage: String?
+    @State private var updateOperationID: UUID?
+    @State private var step: Step
 
     private var preferences: AppPreferences { environment.preferences }
 
     init(environment: AppEnvironment) {
         self.environment = environment
-        _visibleLevel = State(initialValue: environment.preferences.initialLevel ?? .level5)
+        if environment.preferences.isPresentingLevelSelection {
+            _step = State(initialValue: .level)
+        } else if environment.preferences.isNewToOPIc == nil {
+            _step = State(initialValue: .firstQuestion)
+        } else if environment.preferences.isNewToOPIc == true,
+                  environment.preferences.guideState == .inProgress {
+            _step = State(initialValue: .guide)
+        } else {
+            _step = State(initialValue: .level)
+        }
     }
 
     var body: some View {
@@ -26,7 +37,17 @@ struct OnboardingView: View {
                 )
                 .ignoresSafeArea()
 
-                levelSelection
+                switch step {
+                case .firstQuestion:
+                    firstQuestion
+                case .guide:
+                    OPIcGuideView(preferences: preferences) { skipped in
+                        preferences.finishGuide(skipped: skipped)
+                        step = .level
+                    }
+                case .level:
+                    levelSelection
+                }
 
                 if showsConfirmation, let selectedLevel {
                     TargetLevelConfirmationDialog(
@@ -48,66 +69,90 @@ struct OnboardingView: View {
         }
     }
 
-    private var levelSelection: some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 32)
-            Text(preferences.initialLevel == nil ? "Self Assessment 단계를 선택하세요" : "변경할 Self Assessment 단계를 선택하세요")
+    private var firstQuestion: some View {
+        VStack(spacing: 24) {
+            Spacer()
+            Image(systemName: "questionmark.bubble.fill")
+                .font(.system(size: 58))
+                .foregroundStyle(AppPalette.primary)
+            Text("오픽 시험이 처음이신가요?")
                 .font(AppTypography.title)
                 .multilineTextAlignment(.center)
-                .foregroundStyle(AppPalette.ink)
-            Text(guidanceText)
+            Text("가이드를 건너뛰어도 Daily와 모의고사 이용에는 불이익이 없습니다.")
                 .font(AppTypography.body)
                 .foregroundStyle(AppPalette.secondaryInk)
                 .multilineTextAlignment(.center)
-                .padding(.horizontal, 24)
+            PrimaryButton(title: "네, 가이드를 볼게요", systemImage: "book.fill") {
+                preferences.isNewToOPIc = true
+                preferences.guideState = .inProgress
+                step = .guide
+            }
+            PrimaryButton(title: "아니오, 난이도를 선택할게요", systemImage: "arrow.right") {
+                preferences.isNewToOPIc = false
+                preferences.guideState = .skipped
+                step = .level
+            }
+            Spacer()
+        }
+        .padding(24)
+    }
 
-            if let message = errorMessage {
-                ErrorBanner(
-                    message: message,
-                    retry: selectedLevel.map { level in
-                        {
-                            withAnimation(.easeInOut(duration: 0.18)) {
-                                showsConfirmation = true
+    private var levelSelection: some View {
+        ScrollView {
+            VStack(spacing: 18) {
+                HStack {
+                    Spacer()
+                    GuideEntryButton(preferences: preferences)
+                }
+                Text(preferences.initialLevel == nil ? "OPIc 시작 난이도를 선택해 주세요" : "변경할 시작 난이도를 선택해 주세요")
+                    .font(AppTypography.title)
+                    .multilineTextAlignment(.center)
+                    .foregroundStyle(AppPalette.ink)
+                Text(guidanceText)
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .multilineTextAlignment(.center)
+
+                if let message = errorMessage {
+                    ErrorBanner(
+                        message: message,
+                        retry: selectedLevel.map { level in
+                            {
+                                withAnimation(.easeInOut(duration: 0.18)) {
+                                    showsConfirmation = true
+                                }
+                                Task { await submitSelection(level) }
                             }
-                            Task { await submitSelection(level) }
                         }
-                    }
-                )
-                .padding(.horizontal, 24)
-            }
+                    )
+                }
 
-            if let progressMessage {
-                ProgressBanner(message: progressMessage)
-                    .padding(.horizontal, 24)
-            }
+                if let progressMessage {
+                    ProgressBanner(message: progressMessage)
+                }
 
-            TabView(selection: $visibleLevel) {
                 ForEach(SelfAssessmentLevel.allCases) { level in
                     levelCard(level)
-                    .padding(.horizontal, 28)
-                    .tag(level)
+                }
+
+                PrimaryButton(
+                    title: selectedLevel == nil ? "단계를 선택해 주세요" : "선택한 단계 확인",
+                    systemImage: "checkmark.circle.fill",
+                    isLoading: isSubmitting,
+                    isDisabled: selectedLevel == nil || isSubmitting
+                ) {
+                    withAnimation(.easeInOut(duration: 0.18)) {
+                        showsConfirmation = true
+                    }
                 }
             }
-            .tabViewStyle(.page(indexDisplayMode: .always))
-            .frame(height: 430)
-            PrimaryButton(
-                title: selectedLevel == nil ? "등급을 선택해 주세요" : "DailyOPIc 시작",
-                systemImage: "mic.fill",
-                isLoading: isSubmitting,
-                isDisabled: selectedLevel == nil || isSubmitting
-            ) {
-                withAnimation(.easeInOut(duration: 0.18)) {
-                    showsConfirmation = true
-                }
-            }
-            .padding(.horizontal, 24)
-            Spacer(minLength: 20)
+            .padding(24)
         }
     }
 
     private var guidanceText: String {
         if preferences.initialLevel == nil {
-            return "선택한 단계로 전반 7문항을 준비하고, Q7 이후 난이도를 다시 선택합니다."
+            return "실제 시험 전 자기평가와 비슷한 학습 시작값입니다. 선택한 단계로 시작하고 Q7 이후 난이도를 한 번 조정합니다."
         }
         return "Self Assessment 단계를 바꾸면 새 문제가 다시 생성됩니다. 변경하려면 보상형 광고를 끝까지 시청해야 합니다."
     }
@@ -118,33 +163,28 @@ struct OnboardingView: View {
             guard !isSubmitting else { return }
             selectedLevel = level
         } label: {
-            VStack(spacing: 22) {
-                Text(level.title)
-                    .font(.system(size: 56, weight: .bold, design: .rounded))
+            HStack(alignment: .top, spacing: 14) {
+                Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
+                    .font(.title2)
                     .foregroundStyle(AppPalette.primary)
-                Text(level.estimatedRange)
-                    .font(.title3)
-                    .foregroundStyle(AppPalette.primary)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 280)
-                Text(level.summary)
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                    .multilineTextAlignment(.center)
-                    .frame(maxWidth: 300)
-                Text(isSelected ? "선택됨" : "선택")
-                    .font(.headline)
-                    .foregroundStyle(isSelected ? .white : AppPalette.primary)
-                    .frame(maxWidth: .infinity)
-                    .frame(height: 52)
-                    .background(isSelected ? AppPalette.primary : Color.white)
-                    .clipShape(RoundedRectangle(cornerRadius: 17, style: .continuous))
-                    .overlay {
-                        RoundedRectangle(cornerRadius: 17, style: .continuous)
-                            .stroke(AppPalette.primary.opacity(isSelected ? 0 : 0.28), lineWidth: 1)
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack {
+                        Text(level.title).font(.title2.bold())
+                        Spacer()
+                        Text(level.estimatedRange)
+                            .font(.caption.bold())
+                            .foregroundStyle(AppPalette.primary)
                     }
+                    Text(level.summary).font(AppTypography.body)
+                    Text("추천: \(recommendation(for: level))")
+                        .font(.footnote.weight(.semibold))
+                    Text("답변 예시: “\(answerExample(for: level))”")
+                        .font(.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
-            .padding(30)
+            .padding(18)
             .background(isSelected ? AppPalette.primarySoft : Color(.secondarySystemBackground))
             .overlay {
                 RoundedRectangle(cornerRadius: 28, style: .continuous)
@@ -158,6 +198,28 @@ struct OnboardingView: View {
         .buttonStyle(.plain)
         .disabled(isSubmitting)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
+    }
+
+    private func recommendation(for level: SelfAssessmentLevel) -> String {
+        switch level.rawValue {
+        case 1: "영어 문장으로 답하기를 처음 시작하는 학습자"
+        case 2: "익숙한 주제에 짧은 문장 몇 개로 답하는 학습자"
+        case 3: "일상 질문에 이유를 덧붙일 수 있는 학습자"
+        case 4: "경험을 순서대로 설명하고 싶은 학습자"
+        case 5: "구체적인 예시와 비교를 연습하는 학습자"
+        default: "복잡한 상황과 의견을 자연스럽게 확장하는 학습자"
+        }
+    }
+
+    private func answerExample(for level: SelfAssessmentLevel) -> String {
+        switch level.rawValue {
+        case 1: "I like music. It is fun."
+        case 2: "I listen to music at home because it helps me relax."
+        case 3: "Last weekend, I found a new artist and listened with my friend."
+        case 4: "What I enjoy most is discovering artists when friends recommend them."
+        case 5: "My taste has changed; I used to prefer pop, whereas I now enjoy jazz."
+        default: "Although streaming is convenient, live performances remain memorable because the audience shapes the experience."
+        }
     }
 
     private func requiresReward(for level: SelfAssessmentLevel) -> Bool {
@@ -195,13 +257,22 @@ struct OnboardingView: View {
     }
 
     private func saveTargetLevel(_ level: SelfAssessmentLevel, rewardNonce: String?) async throws {
-        _ = try await environment.api.updateInitialLevel(level, rewardNonce: rewardNonce)
+        let operationID = updateOperationID ?? UUID()
+        updateOperationID = operationID
+        _ = try await environment.api.updateInitialLevel(
+            level,
+            rewardNonce: rewardNonce,
+            requestID: operationID
+        )
     }
 
     private func rewardNonceForTargetLevelChange() async throws -> String {
         progressMessage = "단계 변경 권한을 준비하는 중입니다."
         print("[DailyOPIc][Rewards] creating target_level_change intent")
-        let intent = try await environment.api.createRewardIntent(purpose: .targetLevelChange)
+        let intent = try await environment.api.createRewardIntent(
+            purpose: .targetLevelChange,
+            requestID: UUID()
+        )
         print(
             "[DailyOPIc][Rewards] intent created nonce=\(intent.nonce) "
             + "status=\(intent.status)"
@@ -226,6 +297,8 @@ struct OnboardingView: View {
     private func finishSelection(_ level: SelfAssessmentLevel) {
         print("[DailyOPIc][TargetLevel] update completed initialLevel=\(level.rawValue)")
         preferences.completeOnboarding(initialLevel: level, profile: preferences.backgroundProfile)
+        preferences.isPresentingLevelSelection = false
+        updateOperationID = nil
         progressMessage = nil
         isSubmitting = false
         withAnimation(.easeOut(duration: 0.18)) {

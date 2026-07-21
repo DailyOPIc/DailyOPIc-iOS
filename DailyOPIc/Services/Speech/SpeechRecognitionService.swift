@@ -10,6 +10,8 @@ struct SpeechRecordingResult: Sendable {
 
 @MainActor
 final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecognizerDelegate {
+    enum RecordingState: String, Sendable { case idle, recording, processing, interrupted, failed }
+    enum PermissionState: String, Sendable { case unknown, granted, denied }
     enum SpeechError: LocalizedError {
         case permissionDenied
         case unavailable
@@ -31,8 +33,13 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
     }
 
     @Published private(set) var transcript = ""
+    @Published private(set) var partialTranscript = ""
+    @Published private(set) var finalTranscript = ""
     @Published private(set) var isListening = false
     @Published private(set) var errorMessage: String?
+    @Published private(set) var recordingState: RecordingState = .idle
+    @Published private(set) var permissionState: PermissionState = .unknown
+    @Published private(set) var interruptionReason: String?
 
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private let audioEngine = AVAudioEngine()
@@ -40,10 +47,17 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
     private var recognitionTask: SFSpeechRecognitionTask?
     private var audioFile: AVAudioFile?
     private var rawAudioURL: URL?
+    private var tapInstalled = false
 
     override init() {
         super.init()
         recognizer?.delegate = self
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleInterruption),
+            name: AVAudioSession.interruptionNotification,
+            object: AVAudioSession.sharedInstance()
+        )
     }
 
     func preparePermissions() async -> Bool {
@@ -76,7 +90,9 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
         @unknown default:
             microphoneAuthorized = false
         }
-        return speechAuthorized && microphoneAuthorized
+        let granted = speechAuthorized && microphoneAuthorized
+        permissionState = granted ? .granted : .denied
+        return granted
     }
 
     func start() async throws {
@@ -84,55 +100,78 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
         guard recognizer?.isAvailable == true else { throw SpeechError.unavailable }
         cleanupRecognition()
         transcript = ""
+        partialTranscript = ""
+        finalTranscript = ""
         errorMessage = nil
+        interruptionReason = nil
 
-        let session = AVAudioSession.sharedInstance()
-        try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
-        try session.setActive(true, options: .notifyOthersOnDeactivation)
+        do {
+            let session = AVAudioSession.sharedInstance()
+            try session.setCategory(.record, mode: .measurement, options: [.duckOthers])
+            try session.setActive(true, options: .notifyOthersOnDeactivation)
 
-        let request = SFSpeechAudioBufferRecognitionRequest()
-        request.shouldReportPartialResults = true
-        request.taskHint = .dictation
-        recognitionRequest = request
+            let request = SFSpeechAudioBufferRecognitionRequest()
+            request.shouldReportPartialResults = true
+            request.taskHint = .dictation
+            recognitionRequest = request
 
-        let rawURL = FileManager.default.temporaryDirectory
-            .appendingPathComponent("dailyopic-\(UUID().uuidString)")
-            .appendingPathExtension("caf")
-        rawAudioURL = rawURL
+            let rawURL = FileManager.default.temporaryDirectory
+                .appendingPathComponent("dailyopic-\(UUID().uuidString)")
+                .appendingPathExtension("caf")
+            rawAudioURL = rawURL
 
-        let input = audioEngine.inputNode
-        let format = input.outputFormat(forBus: 0)
-        audioFile = try AVAudioFile(forWriting: rawURL, settings: format.settings)
-        input.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, _ in
-            guard let self else { return }
-            request.append(buffer)
-            try? self.audioFile?.write(from: buffer)
-        }
+            let input = audioEngine.inputNode
+            let format = input.outputFormat(forBus: 0)
+            audioFile = try AVAudioFile(forWriting: rawURL, settings: format.settings)
+            input.installTap(onBus: 0, bufferSize: 1_024, format: format) { [weak self] buffer, _ in
+                guard let self else { return }
+                request.append(buffer)
+                try? self.audioFile?.write(from: buffer)
+            }
+            tapInstalled = true
 
-        recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, error in
-            Task { @MainActor in
-                if let result {
-                    self?.transcript = result.bestTranscription.formattedString
-                }
-                if let error, self?.isListening == true {
-                    self?.errorMessage = error.localizedDescription
+            recognitionTask = recognizer?.recognitionTask(with: request) { [weak self] result, error in
+                Task { @MainActor in
+                    if let result {
+                        self?.transcript = result.bestTranscription.formattedString
+                        if result.isFinal {
+                            self?.finalTranscript = result.bestTranscription.formattedString
+                            self?.partialTranscript = ""
+                        } else {
+                            self?.partialTranscript = result.bestTranscription.formattedString
+                        }
+                    }
+                    if let error, self?.isListening == true {
+                        self?.errorMessage = error.localizedDescription
+                    }
                 }
             }
+            audioEngine.prepare()
+            try audioEngine.start()
+            isListening = true
+            recordingState = .recording
+        } catch {
+            if audioEngine.isRunning { audioEngine.stop() }
+            removeTapIfNeeded()
+            if let rawAudioURL { try? FileManager.default.removeItem(at: rawAudioURL) }
+            cleanupRecognition()
+            deactivateAudioSession()
+            isListening = false
+            recordingState = .failed
+            throw error
         }
-        audioEngine.prepare()
-        try audioEngine.start()
-        isListening = true
     }
 
     func stop() async throws -> SpeechRecordingResult {
         guard isListening, let rawAudioURL else { throw SpeechError.audioFailure }
+        recordingState = .processing
         audioEngine.stop()
-        audioEngine.inputNode.removeTap(onBus: 0)
+        removeTapIfNeeded()
         recognitionRequest?.endAudio()
         recognitionTask?.finish()
         audioFile = nil
         isListening = false
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        deactivateAudioSession()
 
         try await Task.sleep(for: .milliseconds(250))
         let normalized = transcript.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -143,18 +182,23 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
         let compressed = try await compressToM4A(rawAudioURL)
         try? FileManager.default.removeItem(at: rawAudioURL)
         cleanupRecognition()
+        recordingState = .idle
         return SpeechRecordingResult(transcript: normalized, audioURL: compressed)
     }
 
     func cancel() {
         if audioEngine.isRunning {
             audioEngine.stop()
-            audioEngine.inputNode.removeTap(onBus: 0)
         }
+        removeTapIfNeeded()
         if let rawAudioURL { try? FileManager.default.removeItem(at: rawAudioURL) }
         cleanupRecognition()
         isListening = false
         transcript = ""
+        partialTranscript = ""
+        finalTranscript = ""
+        recordingState = .idle
+        deactivateAudioSession()
     }
 
     private func cleanupRecognition() {
@@ -163,6 +207,28 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
         recognitionRequest = nil
         audioFile = nil
         rawAudioURL = nil
+    }
+
+    private func removeTapIfNeeded() {
+        guard tapInstalled else { return }
+        audioEngine.inputNode.removeTap(onBus: 0)
+        tapInstalled = false
+    }
+
+    private func deactivateAudioSession() {
+        try? AVAudioSession.sharedInstance().setActive(
+            false,
+            options: .notifyOthersOnDeactivation
+        )
+    }
+
+    @objc private func handleInterruption(_ notification: Notification) {
+        guard isListening else { return }
+        interruptionReason = "통화 또는 다른 오디오로 녹음이 중단됐습니다. 같은 문항에서 다시 시작해 주세요."
+        recordingState = .interrupted
+        errorMessage = interruptionReason
+        cancel()
+        recordingState = .interrupted
     }
 
     private func compressToM4A(_ source: URL) async throws -> URL {

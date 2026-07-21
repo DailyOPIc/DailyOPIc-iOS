@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		F30000000000000000000001 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000001 /* FirebaseCore */; };
+		F30000000000000000000002 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000002 /* FirebaseAuth */; };
 		F30000000000000000000003 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000003 /* FirebaseAppCheck */; };
 		F30000000000000000000004 /* GoogleMobileAds in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000004 /* GoogleMobileAds */; };
 /* End PBXBuildFile section */
@@ -76,6 +77,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F30000000000000000000001 /* FirebaseCore in Frameworks */,
+				F30000000000000000000002 /* FirebaseAuth in Frameworks */,
 				F30000000000000000000003 /* FirebaseAppCheck in Frameworks */,
 				F30000000000000000000004 /* GoogleMobileAds in Frameworks */,
 			);
@@ -141,6 +143,7 @@
 			name = DailyOPIc;
 			packageProductDependencies = (
 				F20000000000000000000001 /* FirebaseCore */,
+				F20000000000000000000002 /* FirebaseAuth */,
 				F20000000000000000000003 /* FirebaseAppCheck */,
 				F20000000000000000000004 /* GoogleMobileAds */,
 			);
@@ -644,6 +647,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F10000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
 			productName = FirebaseCore;
+		};
+		F20000000000000000000002 /* FirebaseAuth */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F10000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */;
+			productName = FirebaseAuth;
 		};
 		F20000000000000000000003 /* FirebaseAppCheck */ = {
 			isa = XCSwiftPackageProductDependency;

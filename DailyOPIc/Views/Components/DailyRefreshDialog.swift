@@ -15,14 +15,14 @@ struct DailyRefreshDialog: View {
                 }
 
             VStack(spacing: 18) {
-                Image(systemName: "ticket.fill")
+                Image(systemName: "play.rectangle.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
                 VStack(spacing: 8) {
-                    Text("토큰 1개를 사용할까요?")
+                    Text("광고를 보고 새 질문을 받을까요?")
                         .font(.title3.bold())
                         .foregroundStyle(AppPalette.ink)
-                    Text("새 Daily 문제를 불러오려면 토큰 1개가 소모됩니다. 원하는 난이도를 선택하면 바로 다음 문제 풀이를 이어갈 수 있습니다.")
+                    Text("질문 새로고침은 분석 횟수를 사용하지 않습니다. 광고를 끝까지 시청하고 원하는 난이도의 새 질문을 받습니다.")
                         .font(AppTypography.body)
                         .foregroundStyle(AppPalette.secondaryInk)
                         .multilineTextAlignment(.center)

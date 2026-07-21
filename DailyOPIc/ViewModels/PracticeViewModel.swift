@@ -28,6 +28,14 @@ final class PracticeViewModel {
     var showsRefreshDialog = false
     var isRefreshingQuestions = false
     var refreshProgressMessage: String?
+    var operationState: AsyncOperationState = .idle
+    var operationKind: AsyncOperationKind = .dataLoading
+    private var loadTask: Task<Void, Never>?
+    private var evaluationTask: Task<Void, Never>?
+    private var refreshTask: Task<Void, Never>?
+    private var loadOperationID = UUID()
+    private var evaluationOperationID: UUID?
+    private var refreshOperationID: UUID?
 
     init(environment: AppEnvironment) {
         api = environment.api
@@ -44,12 +52,28 @@ final class PracticeViewModel {
     }
     var remainingText: String {
         guard let usage else { return "사용량 확인 중" }
-        return "무료 \(usage.freeRemaining) · 광고 보너스 \(usage.bonusRemaining)"
+        return "데일리 분석 남은 횟수: \(usage.totalRemaining)회"
     }
 
     func load() async {
         guard questionSet == nil else { return }
+        if let loadTask {
+            await loadTask.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performLoad()
+        }
+        loadTask = task
+        await task.value
+        loadTask = nil
+    }
+
+    private func performLoad() async {
         phase = .loading
+        operationKind = .dataLoading
+        operationState = .running(operationId: loadOperationID, startedAt: .now)
         errorMessage = nil
         do {
             async let usageTask = api.usage()
@@ -58,16 +82,26 @@ final class PracticeViewModel {
                     initialLevel: initialLevel,
                     background: preferences.backgroundProfile,
                     survey: preferences.mockSurvey ?? .defaultSurvey
-                )
+                ),
+                requestID: loadOperationID
             )
             usage = try await usageTask
             let set = try await setTask
             set.logDebugSummary(mode: "practice")
             questionSet = set
             phase = .idle
+            operationState = .completed
+            loadOperationID = UUID()
+        } catch is CancellationError {
+            phase = .idle
+            operationState = .idle
         } catch {
             phase = .idle
             errorMessage = error.localizedDescription
+            operationState = .recoverableFailure(
+                operationId: loadOperationID,
+                message: error.localizedDescription
+            )
         }
     }
 
@@ -90,11 +124,18 @@ final class PracticeViewModel {
     }
 
     func retryEvaluation() async {
-        do {
-            try await evaluatePendingRecording()
-        } catch {
-            errorMessage = error.localizedDescription
+        if let evaluationTask {
+            await evaluationTask.value
+            return
         }
+        let task = Task { @MainActor [weak self] in
+            do { try await self?.evaluatePendingRecording() }
+            catch is CancellationError { }
+            catch { self?.errorMessage = error.localizedDescription }
+        }
+        evaluationTask = task
+        await task.value
+        evaluationTask = nil
     }
 
     private func evaluatePendingRecording() async throws {
@@ -103,13 +144,18 @@ final class PracticeViewModel {
             try await unlockPracticeCredits()
         }
         phase = .analyzing
+        operationKind = .speechAnalysis
+        let operationID = evaluationOperationID ?? UUID()
+        evaluationOperationID = operationID
+        operationState = .running(operationId: operationID, startedAt: .now)
         do {
             let result = try await api.evaluatePractice(
                 questionSet: questionSet,
                 questionNumber: question.number,
                 transcript: pendingRecording.transcript,
                 targetLevel: targetLevel,
-                audioURL: pendingRecording.audioURL
+                audioURL: pendingRecording.audioURL,
+                requestID: operationID
             )
             evaluation = result
             evaluatedTranscript = pendingRecording.transcript
@@ -123,14 +169,27 @@ final class PracticeViewModel {
             self.pendingRecording = nil
             usage = try? await api.usage()
             phase = .completed
+            operationState = .completed
+            evaluationOperationID = nil
+        } catch is CancellationError {
+            phase = .idle
+            operationState = .idle
+            throw CancellationError()
         } catch {
             phase = .idle
+            operationState = .recoverableFailure(
+                operationId: operationID,
+                message: error.localizedDescription
+            )
             throw error
         }
     }
 
     private func unlockPracticeCredits() async throws {
-        let intent = try await api.createRewardIntent(purpose: .practiceCredits)
+        let intent = try await api.createRewardIntent(
+            purpose: .practiceCredits,
+            requestID: UUID()
+        )
         try await ads.showRewardedAd(
             userIdentifier: intent.userIdentifier,
             customData: intent.customData
@@ -169,42 +228,71 @@ final class PracticeViewModel {
     }
 
     func refreshQuestions(adjustment: DifficultyAdjustment) async {
-        guard !isRefreshingQuestions else { return }
+        if let refreshTask {
+            await refreshTask.value
+            return
+        }
+        let task = Task { @MainActor [weak self] in
+            guard let self else { return }
+            await self.performRefresh(adjustment: adjustment)
+        }
+        refreshTask = task
+        await task.value
+        refreshTask = nil
+    }
+
+    private func performRefresh(adjustment: DifficultyAdjustment) async {
         isRefreshingQuestions = true
-        refreshProgressMessage = "새 Daily 문제를 준비하는 중입니다."
+        operationKind = .questionGeneration
+        let operationID = refreshOperationID ?? UUID()
+        refreshOperationID = operationID
+        operationState = .running(operationId: operationID, startedAt: .now)
+        refreshProgressMessage = "광고 확인 후 새 Daily 문제를 준비합니다."
         errorMessage = nil
         do {
-            let updated = try await refreshAfterEnsuringToken(adjustment: adjustment)
+            let updated = try await refreshAfterVerifiedAd(
+                adjustment: adjustment,
+                operationID: operationID
+            )
             applyRefreshedQuestionSet(updated)
-        } catch let error as APIClientError where error.isPracticeQuotaExhausted {
-            do {
-                refreshProgressMessage = "토큰이 부족해 리워드 광고를 준비하는 중입니다."
-                try await unlockPracticeCredits()
-                let updated = try await refreshAfterEnsuringToken(adjustment: adjustment)
-                applyRefreshedQuestionSet(updated)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            operationState = .completed
+            refreshOperationID = nil
+        } catch is CancellationError {
+            operationState = .idle
         } catch {
             errorMessage = error.localizedDescription
+            operationState = .recoverableFailure(
+                operationId: operationID,
+                message: error.localizedDescription
+            )
         }
         refreshProgressMessage = nil
         isRefreshingQuestions = false
     }
 
-    private func refreshAfterEnsuringToken(adjustment: DifficultyAdjustment) async throws -> QuestionSet {
-        if usage?.totalRemaining == 0 {
-            refreshProgressMessage = "토큰이 부족해 리워드 광고를 준비하는 중입니다."
-            try await unlockPracticeCredits()
-        }
-        refreshProgressMessage = "토큰 1개를 사용해 새 문제를 불러오는 중입니다."
+    private func refreshAfterVerifiedAd(
+        adjustment: DifficultyAdjustment,
+        operationID: UUID
+    ) async throws -> QuestionSet {
+        let intent = try await api.createRewardIntent(
+            purpose: .practiceRefresh,
+            requestID: UUID()
+        )
+        try await ads.showRewardedAd(
+            userIdentifier: intent.userIdentifier,
+            customData: intent.customData
+        )
+        _ = try await api.waitForReward(nonce: intent.nonce)
+        refreshProgressMessage = "새 질문을 안전하게 준비하는 중입니다."
         let updated = try await api.refreshPracticeSet(
             request: PracticeRefreshRequest(
                 initialLevel: initialLevel,
                 background: preferences.backgroundProfile,
                 survey: preferences.mockSurvey ?? .defaultSurvey,
-                adjustment: adjustment
-            )
+                adjustment: adjustment,
+                rewardNonce: intent.nonce
+            ),
+            requestID: operationID
         )
         usage = try? await api.usage()
         return updated

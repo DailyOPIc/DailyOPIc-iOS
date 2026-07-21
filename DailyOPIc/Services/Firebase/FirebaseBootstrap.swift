@@ -13,7 +13,7 @@ import FirebaseAppCheck
 enum FirebaseBootstrap {
     static func configure() {
         #if canImport(FirebaseCore)
-        guard FirebaseApp.app() == nil else {
+        guard FirebaseApp.allApps?["__FIRAPP_DEFAULT"] == nil else {
             log("Firebase is already configured.")
             return
         }

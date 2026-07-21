@@ -4,12 +4,24 @@ import Observation
 @MainActor
 @Observable
 final class AppPreferences {
+    enum GuideState: String, Codable, Sendable {
+        case unseen
+        case inProgress
+        case skipped
+        case completed
+    }
+
     private enum Key {
         static let onboarding = "native_onboarding_completed"
         static let initialLevel = "native_initial_level"
         static let targetLevel = "native_target_level"
         static let background = "native_background_profile"
         static let mockSurvey = "native_mock_background_survey"
+        static let onboardingSchemaVersion = "native_onboarding_schema_version"
+        static let firstOPIcAnswer = "native_first_opic_answer"
+        static let guideState = "native_guide_state"
+        static let guidePage = "native_guide_page"
+        static let initialLevelSyncPending = "native_initial_level_sync_pending"
     }
 
     private let defaults: UserDefaults
@@ -17,6 +29,26 @@ final class AppPreferences {
     var hasCompletedOnboarding: Bool {
         didSet { defaults.set(hasCompletedOnboarding, forKey: Key.onboarding) }
     }
+    var onboardingSchemaVersion: Int {
+        didSet { defaults.set(onboardingSchemaVersion, forKey: Key.onboardingSchemaVersion) }
+    }
+    var isNewToOPIc: Bool? {
+        didSet {
+            if let isNewToOPIc { defaults.set(isNewToOPIc, forKey: Key.firstOPIcAnswer) }
+            else { defaults.removeObject(forKey: Key.firstOPIcAnswer) }
+        }
+    }
+    var guideState: GuideState {
+        didSet { defaults.set(guideState.rawValue, forKey: Key.guideState) }
+    }
+    var lastGuidePage: Int {
+        didSet { defaults.set(lastGuidePage, forKey: Key.guidePage) }
+    }
+    var isInitialLevelSyncPending: Bool {
+        didSet { defaults.set(isInitialLevelSyncPending, forKey: Key.initialLevelSyncPending) }
+    }
+    var isPresentingLevelSelection = false
+    var isPresentingGuide = false
     var initialLevel: SelfAssessmentLevel? {
         didSet { defaults.set(initialLevel?.rawValue, forKey: Key.initialLevel) }
     }
@@ -50,7 +82,19 @@ final class AppPreferences {
         } else {
             storedInitialLevel = SelfAssessmentLevel.from(targetLevel: storedTargetLevel)
         }
-        hasCompletedOnboarding = defaults.bool(forKey: Key.onboarding)
+        let wasCompleted = defaults.bool(forKey: Key.onboarding)
+        hasCompletedOnboarding = wasCompleted
+        let storedSchema = defaults.integer(forKey: Key.onboardingSchemaVersion)
+        onboardingSchemaVersion = wasCompleted ? max(2, storedSchema) : storedSchema
+        isNewToOPIc = defaults.object(forKey: Key.firstOPIcAnswer) as? Bool
+        if let raw = defaults.string(forKey: Key.guideState),
+           let value = GuideState(rawValue: raw) {
+            guideState = value
+        } else {
+            guideState = wasCompleted ? .skipped : .unseen
+        }
+        lastGuidePage = min(6, max(0, defaults.integer(forKey: Key.guidePage)))
+        isInitialLevelSyncPending = defaults.bool(forKey: Key.initialLevelSyncPending)
         initialLevel = storedInitialLevel
         targetLevel = storedTargetLevel ?? storedInitialLevel?.expectedTargetLevel
         if let data = defaults.data(forKey: Key.background),
@@ -65,6 +109,15 @@ final class AppPreferences {
         } else {
             mockSurvey = nil
         }
+        if ProcessInfo.processInfo.arguments.contains("-uiTestingNewUser") {
+            hasCompletedOnboarding = false
+            onboardingSchemaVersion = 0
+            isNewToOPIc = nil
+            guideState = .unseen
+            lastGuidePage = 0
+            isPresentingGuide = false
+            isPresentingLevelSelection = false
+        }
     }
 
     func completeOnboarding(initialLevel: SelfAssessmentLevel, profile: BackgroundProfile) {
@@ -72,9 +125,22 @@ final class AppPreferences {
         targetLevel = initialLevel.expectedTargetLevel
         backgroundProfile = profile
         hasCompletedOnboarding = true
+        onboardingSchemaVersion = 2
+        isInitialLevelSyncPending = false
     }
 
     func resetOnboarding() {
-        hasCompletedOnboarding = false
+        isPresentingLevelSelection = true
+    }
+
+    func beginGuide() {
+        isPresentingGuide = true
+        if guideState == .unseen { guideState = .inProgress }
+    }
+
+    func finishGuide(skipped: Bool) {
+        guideState = skipped ? .skipped : .completed
+        isPresentingGuide = false
+        if !hasCompletedOnboarding { isPresentingLevelSelection = true }
     }
 }

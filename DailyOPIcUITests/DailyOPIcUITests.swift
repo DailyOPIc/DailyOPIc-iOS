@@ -23,12 +23,33 @@ final class DailyOPIcUITests: XCTestCase {
     }
 
     @MainActor
-    func testExample() throws {
-        // UI tests must launch the application that they test.
+    func testNewUserCanEnterAndSkipGuide() throws {
         let app = XCUIApplication()
+        app.launchArguments = ["-uiTestingNewUser"]
         app.launch()
 
-        // Use XCTAssert and related functions to verify your tests produce the correct results.
+        XCTAssertTrue(app.staticTexts["오픽 시험이 처음이신가요?"].waitForExistence(timeout: 5))
+        app.buttons["네, 가이드를 볼게요"].tap()
+        XCTAssertTrue(app.staticTexts["DailyOPIc는 AI 학습 도구예요"].waitForExistence(timeout: 2))
+        app.buttons["건너뛰기"].tap()
+        XCTAssertTrue(app.staticTexts["OPIc 시작 난이도를 선택해 주세요"].waitForExistence(timeout: 2))
+    }
+
+    @MainActor
+    func testOnboardingSupportsAccessibilityTextAndReduceMotion() throws {
+        let app = XCUIApplication()
+        app.launchArguments = [
+            "-uiTestingNewUser",
+            "-UIPreferredContentSizeCategoryName",
+            "UICTContentSizeCategoryAccessibilityExtraExtraExtraLarge",
+            "-UIAccessibilityReduceMotionEnabled",
+            "YES"
+        ]
+        app.launch()
+
+        XCTAssertTrue(app.buttons["아니오, 난이도를 선택할게요"].waitForExistence(timeout: 5))
+        app.buttons["아니오, 난이도를 선택할게요"].tap()
+        XCTAssertTrue(app.staticTexts["OPIc 시작 난이도를 선택해 주세요"].waitForExistence(timeout: 2))
     }
 
     @MainActor

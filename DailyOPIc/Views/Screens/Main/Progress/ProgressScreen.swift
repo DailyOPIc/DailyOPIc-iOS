@@ -2,6 +2,12 @@ import SwiftUI
 import SwiftData
 
 struct ProgressScreen: View {
+    private enum Period: String, CaseIterable, Identifiable {
+        case seven = "최근 7일"
+        case thirty = "30일"
+        case all = "전체"
+        var id: Self { self }
+    }
     let preferences: AppPreferences
     @Environment(\.modelContext) private var modelContext
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
@@ -9,15 +15,36 @@ struct ProgressScreen: View {
     @Query(sort: \MockHistoryRecord.createdAt, order: .reverse)
     private var mockRecords: [MockHistoryRecord]
     @State private var showsDeleteAll = false
+    @State private var period: Period = .seven
+
+    private var cutoff: Date? {
+        switch period {
+        case .seven: Calendar.current.date(byAdding: .day, value: -7, to: .now)
+        case .thirty: Calendar.current.date(byAdding: .day, value: -30, to: .now)
+        case .all: nil
+        }
+    }
+    private var visiblePractice: [PracticeHistoryRecord] {
+        guard let cutoff else { return practiceRecords }
+        return practiceRecords.filter { $0.createdAt >= cutoff }
+    }
+    private var visibleMock: [MockHistoryRecord] {
+        guard let cutoff else { return mockRecords }
+        return mockRecords.filter { $0.createdAt >= cutoff }
+    }
+    private var corruptRecordCount: Int {
+        visiblePractice.filter { $0.question == nil || $0.evaluation == nil }.count
+            + visibleMock.filter { $0.questionSet == nil || $0.evaluation == nil }.count
+    }
 
     private var latestLevel: OPIcLevel? {
-        let practice = practiceRecords.first.map { ($0.createdAt, $0.predictedLevel) }
-        let mock = mockRecords.first.map { ($0.createdAt, $0.predictedLevel) }
+        let practice = visiblePractice.first.map { ($0.createdAt, $0.predictedLevel) }
+        let mock = visibleMock.first.map { ($0.createdAt, $0.predictedLevel) }
         return [practice, mock].compactMap { $0 }.max { $0.0 < $1.0 }?.1
     }
 
     private var distribution: [(OPIcLevel, Int)] {
-        let levels = practiceRecords.map(\.predictedLevel) + mockRecords.map(\.predictedLevel)
+        let levels = visiblePractice.map(\.predictedLevel) + visibleMock.map(\.predictedLevel)
         return OPIcLevel.allCases.compactMap { level in
             let count = levels.filter { $0 == level }.count
             return count > 0 ? (level, count) : nil
@@ -29,10 +56,17 @@ struct ProgressScreen: View {
             VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("통계").font(AppTypography.title)
-                    Text("최근 연습과 모의고사 결과를 한눈에 확인하세요.")
+                    Text("이 기기에 저장된 연습과 모의고사 결과입니다.")
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
+                Picker("통계 기간", selection: $period) {
+                    ForEach(Period.allCases) { Text($0.rawValue).tag($0) }
+                }
+                .pickerStyle(.segmented)
                 summary
+                if corruptRecordCount > 0 {
+                    ErrorBanner(message: "읽을 수 없는 로컬 기록 \(corruptRecordCount)개가 있습니다. 기록은 숨기지 않고 오류로 집계했습니다.")
+                }
                 if !distribution.isEmpty { distributionView }
                 HStack {
                     VStack(alignment: .leading) {
@@ -68,12 +102,12 @@ struct ProgressScreen: View {
                 .overlay { Capsule().stroke(AppPalette.primary.opacity(0.5)) }
                 .offset(y: -22)
             HStack(spacing: 12) {
-                summaryCell(title: "총 시도", value: "\(practiceRecords.count + mockRecords.count)회")
+                summaryCell(title: "총 시도", value: "\(visiblePractice.count + visibleMock.count)회")
                 summaryCell(title: "최근 등급", value: latestLevel?.rawValue ?? "-")
             }
             HStack(spacing: 12) {
-                summaryCell(title: "연습", value: "\(practiceRecords.count)회")
-                summaryCell(title: "모의고사", value: "\(mockRecords.count)회")
+                summaryCell(title: "연습", value: "\(visiblePractice.count)회")
+                summaryCell(title: "모의고사", value: "\(visibleMock.count)회")
             }
         }
         .padding(16)
@@ -107,7 +141,7 @@ struct ProgressScreen: View {
                     Text(level.rawValue)
                         .font(.subheadline.bold())
                         .frame(width: 40, alignment: .leading)
-                    ProgressView(value: Double(count), total: Double(max(1, practiceRecords.count + mockRecords.count)))
+                    ProgressView(value: Double(count), total: Double(max(1, visiblePractice.count + visibleMock.count)))
                         .tint(AppPalette.primary)
                     Text("\(count)회")
                         .font(.caption.weight(.semibold))
@@ -159,8 +193,8 @@ struct ProgressScreen: View {
     }
 
     private var historyRows: [HistoryItem] {
-        let practice = practiceRecords.map { HistoryItem(date: $0.createdAt, kind: .practice($0)) }
-        let mock = mockRecords.map { HistoryItem(date: $0.createdAt, kind: .mock($0)) }
+        let practice = visiblePractice.map { HistoryItem(id: $0.id, date: $0.createdAt, kind: .practice($0)) }
+        let mock = visibleMock.map { HistoryItem(id: $0.id, date: $0.createdAt, kind: .mock($0)) }
         return (practice + mock).sorted { $0.date > $1.date }
     }
 
@@ -177,7 +211,7 @@ private struct HistoryItem: Identifiable {
         case practice(PracticeHistoryRecord)
         case mock(MockHistoryRecord)
     }
-    let id = UUID()
+    let id: UUID
     let date: Date
     let kind: Kind
 }

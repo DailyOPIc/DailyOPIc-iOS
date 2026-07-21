@@ -135,6 +135,40 @@ struct DailyOPIcTests {
         #expect(restored.mockSurvey == survey)
     }
 
+    @MainActor
+    @Test func completedV1UserMigratesWithoutForcedGuide() {
+        let suite = "DailyOPIcMigrationTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        defaults.set(true, forKey: "native_onboarding_completed")
+        defaults.set(5, forKey: "native_initial_level")
+
+        let preferences = AppPreferences(defaults: defaults)
+
+        #expect(preferences.hasCompletedOnboarding)
+        #expect(preferences.onboardingSchemaVersion == 2)
+        #expect(preferences.guideState == .skipped)
+        #expect(!preferences.isPresentingGuide)
+    }
+
+    @MainActor
+    @Test func guideProgressAndSkipRemainReenterable() {
+        let suite = "DailyOPIcGuideTests-\(UUID().uuidString)"
+        let defaults = UserDefaults(suiteName: suite)!
+        defer { defaults.removePersistentDomain(forName: suite) }
+        let preferences = AppPreferences(defaults: defaults)
+        preferences.guideState = .inProgress
+        preferences.lastGuidePage = 4
+
+        let restored = AppPreferences(defaults: defaults)
+        #expect(restored.guideState == .inProgress)
+        #expect(restored.lastGuidePage == 4)
+        restored.finishGuide(skipped: true)
+        restored.beginGuide()
+        #expect(restored.guideState == .skipped)
+        #expect(restored.isPresentingGuide)
+    }
+
     @Test func mockRequestEncodesSurvey() throws {
         let survey = BackgroundSurvey.defaultSurvey
         let request = QuestionSetRequest(
@@ -157,7 +191,8 @@ struct DailyOPIcTests {
             initialLevel: .level5,
             background: BackgroundProfile(interests: ["cafes"]),
             survey: .defaultSurvey,
-            adjustment: .harder
+            adjustment: .harder,
+            rewardNonce: "refresh-reward-nonce"
         )
         let data = try JSONCoding.encoder.encode(request)
         let object = try JSONSerialization.jsonObject(with: data) as? [String: Any]
@@ -175,6 +210,49 @@ struct DailyOPIcTests {
 
         #expect(object?["purpose"] as? String == "target_level_change")
         #expect(object?["sessionHash"] == nil)
+    }
+
+    @Test func evaluationRubricV2DecodesWithoutUsingNumericScoreAsPrimaryUI() throws {
+        let data = """
+        {
+          "predictedLevel": "IM2",
+          "confidence": "medium",
+          "scores": {"taskFulfillment": 60, "grammar": 40, "vocabulary": 60, "discourse": 60, "fluency": 40},
+          "strengths": ["Clear topic"],
+          "improvements": ["Connect ideas"],
+          "correctedAnswer": null,
+          "targetGap": "Add detail",
+          "sampleAnswer": null,
+          "audioMetrics": {"durationSeconds": 30, "speakingSeconds": 25, "silenceRatio": 0.16, "wordsPerMinute": 92},
+          "disclaimer": "AI learning estimate only.",
+          "modelVersion": "fixture",
+          "promptVersion": "rubric-v2",
+          "resultStatus": "partial",
+          "rubrics": [
+            {"dimension": "taskFulfillment", "band": "functional", "evidence": "Answered the task.", "nextAction": "Add one example."}
+          ],
+          "warnings": ["optional details unavailable"],
+          "scoreScaleVersion": "rubric-band-v1"
+        }
+        """.data(using: .utf8)!
+
+        let value = try JSONCoding.decoder.decode(PracticeEvaluation.self, from: data)
+
+        #expect(value.isPartial)
+        #expect(value.rubrics?.first?.band == .functional)
+        #expect(value.correctedAnswer == nil)
+    }
+
+    @Test func unknownServerStatusesDecodeSafely() throws {
+        let rewardData = """
+        {"nonce":"n","purpose":"mock_result","status":"future_status","userIdentifier":"u","customData":"n","expiresAt":"2026-07-21T12:00:00Z"}
+        """.data(using: .utf8)!
+        let reward = try JSONCoding.decoder.decode(RewardIntent.self, from: rewardData)
+        if case let .unknown(raw) = reward.status {
+            #expect(raw == "future_status")
+        } else {
+            Issue.record("unknown reward status was not preserved")
+        }
     }
 
     @Test func apiClientClassifiesTargetLevelRewardRequired() throws {
@@ -230,7 +308,7 @@ struct DailyOPIcTests {
         let verified = RewardIntent(
             nonce: "verified-nonce",
             purpose: .targetLevelChange,
-            status: "verified",
+            status: .verified,
             userIdentifier: "user-id",
             customData: "verified-nonce",
             expiresAt: .now
@@ -238,7 +316,7 @@ struct DailyOPIcTests {
         let confirmed = RewardIntent(
             nonce: "confirmed-nonce",
             purpose: .targetLevelChange,
-            status: "confirmed",
+            status: .verified,
             userIdentifier: "user-id",
             customData: "confirmed-nonce",
             expiresAt: .now
@@ -246,7 +324,7 @@ struct DailyOPIcTests {
         let pending = RewardIntent(
             nonce: "pending-nonce",
             purpose: .targetLevelChange,
-            status: "pending",
+            status: .pending,
             userIdentifier: "user-id",
             customData: "pending-nonce",
             expiresAt: .now
@@ -254,7 +332,7 @@ struct DailyOPIcTests {
         let completed = RewardIntent(
             nonce: "completed-nonce",
             purpose: .targetLevelChange,
-            status: "completed",
+            status: .completed,
             userIdentifier: "user-id",
             customData: "completed-nonce",
             expiresAt: .now

@@ -39,16 +39,22 @@ struct SetupView: View {
                         }
                     }
                     Section("앱") {
+                        Button {
+                            dismiss()
+                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
+                                preferences.beginGuide()
+                            }
+                        } label: {
+                            Label("OPIc 가이드 다시 보기", systemImage: "questionmark.circle")
+                        }
                         Button("개인정보처리방침") {
                             openPrivacyPolicy()
                         }
-                        Button("광고 개인정보 설정") {
-                            Task { await presentAdPrivacyOptions() }
+                        if ads.canShowPrivacyOptions {
+                            Button("광고 개인정보 설정") {
+                                Task { await presentAdPrivacyOptions() }
+                            }
                         }
-                        .disabled(!ads.canShowPrivacyOptions)
-                        Text(ads.privacyOptionsStatusText)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
                     }
                 }
 

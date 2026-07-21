@@ -26,6 +26,9 @@ struct PracticeScreen: View {
             }
         }
         .toolbar {
+            ToolbarItem(placement: .topBarLeading) {
+                GuideEntryButton(preferences: preferences)
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Button { showsSetup = true } label: {
                     Image(systemName: "slider.horizontal.3")
@@ -40,7 +43,14 @@ struct PracticeScreen: View {
             Task { await viewModel.reloadQuestions() }
         }
         .overlay {
-            if viewModel.showsRefreshDialog {
+            if viewModel.operationState.isRunning,
+               viewModel.phase == .analyzing || viewModel.isRefreshingQuestions {
+                AILoadingOverlay(
+                    kind: viewModel.operationKind,
+                    blocksInteraction: true,
+                    canContinueInBackground: true
+                )
+            } else if viewModel.showsRefreshDialog {
                 DailyRefreshDialog(
                     isLoading: viewModel.isRefreshingQuestions,
                     progressMessage: viewModel.refreshProgressMessage,
@@ -61,13 +71,17 @@ struct PracticeScreen: View {
         ScrollView {
             VStack(spacing: 22) {
                 HStack {
-                    Text("Self Assessment: ") + Text(viewModel.initialLevel.title).foregroundStyle(AppPalette.primary)
-                    Spacer()
                     Text(viewModel.remainingText)
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(AppPalette.secondaryInk)
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(AppPalette.primary)
+                    Spacer()
                 }
-                .font(.subheadline.weight(.medium))
+                if let usage = viewModel.usage {
+                    Text("기본 분석 \(usage.dailyAnalysisFreeRemaining ?? usage.freeRemaining)회 · 광고 보상 \(usage.dailyAnalysisRewardRemaining ?? usage.bonusRemaining)회")
+                        .font(.caption)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
 
                 if let message = viewModel.errorMessage {
                     ErrorBanner(message: message) {
@@ -90,15 +104,11 @@ struct PracticeScreen: View {
                         }
                         Text(speech.isListening ? "Tap to Finish" : "Tap to Answer")
                             .font(.title3.bold())
-                        Text(
-                            speech.isListening
-                                ? (speech.transcript.isEmpty ? "영어로 답변해 주세요." : speech.transcript)
-                                : "녹음을 시작하려면 탭하세요."
+                        TranscriptPanel(
+                            finalText: speech.finalTranscript,
+                            partialText: speech.partialTranscript,
+                            isRecording: speech.isListening
                         )
-                        .font(AppTypography.body)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                        .multilineTextAlignment(.center)
-                        .frame(minHeight: 46)
                     }
                     .padding(.vertical, 32)
 

@@ -1,6 +1,19 @@
 import Foundation
 
 enum AppConfiguration {
+    enum ConfigurationError: LocalizedError {
+        case invalidProductionAPI
+        case missingProductionAdUnit
+        case sampleAdUnitInRelease
+
+        var errorDescription: String? {
+            switch self {
+            case .invalidProductionAPI: "프로덕션 API 주소가 올바르게 설정되지 않았습니다."
+            case .missingProductionAdUnit: "프로덕션 광고 unit ID가 설정되지 않았습니다."
+            case .sampleAdUnitInRelease: "Release 빌드에 Google sample 광고 unit ID를 사용할 수 없습니다."
+            }
+        }
+    }
     nonisolated static var apiBaseURL: URL {
         resolvedAPIBaseURL.url
     }
@@ -19,6 +32,25 @@ enum AppConfiguration {
 
     nonisolated static var privacyPolicyURL: URL? {
         configuredURL(Bundle.main.object(forInfoDictionaryKey: "DAILYOPIC_PRIVACY_POLICY_URL") as? String)
+    }
+
+    nonisolated static func validateForLaunch() throws {
+        #if !DEBUG
+        let url = apiBaseURL
+        guard url.scheme == "https",
+              let host = url.host,
+              !host.contains("REPLACE_WITH") else {
+            throw ConfigurationError.invalidProductionAPI
+        }
+        guard let rewardedAdUnitID, let bannerAdUnitID else {
+            throw ConfigurationError.missingProductionAdUnit
+        }
+        let samplePrefix = "ca-app-pub-3940256099942544/"
+        guard !rewardedAdUnitID.hasPrefix(samplePrefix),
+              !bannerAdUnitID.hasPrefix(samplePrefix) else {
+            throw ConfigurationError.sampleAdUnitInRelease
+        }
+        #endif
     }
 
     #if DEBUG

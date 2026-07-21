@@ -15,7 +15,12 @@ struct AppRootView: View {
                     Task { await environment.initialize() }
                 }
             case .ready:
-                if environment.preferences.hasCompletedOnboarding {
+                if environment.preferences.isPresentingGuide {
+                    OPIcGuideView(preferences: environment.preferences) { skipped in
+                        environment.preferences.finishGuide(skipped: skipped)
+                    }
+                } else if environment.preferences.hasCompletedOnboarding,
+                          !environment.preferences.isPresentingLevelSelection {
                     MainTabView(environment: environment)
                 } else {
                     OnboardingView(environment: environment)

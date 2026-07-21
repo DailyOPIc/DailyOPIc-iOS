@@ -16,6 +16,7 @@ final class AppEnvironment {
     let api: APIClient
     let ads: AdService
     var launchState: LaunchState = .launching
+    var capabilities: Capabilities?
 
     init() {
         let authentication = AuthenticationService()
@@ -35,9 +36,15 @@ final class AppEnvironment {
 
     func initialize() async {
         launchState = .launching
+        if ProcessInfo.processInfo.arguments.contains("-uiTestingNewUser") {
+            launchState = .ready
+            return
+        }
         Task { await ads.prepare() }
         do {
+            try AppConfiguration.validateForLaunch()
             try await authentication.prepareForLaunch()
+            capabilities = try await api.capabilities()
             try await Task.sleep(for: .milliseconds(450))
             launchState = .ready
         } catch {

@@ -7,16 +7,22 @@ import FirebaseAppCheck
 #if canImport(FirebaseCore)
 import FirebaseCore
 #endif
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
 
 actor AuthenticationService {
     enum AuthError: LocalizedError {
         case appCheckUnavailable
+        case firebaseAuthUnavailable
         case installationIDUnavailable
 
         var errorDescription: String? {
             switch self {
             case .appCheckUnavailable:
                 "Firebase App Check 토큰을 발급받지 못했습니다. 실제 기기의 App Attest entitlement와 Firebase Console 설정을 확인해 주세요."
+            case .firebaseAuthUnavailable:
+                "안전한 사용자 인증을 준비하지 못했습니다. 네트워크 연결을 확인하고 다시 시도해 주세요."
             case .installationIDUnavailable:
                 "기기 식별자를 준비할 수 없습니다. Keychain 접근 상태를 확인해 주세요."
             }
@@ -28,14 +34,55 @@ actor AuthenticationService {
 
     func prepareForLaunch() async throws {
         _ = try installationID()
+        _ = try await firebaseUserID()
         _ = try await appCheckToken()
     }
 
-    func headers() async throws -> [String: String] {
-        [
+    func headers(forceRefreshAuthToken: Bool = false) async throws -> [String: String] {
+        var values = [
             "X-DailyOPIc-User-ID": try installationID(),
-            "X-Firebase-AppCheck": try await appCheckToken()
+            "X-Firebase-AppCheck": try await appCheckToken(),
+            "Authorization": "Bearer \(try await firebaseIDToken(forceRefresh: forceRefreshAuthToken))"
         ]
+        values["X-App-Version"] = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "unknown"
+        values["X-DailyOPIc-Capabilities"] = "operations-v1,mock-session-v2,evaluation-rubric-v2,onboarding-v2"
+        return values
+    }
+
+    private func firebaseUserID() async throws -> String {
+        #if canImport(FirebaseAuth) && canImport(FirebaseCore)
+        guard FirebaseApp.app() != nil else { throw AuthError.firebaseAuthUnavailable }
+        if let current = Auth.auth().currentUser { return current.uid }
+        return try await withCheckedThrowingContinuation { continuation in
+            Auth.auth().signInAnonymously { result, error in
+                if let user = result?.user {
+                    continuation.resume(returning: user.uid)
+                } else {
+                    continuation.resume(throwing: error ?? AuthError.firebaseAuthUnavailable)
+                }
+            }
+        }
+        #else
+        throw AuthError.firebaseAuthUnavailable
+        #endif
+    }
+
+    private func firebaseIDToken(forceRefresh: Bool) async throws -> String {
+        #if canImport(FirebaseAuth)
+        _ = try await firebaseUserID()
+        guard let user = Auth.auth().currentUser else { throw AuthError.firebaseAuthUnavailable }
+        return try await withCheckedThrowingContinuation { continuation in
+            user.getIDTokenForcingRefresh(forceRefresh) { token, error in
+                if let token {
+                    continuation.resume(returning: token)
+                } else {
+                    continuation.resume(throwing: error ?? AuthError.firebaseAuthUnavailable)
+                }
+            }
+        }
+        #else
+        throw AuthError.firebaseAuthUnavailable
+        #endif
     }
 
     private func installationID() throws -> String {

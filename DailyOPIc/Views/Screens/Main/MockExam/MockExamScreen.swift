@@ -3,12 +3,14 @@ import SwiftUI
 struct MockExamScreen: View {
     let viewModel: MockExamViewModel
     @ObservedObject private var speech: SpeechRecognitionService
+    @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsResetConfirmation = false
     @State private var showsSavedSurveyDialog = false
 
     init(viewModel: MockExamViewModel) {
         self.viewModel = viewModel
         _speech = ObservedObject(wrappedValue: viewModel.speech)
+        _promptPlayback = ObservedObject(wrappedValue: viewModel.promptPlayback)
     }
 
     var body: some View {
@@ -31,7 +33,7 @@ struct MockExamScreen: View {
             case .completed:
                 if let evaluation = viewModel.evaluation {
                     MockResultView(evaluation: evaluation, targetLevel: viewModel.targetLevel) {
-                        viewModel.resetExam()
+                        // A completed KST-day session remains the single result for today.
                     }
                 }
             }
@@ -39,14 +41,20 @@ struct MockExamScreen: View {
         .toolbar {
             if canResetExam {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("모의고사 다시하기") {
+                    Button("모의고사 포기") {
                         showsResetConfirmation = true
                     }
                 }
             }
         }
         .overlay {
-            if showsResetConfirmation {
+            if viewModel.operationState.isRunning {
+                AILoadingOverlay(
+                    kind: viewModel.operationKind,
+                    blocksInteraction: true,
+                    canContinueInBackground: true
+                )
+            } else if showsResetConfirmation {
                 ResetMockExamDialog(
                     cancel: { showsResetConfirmation = false },
                     confirm: {
@@ -68,11 +76,12 @@ struct MockExamScreen: View {
                 )
             }
         }
-        .task { viewModel.restoreDraftIfAvailable() }
+        .task { await viewModel.restoreDraftIfAvailable() }
     }
 
     private var canResetExam: Bool {
-        viewModel.questionSet != nil || !viewModel.answers.isEmpty || viewModel.evaluation != nil
+        viewModel.phase != .completed
+            && (viewModel.questionSet != nil || !viewModel.answers.isEmpty)
     }
 
     private var introduction: some View {
@@ -85,7 +94,7 @@ struct MockExamScreen: View {
                 Text("실전처럼 15문항에 답해보세요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
-                Text("OPIc 유형 기반 모의고사입니다. Daily와 공통으로 쓰는 Background Survey 선택값을 바탕으로 자기소개, 관심 주제 콤보, 롤플레이, 비교·의견 문항을 차례로 진행합니다.")
+                Text("하루 1회, 총 15문항입니다. Q7 뒤 난이도를 한 번 조정하며 시작·조정·최종 분석에 총 3회의 보상형 광고가 필요합니다. 광고 실패나 앱 종료 후에도 오늘 세션을 이어할 수 있습니다.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
@@ -190,6 +199,16 @@ struct MockExamScreen: View {
                 MockProgressHeader(currentQuestion: viewModel.currentIndex + 1)
                 if let question = viewModel.currentQuestion {
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
+                    HStack {
+                        Label(
+                            viewModel.promptPlayback.isSpeaking ? "질문 재생 중" : "질문 재생 완료",
+                            systemImage: viewModel.promptPlayback.isSpeaking ? "speaker.wave.2.fill" : "speaker.fill"
+                        )
+                        Spacer()
+                        Button("한 번 다시 듣기") { viewModel.replayCurrentPrompt() }
+                            .disabled(!viewModel.promptPlayback.canReplay(question) || speech.isListening)
+                    }
+                    .font(.subheadline)
                 }
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
                 RecordingButton(isRecording: speech.isListening, isDisabled: false) {
@@ -197,18 +216,23 @@ struct MockExamScreen: View {
                 }
                 Text(speech.isListening ? "Tap to Finish" : "Tap to Answer")
                     .font(.title3.bold())
+                Text("남은 시간 \(viewModel.remainingSeconds)초")
+                    .font(.headline.monospacedDigit())
+                    .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.danger : AppPalette.secondaryInk)
                 Text(speech.transcript.isEmpty ? "답변을 녹음하면 다음 문항으로 이동합니다." : speech.transcript)
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
-                if viewModel.currentIndex > 0 && !speech.isListening {
-                    Button("이전 문항 다시 답하기") { viewModel.previousQuestion() }
-                        .buttonStyle(.bordered)
-                }
+                Text("제출한 문항은 다시 답할 수 없습니다.")
+                    .font(.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
             }
             .padding(20)
         }
         .interactiveDismissDisabled(speech.isListening)
+        .task(id: viewModel.currentQuestion?.number) {
+            viewModel.playCurrentPromptAutomatically()
+        }
     }
 
     private var adjustment: some View {
@@ -319,7 +343,7 @@ private struct MultiChoiceSection: View {
 private struct MockProgressHeader: View {
     let currentQuestion: Int
     private let totalQuestions = 15
-    private let adMarkers = [5, 10]
+    private let adMarkers = [0, 7, 15]
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -327,7 +351,7 @@ private struct MockProgressHeader: View {
                 Text("\(currentQuestion) / \(totalQuestions)")
                     .font(.headline)
                 Spacer()
-                Label("AD: 광고 예정", systemImage: "play.rectangle.fill")
+                Label("광고 1/3 · 2/3 · 3/3", systemImage: "play.rectangle.fill")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(.orange)
             }
@@ -356,7 +380,7 @@ private struct MockProgressHeader: View {
                                     .stroke(Color.white.opacity(0.75), lineWidth: 1)
                             }
                             .position(
-                                x: width * CGFloat(marker) / CGFloat(totalQuestions),
+                                x: min(max(12, width * CGFloat(marker) / CGFloat(totalQuestions)), width - 12),
                                 y: 5
                             )
                             .accessibilityLabel("\(marker)번 뒤 광고 예정")

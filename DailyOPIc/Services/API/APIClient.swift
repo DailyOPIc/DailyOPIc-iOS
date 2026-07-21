@@ -46,6 +46,12 @@ enum APIClientError: LocalizedError {
 }
 
 actor APIClient {
+    enum RequestTimeout {
+        static let read: TimeInterval = 15
+        static let generation: TimeInterval = 90
+        static let evaluation: TimeInterval = 180
+        static let rewardVerification: TimeInterval = 60
+    }
     private let baseURL: URL
     private let session: URLSession
     private let authentication: AuthenticationService
@@ -62,23 +68,82 @@ actor APIClient {
         self.authentication = authentication
     }
 
-    func createPracticeSet(request payload: QuestionSetRequest) async throws -> QuestionSet {
-        try await sendJSON(path: "/v1/question-sets/practice", method: "POST", body: payload)
+    func capabilities() async throws -> Capabilities {
+        try await send(path: "/v1/capabilities", method: "GET", body: nil)
     }
 
-    func refreshPracticeSet(request payload: PracticeRefreshRequest) async throws -> QuestionSet {
-        try await sendJSON(path: "/v1/question-sets/practice/refresh", method: "POST", body: payload)
-    }
-
-    func createMockExam(request payload: QuestionSetRequest) async throws -> QuestionSet {
-        try await sendJSON(path: "/v1/mock-exams", method: "POST", body: payload)
-    }
-
-    func applyQuestionSetAdjustment(setId: String, adjustment: DifficultyAdjustment) async throws -> QuestionSet {
+    func createPracticeSet(
+        request payload: QuestionSetRequest,
+        requestID: UUID
+    ) async throws -> QuestionSet {
         try await sendJSON(
-            path: "/v1/question-sets/\(setId)/adjustment",
+            path: "/v1/question-sets/practice",
             method: "POST",
-            body: QuestionSetAdjustmentRequest(adjustment: adjustment)
+            body: payload,
+            requestID: requestID,
+            timeout: RequestTimeout.generation
+        )
+    }
+
+    func refreshPracticeSet(
+        request payload: PracticeRefreshRequest,
+        requestID: UUID
+    ) async throws -> QuestionSet {
+        try await sendJSON(
+            path: "/v1/question-sets/practice/refresh",
+            method: "POST",
+            body: payload,
+            requestID: requestID,
+            timeout: RequestTimeout.generation
+        )
+    }
+
+    func createMockSession(
+        request payload: QuestionSetRequest,
+        requestID: UUID
+    ) async throws -> MockSession {
+        try await sendJSON(
+            path: "/v1/mock-exams/sessions",
+            method: "POST",
+            body: payload,
+            requestID: requestID,
+            timeout: RequestTimeout.read
+        )
+    }
+
+    func currentMockSession() async throws -> MockSession {
+        try await send(path: "/v1/mock-exams/current", method: "GET", body: nil)
+    }
+
+    func startMockSession(
+        sessionId: String,
+        rewardNonce: String,
+        requestID: UUID
+    ) async throws -> MockSession {
+        try await sendJSON(
+            path: "/v1/mock-exams/\(sessionId)/start",
+            method: "POST",
+            body: MockSessionRewardRequest(rewardNonce: rewardNonce),
+            requestID: requestID,
+            timeout: RequestTimeout.generation
+        )
+    }
+
+    func adjustMockSession(
+        sessionId: String,
+        adjustment: DifficultyAdjustment,
+        rewardNonce: String,
+        requestID: UUID
+    ) async throws -> MockSession {
+        try await sendJSON(
+            path: "/v1/mock-exams/\(sessionId)/adjustment",
+            method: "POST",
+            body: MockSessionAdjustmentRequest(
+                adjustment: adjustment,
+                rewardNonce: rewardNonce
+            ),
+            requestID: requestID,
+            timeout: RequestTimeout.generation
         )
     }
 
@@ -86,11 +151,17 @@ actor APIClient {
         try await send(path: "/v1/usage", method: "GET", body: nil)
     }
 
-    func createRewardIntent(purpose: RewardPurpose, sessionHash: String? = nil) async throws -> RewardIntent {
+    func createRewardIntent(
+        purpose: RewardPurpose,
+        sessionHash: String? = nil,
+        requestID: UUID
+    ) async throws -> RewardIntent {
         try await sendJSON(
             path: "/v1/ad-rewards/intents",
             method: "POST",
-            body: RewardIntentRequest(purpose: purpose, sessionHash: sessionHash)
+            body: RewardIntentRequest(purpose: purpose, sessionHash: sessionHash),
+            requestID: requestID,
+            timeout: RequestTimeout.read
         )
     }
 
@@ -98,12 +169,22 @@ actor APIClient {
         try await send(path: "/v1/ad-rewards/\(nonce)", method: "GET", body: nil)
     }
 
-    func updateInitialLevel(_ initialLevel: SelfAssessmentLevel, rewardNonce: String? = nil) async throws -> TargetLevelResponse {
+    func updateInitialLevel(
+        _ initialLevel: SelfAssessmentLevel,
+        rewardNonce: String? = nil,
+        requestID: UUID
+    ) async throws -> TargetLevelResponse {
         try await sendJSON(
             path: "/v1/users/me/target-level",
             method: "PUT",
-            body: TargetLevelRequest(initialLevel: initialLevel.rawValue, rewardNonce: rewardNonce)
+            body: TargetLevelRequest(initialLevel: initialLevel.rawValue, rewardNonce: rewardNonce),
+            requestID: requestID,
+            timeout: RequestTimeout.read
         )
+    }
+
+    func operation(id: UUID) async throws -> OperationResult {
+        try await send(path: "/v1/operations/\(id.uuidString)", method: "GET", body: nil)
     }
 
     func waitForReward(
@@ -135,7 +216,7 @@ actor APIClient {
         transcript: String,
         targetLevel: OPIcLevel,
         audioURL: URL,
-        requestID: UUID = UUID()
+        requestID: UUID
     ) async throws -> PracticeEvaluation {
         var form = MultipartFormData()
         form.append(name: "setId", value: questionSet.setId)
@@ -145,18 +226,20 @@ actor APIClient {
         try form.append(name: "audio", fileURL: audioURL)
         form.finish()
         return try await sendMultipart(
-            path: "/v1/evaluations/practice",
+            path: "/v2/evaluations/practice",
             form: form,
-            requestID: requestID
+            requestID: requestID,
+            timeout: RequestTimeout.evaluation
         )
     }
 
     func evaluateMock(
+        sessionId: String,
         questionSet: QuestionSet,
         answers: [RecordedAnswer],
         targetLevel: OPIcLevel,
         rewardNonce: String,
-        requestID: UUID = UUID()
+        requestID: UUID
     ) async throws -> MockEvaluation {
         let manifest = MockEvaluationManifest(
             targetLevel: questionSet.expectedTargetLevel,
@@ -178,18 +261,27 @@ actor APIClient {
         }
         form.finish()
         return try await sendMultipart(
-            path: "/v1/evaluations/mock",
+            path: "/v1/mock-exams/\(sessionId)/evaluate",
             form: form,
-            requestID: requestID
+            requestID: requestID,
+            timeout: RequestTimeout.evaluation
         )
     }
 
     private func sendJSON<Input: Encodable, Output: Decodable>(
         path: String,
         method: String,
-        body: Input
+        body: Input,
+        requestID: UUID? = nil,
+        timeout: TimeInterval = RequestTimeout.read
     ) async throws -> Output {
-        try await send(path: path, method: method, body: try encoder.encode(body))
+        try await send(
+            path: path,
+            method: method,
+            body: try encoder.encode(body),
+            requestID: requestID,
+            timeout: timeout
+        )
     }
 
     private var rewardVerificationTimeoutMessage: String {
@@ -218,12 +310,18 @@ actor APIClient {
     private func send<Output: Decodable>(
         path: String,
         method: String,
-        body: Data?
+        body: Data?,
+        requestID: UUID? = nil,
+        timeout: TimeInterval = RequestTimeout.read
     ) async throws -> Output {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = method
         request.httpBody = body
+        request.timeoutInterval = timeout
         if body != nil { request.setValue("application/json", forHTTPHeaderField: "Content-Type") }
+        if let requestID {
+            request.setValue(requestID.uuidString, forHTTPHeaderField: "Idempotency-Key")
+        }
         try await addAuthentication(to: &request)
         return try await execute(request)
     }
@@ -231,11 +329,13 @@ actor APIClient {
     private func sendMultipart<Output: Decodable>(
         path: String,
         form: MultipartFormData,
-        requestID: UUID
+        requestID: UUID,
+        timeout: TimeInterval
     ) async throws -> Output {
         var request = URLRequest(url: baseURL.appending(path: path))
         request.httpMethod = "POST"
         request.httpBody = form.data
+        request.timeoutInterval = timeout
         request.setValue("multipart/form-data; boundary=\(form.boundary)", forHTTPHeaderField: "Content-Type")
         request.setValue(requestID.uuidString, forHTTPHeaderField: "Idempotency-Key")
         try await addAuthentication(to: &request)
@@ -253,10 +353,29 @@ actor APIClient {
         guard let http = response as? HTTPURLResponse else {
             throw APIClientError.invalidResponse
         }
+        if http.statusCode == 401, Self.isRefreshableAuthenticationError(data: data) {
+            var retryRequest = request
+            for (key, value) in try await authentication.headers(forceRefreshAuthToken: true) {
+                retryRequest.setValue(value, forHTTPHeaderField: key)
+            }
+            let (retryData, retryResponse) = try await session.data(for: retryRequest)
+            guard let retryHTTP = retryResponse as? HTTPURLResponse else {
+                throw APIClientError.invalidResponse
+            }
+            guard 200..<300 ~= retryHTTP.statusCode else {
+                throw Self.makeError(status: retryHTTP.statusCode, data: retryData)
+            }
+            return try decoder.decode(Output.self, from: retryData)
+        }
         guard 200..<300 ~= http.statusCode else {
             throw Self.makeError(status: http.statusCode, data: data)
         }
         return try decoder.decode(Output.self, from: data)
+    }
+
+    nonisolated private static func isRefreshableAuthenticationError(data: Data) -> Bool {
+        let error = makeError(status: 401, data: data)
+        return error.code == "invalid_id_token" || error.code == "expired_id_token"
     }
 
     nonisolated static func makeError(status: Int, data: Data) -> APIClientError {

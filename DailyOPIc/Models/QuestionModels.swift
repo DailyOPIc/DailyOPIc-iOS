@@ -44,6 +44,30 @@ enum QuestionStyle: String, Codable, Sendable {
     }
 }
 
+enum QuestionSetStatus: Codable, Hashable, Sendable {
+    case awaitingAdjustment
+    case complete
+    case unknown(String)
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        switch value {
+        case "awaiting_adjustment": self = .awaitingAdjustment
+        case "complete": self = .complete
+        default: self = .unknown(value)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .awaitingAdjustment: try container.encode("awaiting_adjustment")
+        case .complete: try container.encode("complete")
+        case let .unknown(value): try container.encode(value)
+        }
+    }
+}
+
 struct GeneratedQuestion: Codable, Identifiable, Hashable, Sendable {
     let number: Int
     let examSection: ExamSection
@@ -152,9 +176,16 @@ struct QuestionSet: Codable, Sendable {
     let effectiveLevel: Int
     let effectiveLevelCode: String
     let expectedTargetLevel: OPIcLevel
-    let status: String
+    let status: QuestionSetStatus
     let requiresAdjustmentAfter: Int?
     let isComplete: Bool
+    let provider: String?
+    let fallbackReason: String?
+    let fallbackQuestionNumbers: [Int]?
+    let retryCount: Int?
+    let promptVersion: String?
+    let schemaVersion: String?
+    let serverDateKey: String?
 
     init(
         setId: String,
@@ -168,9 +199,16 @@ struct QuestionSet: Codable, Sendable {
         effectiveLevel: Int = 4,
         effectiveLevelCode: String = "4-4",
         expectedTargetLevel: OPIcLevel = .IM2,
-        status: String = "complete",
+        status: QuestionSetStatus = .complete,
         requiresAdjustmentAfter: Int? = nil,
-        isComplete: Bool = true
+        isComplete: Bool = true,
+        provider: String? = nil,
+        fallbackReason: String? = nil,
+        fallbackQuestionNumbers: [Int]? = nil,
+        retryCount: Int? = nil,
+        promptVersion: String? = nil,
+        schemaVersion: String? = nil,
+        serverDateKey: String? = nil
     ) {
         self.setId = setId
         self.setHash = setHash
@@ -186,6 +224,13 @@ struct QuestionSet: Codable, Sendable {
         self.status = status
         self.requiresAdjustmentAfter = requiresAdjustmentAfter
         self.isComplete = isComplete
+        self.provider = provider
+        self.fallbackReason = fallbackReason
+        self.fallbackQuestionNumbers = fallbackQuestionNumbers
+        self.retryCount = retryCount
+        self.promptVersion = promptVersion
+        self.schemaVersion = schemaVersion
+        self.serverDateKey = serverDateKey
     }
 
     var debugTopicIDs: [String] {
@@ -240,20 +285,62 @@ struct PracticeRefreshRequest: Codable, Sendable {
     let recentQuestionHashes: [String]
     let survey: BackgroundSurvey?
     let adjustment: DifficultyAdjustment
+    let rewardNonce: String
 
     init(
         initialLevel: SelfAssessmentLevel,
         background: BackgroundProfile,
         recentQuestionHashes: [String] = [],
         survey: BackgroundSurvey?,
-        adjustment: DifficultyAdjustment
+        adjustment: DifficultyAdjustment,
+        rewardNonce: String
     ) {
         self.initialLevel = initialLevel.rawValue
         self.background = background
         self.recentQuestionHashes = recentQuestionHashes
         self.survey = survey
         self.adjustment = adjustment
+        self.rewardNonce = rewardNonce
     }
+}
+
+enum MockSessionStage: String, Codable, Sendable {
+    case awaitingStartAd = "awaiting_start_ad"
+    case generatingFront = "generating_front"
+    case answeringFront = "answering_front"
+    case awaitingAdjustmentAd = "awaiting_adjustment_ad"
+    case generatingTail = "generating_tail"
+    case answeringTail = "answering_tail"
+    case awaitingResultAd = "awaiting_result_ad"
+    case evaluating
+    case completed
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        self = Self(rawValue: value) ?? .unknown
+    }
+}
+
+struct MockSession: Codable, Sendable {
+    let sessionId: String
+    let sessionHash: String
+    let serverDateKey: String
+    let stage: MockSessionStage
+    let resetsAt: Date
+    let setId: String?
+    let setHash: String?
+    let adjustment: DifficultyAdjustment?
+    let questionSet: QuestionSet?
+}
+
+struct MockSessionRewardRequest: Codable, Sendable {
+    let rewardNonce: String
+}
+
+struct MockSessionAdjustmentRequest: Codable, Sendable {
+    let adjustment: DifficultyAdjustment
+    let rewardNonce: String
 }
 
 struct RecordedAnswer: Codable, Identifiable, Sendable {

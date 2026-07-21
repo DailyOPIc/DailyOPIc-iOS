@@ -52,6 +52,37 @@ struct ScoreBars: View {
     }
 }
 
+struct RubricBandsView: View {
+    let rubrics: [RubricAssessment]
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 16) {
+            Text("5단계 말하기 루브릭").font(.headline)
+            ForEach(rubrics) { rubric in
+                VStack(alignment: .leading, spacing: 7) {
+                    HStack {
+                        Text(rubric.dimension.label).font(.subheadline.bold())
+                        Spacer()
+                        Text(rubric.band.label)
+                            .font(.caption.bold())
+                            .foregroundStyle(AppPalette.primary)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(AppPalette.primarySoft)
+                            .clipShape(Capsule())
+                    }
+                    Text(rubric.evidence).font(.subheadline)
+                    Label(rubric.nextAction, systemImage: "arrow.right.circle.fill")
+                        .font(.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+                if rubric.id != rubrics.last?.id { Divider() }
+            }
+        }
+        .cardStyle()
+    }
+}
+
 struct FeedbackSection: View {
     let title: String
     let text: String

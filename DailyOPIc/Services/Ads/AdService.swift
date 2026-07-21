@@ -11,18 +11,21 @@ import UserMessagingPlatform
 
 @MainActor
 final class AdService: NSObject, ObservableObject {
+    enum State: Equatable { case idle, loading, ready, presenting, verifying, failed(String) }
     enum AdError: LocalizedError {
         case unavailable
         case notEarned
         case privacyOptionsUnavailable
         case privacyOptionsNotRequired
+        case busy
 
         var errorDescription: String? {
             switch self {
             case .unavailable: "리워드 광고를 불러오지 못했습니다. 잠시 후 다시 시도해 주세요."
             case .notEarned: "광고를 끝까지 시청해야 계속할 수 있습니다."
             case .privacyOptionsUnavailable: "광고 개인정보 설정을 열 수 없습니다. 잠시 후 다시 시도해 주세요."
-            case .privacyOptionsNotRequired: "현재 지역 또는 AdMob 메시지 설정에서는 광고 개인정보 설정이 필요하지 않습니다."
+            case .privacyOptionsNotRequired: "광고 개인정보 설정 메뉴를 지금은 열 수 없습니다."
+            case .busy: "다른 광고를 처리하고 있습니다. 잠시 후 다시 시도해 주세요."
             }
         }
     }
@@ -30,6 +33,8 @@ final class AdService: NSObject, ObservableObject {
     @Published private(set) var canRequestAds = false
     @Published private(set) var canShowPrivacyOptions = false
     @Published private(set) var privacyOptionsStatusText = "광고 개인정보 설정 상태를 확인 중입니다."
+    @Published private(set) var state: State = .idle
+    private var activeNonce: String?
 
     #if canImport(GoogleMobileAds)
     private var rewardedAd: RewardedAd?
@@ -93,6 +98,16 @@ final class AdService: NSObject, ObservableObject {
     }
 
     func showRewardedAd(userIdentifier: String, customData: String) async throws {
+        guard state == .idle || {
+            if case .failed = state { return true }
+            return false
+        }() else { throw AdError.busy }
+        state = .loading
+        activeNonce = customData
+        defer {
+            activeNonce = nil
+            if case .failed = state { } else { state = .idle }
+        }
         #if canImport(GoogleMobileAds)
         guard canRequestAds else {
             throw AdError.unavailable
@@ -106,8 +121,11 @@ final class AdService: NSObject, ObservableObject {
         do {
             ad = try await RewardedAd.load(with: unitID, request: Request())
         } catch {
+            state = .failed(error.localizedDescription)
             throw error
         }
+        guard activeNonce == customData else { throw CancellationError() }
+        state = .ready
         let options = ServerSideVerificationOptions()
         options.userIdentifier = userIdentifier
         options.customRewardText = customData
@@ -119,6 +137,7 @@ final class AdService: NSObject, ObservableObject {
             }
             rewardedPresentationDelegate = delegate
             ad.fullScreenContentDelegate = delegate
+            state = .presenting
             ad.present(from: nil) {
                 delegate.markRewardEarned()
             }
@@ -126,8 +145,10 @@ final class AdService: NSObject, ObservableObject {
         rewardedPresentationDelegate = nil
         rewardedAd = nil
         guard earned else { throw AdError.notEarned }
+        state = .verifying
         #else
         try await Task.sleep(for: .milliseconds(500))
+        state = .verifying
         #endif
     }
 
@@ -177,7 +198,7 @@ final class AdService: NSObject, ObservableObject {
             privacyOptionsStatusText = "광고 개인정보 설정을 열 수 있습니다."
         case .notRequired:
             canShowPrivacyOptions = false
-            privacyOptionsStatusText = "현재 지역 또는 AdMob 메시지 설정에서는 광고 개인정보 설정이 필요하지 않습니다."
+            privacyOptionsStatusText = ""
         case .unknown:
             canShowPrivacyOptions = false
             privacyOptionsStatusText = "광고 개인정보 설정 상태를 확인 중입니다."

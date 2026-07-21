@@ -37,19 +37,70 @@ struct AudioMetrics: Codable, Sendable {
     let wordsPerMinute: Double
 }
 
+enum RubricBand: String, Codable, Sendable {
+    case foundation
+    case developing
+    case functional
+    case strong
+    case advanced
+
+    var label: String {
+        switch self {
+        case .foundation: "기초"
+        case .developing: "발전 중"
+        case .functional: "기능적"
+        case .strong: "강함"
+        case .advanced: "고급"
+        }
+    }
+}
+
+enum RubricDimension: String, Codable, Sendable {
+    case taskFulfillment
+    case grammar
+    case vocabulary
+    case discourse
+    case fluency
+
+    var label: String {
+        switch self {
+        case .taskFulfillment: "과제 충족"
+        case .grammar: "문법"
+        case .vocabulary: "어휘"
+        case .discourse: "담화 구성"
+        case .fluency: "유창성"
+        }
+    }
+}
+
+struct RubricAssessment: Codable, Identifiable, Sendable {
+    let dimension: RubricDimension
+    let band: RubricBand
+    let evidence: String
+    let nextAction: String
+
+    var id: RubricDimension { dimension }
+}
+
 struct PracticeEvaluation: Codable, Sendable {
     let predictedLevel: OPIcLevel
     let confidence: ConfidenceBand
     let scores: EvaluationScores
     let strengths: [String]
     let improvements: [String]
-    let correctedAnswer: String
-    let targetGap: String
-    let sampleAnswer: String
+    let correctedAnswer: String?
+    let targetGap: String?
+    let sampleAnswer: String?
     let audioMetrics: AudioMetrics
     let disclaimer: String
     let modelVersion: String
     let promptVersion: String
+    let resultStatus: String?
+    let rubrics: [RubricAssessment]?
+    let warnings: [String]?
+    let scoreScaleVersion: String?
+
+    var isPartial: Bool { resultStatus == "partial" }
 }
 
 struct PerQuestionFeedback: Codable, Identifiable, Sendable {
@@ -72,18 +123,37 @@ struct MockEvaluation: Codable, Sendable {
     let disclaimer: String
     let modelVersion: String
     let promptVersion: String
+    let resultStatus: String?
+    let rubrics: [RubricAssessment]?
+    let warnings: [String]?
+    let scoreScaleVersion: String?
+
+    var isPartial: Bool { resultStatus == "partial" }
 }
 
 struct UsageStatus: Codable, Sendable {
     let date: String
     let freeRemaining: Int
     let bonusRemaining: Int
+    let serverDateKey: String?
+    let resetsAt: Date?
+    let dailyAnalysisFreeRemaining: Int?
+    let dailyAnalysisRewardRemaining: Int?
+    let dailyRefreshRemaining: Int?
+    let mockAvailable: Bool?
+    let mockSessionStage: String?
 
-    var totalRemaining: Int { freeRemaining + bonusRemaining }
+    var totalRemaining: Int {
+        (dailyAnalysisFreeRemaining ?? freeRemaining)
+            + (dailyAnalysisRewardRemaining ?? bonusRemaining)
+    }
 }
 
 enum RewardPurpose: String, Codable, Sendable {
     case practiceCredits = "practice_credits"
+    case practiceRefresh = "practice_refresh"
+    case mockStart = "mock_start"
+    case mockAdjustment = "mock_adjustment"
     case mockResult = "mock_result"
     case targetLevelChange = "target_level_change"
 }
@@ -149,13 +219,99 @@ struct TargetLevelResponse: Codable, Sendable {
 struct RewardIntent: Codable, Sendable {
     let nonce: String
     let purpose: RewardPurpose
-    let status: String
+    let status: RewardStatus
     let userIdentifier: String
     let customData: String
     let expiresAt: Date
 
-    var isVerified: Bool { status == "verified" || status == "confirmed" || status == "completed" }
-    var isPending: Bool { status == "pending" }
+    var isVerified: Bool { status == .verified || status == .completed }
+    var isPending: Bool { status == .pending }
+}
+
+enum RewardStatus: Codable, Equatable, Sendable, CustomStringConvertible {
+    case pending
+    case verified
+    case completed
+    case failed
+    case unknown(String)
+
+    init(from decoder: Decoder) throws {
+        let value = try decoder.singleValueContainer().decode(String.self)
+        switch value {
+        case "pending": self = .pending
+        case "verified", "confirmed": self = .verified
+        case "completed": self = .completed
+        case "failed": self = .failed
+        default: self = .unknown(value)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        try container.encode(description)
+    }
+
+    var description: String {
+        switch self {
+        case .pending: "pending"
+        case .verified: "verified"
+        case .completed: "completed"
+        case .failed: "failed"
+        case let .unknown(value): value
+        }
+    }
+}
+
+struct Capabilities: Codable, Sendable {
+    struct QuotaPolicy: Codable, Sendable {
+        let dailyAnalysisFree: Int
+        let dailyRefreshRewards: Int
+        let mockSessionsPerDay: Int
+        let mockRewardGates: Int
+    }
+
+    let minimumSupportedAppVersion: String
+    let questionGenerationV2: Bool
+    let mockSessionV2: Bool
+    let evaluationRubricV2: Bool
+    let practiceRefresh: Bool
+    let guideSchemaVersion: Int
+    let quotaPolicy: QuotaPolicy
+}
+
+struct OperationResult: Codable, Sendable {
+    let operationId: String
+    let operation: String
+    let status: String
+    let result: [String: JSONValue]?
+    let retryable: Bool
+    let updatedAt: Date?
+}
+
+enum JSONValue: Codable, Sendable {
+    case string(String), number(Double), bool(Bool), object([String: JSONValue]), array([JSONValue]), null
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.singleValueContainer()
+        if container.decodeNil() { self = .null }
+        else if let value = try? container.decode(Bool.self) { self = .bool(value) }
+        else if let value = try? container.decode(Double.self) { self = .number(value) }
+        else if let value = try? container.decode(String.self) { self = .string(value) }
+        else if let value = try? container.decode([String: JSONValue].self) { self = .object(value) }
+        else { self = .array(try container.decode([JSONValue].self)) }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case let .string(value): try container.encode(value)
+        case let .number(value): try container.encode(value)
+        case let .bool(value): try container.encode(value)
+        case let .object(value): try container.encode(value)
+        case let .array(value): try container.encode(value)
+        case .null: try container.encodeNil()
+        }
+    }
 }
 
 struct MockEvaluationManifest: Codable, Sendable {
