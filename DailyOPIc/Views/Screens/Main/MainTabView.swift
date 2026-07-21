@@ -29,7 +29,7 @@ struct MainTabView: View {
             NavigationStack {
                 ProgressScreen(preferences: environment.preferences)
             }
-            .tabItem { Label("통계", systemImage: "checkmark.circle.fill") }
+            .tabItem { Label("통계", systemImage: "chart.bar.fill") }
             .tag(2)
         }
         .environmentObject(environment.ads)

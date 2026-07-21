@@ -12,6 +12,7 @@ final class PracticeViewModel {
     }
 
     let speech = SpeechRecognitionService()
+    let promptPlayback = PromptPlaybackService()
     private let api: APIClient
     private let ads: AdService
     private let preferences: AppPreferences
@@ -50,10 +51,7 @@ final class PracticeViewModel {
         guard let questions = questionSet?.questions, !questions.isEmpty else { return nil }
         return questions[min(questionIndex, questions.count - 1)]
     }
-    var remainingText: String {
-        guard let usage else { return "사용량 확인 중" }
-        return "데일리 분석 남은 횟수: \(usage.totalRemaining)회"
-    }
+    var dailyTokenCount: Int? { usage?.totalRemaining }
 
     func load() async {
         guard questionSet == nil else { return }
@@ -105,6 +103,16 @@ final class PracticeViewModel {
         }
     }
 
+    func playCurrentPromptAutomatically() {
+        guard let currentQuestion else { return }
+        promptPlayback.playAutomatically(currentQuestion)
+    }
+
+    func replayCurrentPrompt() {
+        guard let currentQuestion else { return }
+        promptPlayback.replayOnce(currentQuestion)
+    }
+
     func toggleRecording() async {
         errorMessage = nil
         if speech.isListening {
@@ -115,6 +123,7 @@ final class PracticeViewModel {
                 errorMessage = error.localizedDescription
             }
         } else {
+            promptPlayback.stop()
             do {
                 try await speech.start()
             } catch {
@@ -247,7 +256,7 @@ final class PracticeViewModel {
         let operationID = refreshOperationID ?? UUID()
         refreshOperationID = operationID
         operationState = .running(operationId: operationID, startedAt: .now)
-        refreshProgressMessage = "광고 확인 후 새 Daily 문제를 준비합니다."
+        refreshProgressMessage = "새 질문을 준비하고 있어요."
         errorMessage = nil
         do {
             let updated = try await refreshAfterVerifiedAd(
@@ -283,7 +292,7 @@ final class PracticeViewModel {
             customData: intent.customData
         )
         _ = try await api.waitForReward(nonce: intent.nonce)
-        refreshProgressMessage = "새 질문을 안전하게 준비하는 중입니다."
+        refreshProgressMessage = "새 질문을 준비하고 있어요."
         let updated = try await api.refreshPracticeSet(
             request: PracticeRefreshRequest(
                 initialLevel: initialLevel,

@@ -31,23 +31,29 @@ struct OnboardingView: View {
         NavigationStack {
             ZStack {
                 LinearGradient(
-                    colors: [.white, AppPalette.primarySoft.opacity(0.72)],
+                    colors: [Color(.systemBackground), AppPalette.primarySoft.opacity(0.6)],
                     startPoint: .top,
                     endPoint: .bottom
                 )
                 .ignoresSafeArea()
 
-                switch step {
-                case .firstQuestion:
-                    firstQuestion
-                case .guide:
-                    OPIcGuideView(preferences: preferences) { skipped in
-                        preferences.finishGuide(skipped: skipped)
-                        step = .level
+                Group {
+                    switch step {
+                    case .firstQuestion:
+                        firstQuestion
+                    case .guide:
+                        OPIcGuideView(preferences: preferences) { skipped in
+                            preferences.finishGuide(skipped: skipped)
+                            withAnimation(.easeInOut(duration: 0.25)) { step = .level }
+                        }
+                    case .level:
+                        levelSelection
                     }
-                case .level:
-                    levelSelection
                 }
+                .transition(.asymmetric(
+                    insertion: .move(edge: .trailing).combined(with: .opacity),
+                    removal: .opacity
+                ))
 
                 if showsConfirmation, let selectedLevel {
                     TargetLevelConfirmationDialog(
@@ -70,48 +76,51 @@ struct OnboardingView: View {
     }
 
     private var firstQuestion: some View {
-        VStack(spacing: 24) {
+        VStack(spacing: AppSpacing.lg) {
             Spacer()
             Image(systemName: "questionmark.bubble.fill")
                 .font(.system(size: 58))
                 .foregroundStyle(AppPalette.primary)
-            Text("오픽 시험이 처음이신가요?")
+            Text("오픽이 처음이신가요?")
                 .font(AppTypography.title)
                 .multilineTextAlignment(.center)
-            Text("가이드를 건너뛰어도 Daily와 모의고사 이용에는 불이익이 없습니다.")
+            Text("간단한 안내를 먼저 볼 수 있어요.")
                 .font(AppTypography.body)
                 .foregroundStyle(AppPalette.secondaryInk)
                 .multilineTextAlignment(.center)
-            PrimaryButton(title: "네, 가이드를 볼게요", systemImage: "book.fill") {
+            PrimaryButton(title: "안내 보기", systemImage: "book.fill") {
                 preferences.isNewToOPIc = true
                 preferences.guideState = .inProgress
-                step = .guide
+                withAnimation(.easeInOut(duration: 0.25)) { step = .guide }
             }
-            PrimaryButton(title: "아니오, 난이도를 선택할게요", systemImage: "arrow.right") {
+            Button("바로 시작할게요") {
                 preferences.isNewToOPIc = false
                 preferences.guideState = .skipped
-                step = .level
+                withAnimation(.easeInOut(duration: 0.25)) { step = .level }
             }
+            .font(.headline)
+            .foregroundStyle(AppPalette.primary)
             Spacer()
         }
-        .padding(24)
+        .padding(AppSpacing.lg)
     }
 
     private var levelSelection: some View {
         ScrollView {
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 HStack {
                     Spacer()
                     GuideEntryButton(preferences: preferences)
                 }
-                Text(preferences.initialLevel == nil ? "OPIc 시작 난이도를 선택해 주세요" : "변경할 시작 난이도를 선택해 주세요")
+                Text(preferences.initialLevel == nil ? "시작 난이도를 골라주세요" : "난이도를 바꿔볼까요?")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
                     .foregroundStyle(AppPalette.ink)
                 Text(guidanceText)
-                    .font(AppTypography.body)
+                    .font(AppTypography.callout)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 if let message = errorMessage {
                     ErrorBanner(
@@ -136,7 +145,7 @@ struct OnboardingView: View {
                 }
 
                 PrimaryButton(
-                    title: selectedLevel == nil ? "단계를 선택해 주세요" : "선택한 단계 확인",
+                    title: selectedLevel == nil ? "난이도를 선택해 주세요" : "이 난이도로 시작",
                     systemImage: "checkmark.circle.fill",
                     isLoading: isSubmitting,
                     isDisabled: selectedLevel == nil || isSubmitting
@@ -146,69 +155,62 @@ struct OnboardingView: View {
                     }
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 
     private var guidanceText: String {
         if preferences.initialLevel == nil {
-            return "실제 시험 전 자기평가와 비슷한 학습 시작값입니다. 선택한 단계로 시작하고 Q7 이후 난이도를 한 번 조정합니다."
+            return "지금 실력과 비슷한 단계를 고르면 돼요. 나중에 언제든 바꿀 수 있어요."
         }
-        return "Self Assessment 단계를 바꾸면 새 문제가 다시 생성됩니다. 변경하려면 보상형 광고를 끝까지 시청해야 합니다."
+        return "난이도를 바꾸면 새 질문이 만들어져요. 변경하려면 광고를 끝까지 봐야 해요."
     }
 
     private func levelCard(_ level: SelfAssessmentLevel) -> some View {
         let isSelected = selectedLevel == level
         return Button {
-            guard !isSubmitting else { return }
-            selectedLevel = level
+            withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) {
+                selectedLevel = level
+            }
         } label: {
             HStack(alignment: .top, spacing: 14) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundStyle(AppPalette.primary)
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text(level.title).font(.title2.bold())
+                        Text(level.title).font(.title3.bold())
                         Spacer()
                         Text(level.estimatedRange)
                             .font(.caption.bold())
                             .foregroundStyle(AppPalette.primary)
                     }
-                    Text(level.summary).font(AppTypography.body)
-                    Text("추천: \(recommendation(for: level))")
-                        .font(.footnote.weight(.semibold))
-                    Text("답변 예시: “\(answerExample(for: level))”")
-                        .font(.footnote)
+                    Text(level.summary)
+                        .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
-                        .fixedSize(horizontal: false, vertical: true)
+                    if isSelected {
+                        Text("예: “\(answerExample(for: level))”")
+                            .font(AppTypography.footnote.italic())
+                            .foregroundStyle(AppPalette.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .transition(.opacity.combined(with: .move(edge: .top)))
+                    }
                 }
             }
-            .padding(18)
-            .background(isSelected ? AppPalette.primarySoft : Color(.secondarySystemBackground))
+            .padding(AppSpacing.md)
+            .background(isSelected ? AppPalette.primarySoft : AppPalette.surface)
             .overlay {
-                RoundedRectangle(cornerRadius: 28, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
                     .stroke(
-                        AppPalette.primary.opacity(isSelected ? 0.75 : 0.22),
+                        AppPalette.primary.opacity(isSelected ? 0.75 : 0.18),
                         lineWidth: isSelected ? 1.8 : 1
                     )
             }
-            .clipShape(RoundedRectangle(cornerRadius: 28, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isSubmitting)
         .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private func recommendation(for level: SelfAssessmentLevel) -> String {
-        switch level.rawValue {
-        case 1: "영어 문장으로 답하기를 처음 시작하는 학습자"
-        case 2: "익숙한 주제에 짧은 문장 몇 개로 답하는 학습자"
-        case 3: "일상 질문에 이유를 덧붙일 수 있는 학습자"
-        case 4: "경험을 순서대로 설명하고 싶은 학습자"
-        case 5: "구체적인 예시와 비교를 연습하는 학습자"
-        default: "복잡한 상황과 의견을 자연스럽게 확장하는 학습자"
-        }
     }
 
     private func answerExample(for level: SelfAssessmentLevel) -> String {
@@ -232,7 +234,7 @@ struct OnboardingView: View {
         guard !isSubmitting else { return }
         isSubmitting = true
         errorMessage = nil
-        progressMessage = "Self Assessment 단계를 저장하는 중입니다."
+        progressMessage = "난이도를 저장하고 있어요."
         print("[DailyOPIc][TargetLevel] update requested initialLevel=\(level.rawValue)")
         do {
             try await saveTargetLevel(level, rewardNonce: nil)
@@ -244,7 +246,7 @@ struct OnboardingView: View {
             )
             do {
                 let rewardNonce = try await rewardNonceForTargetLevelChange()
-                progressMessage = "광고 검증이 완료됐습니다. 단계 변경을 다시 요청하는 중입니다."
+                progressMessage = "확인됐어요. 난이도를 바꾸고 있어요."
                 print("[DailyOPIc][TargetLevel] retrying update with reward nonce=\(rewardNonce)")
                 try await saveTargetLevel(level, rewardNonce: rewardNonce)
                 finishSelection(level)
@@ -267,7 +269,7 @@ struct OnboardingView: View {
     }
 
     private func rewardNonceForTargetLevelChange() async throws -> String {
-        progressMessage = "단계 변경 권한을 준비하는 중입니다."
+        progressMessage = "잠시만요, 준비하고 있어요."
         print("[DailyOPIc][Rewards] creating target_level_change intent")
         let intent = try await environment.api.createRewardIntent(
             purpose: .targetLevelChange,
@@ -277,18 +279,18 @@ struct OnboardingView: View {
             "[DailyOPIc][Rewards] intent created nonce=\(intent.nonce) "
             + "status=\(intent.status)"
         )
-        progressMessage = "리워드 광고를 불러오는 중입니다."
+        progressMessage = "광고를 불러오고 있어요."
         try await environment.ads.showRewardedAd(
             userIdentifier: intent.userIdentifier,
             customData: intent.customData
         )
         print("[DailyOPIc][Rewards] rewarded ad earned. waiting for SSV nonce=\(intent.nonce)")
-        progressMessage = "광고 시청 확인 중입니다. SSV 콜백을 기다리는 중입니다."
+        progressMessage = "광고 시청을 확인하고 있어요."
         _ = try await environment.api.waitForReward(nonce: intent.nonce) { reward in
             print("[DailyOPIc][Rewards] poll nonce=\(reward.nonce) status=\(reward.status)")
             guard reward.isPending else { return }
             await MainActor.run {
-                progressMessage = "광고 시청 확인 중입니다. SSV 콜백 대기 중입니다."
+                progressMessage = "광고 시청을 확인하고 있어요."
             }
         }
         return intent.nonce
@@ -321,9 +323,8 @@ private struct ProgressBanner: View {
     let message: String
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
-            ProgressView()
-                .tint(AppPalette.primary)
+        HStack(alignment: .center, spacing: 12) {
+            AppLoadingIndicator(dotSize: 8)
             Text(message)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(AppPalette.primary)
@@ -331,7 +332,7 @@ private struct ProgressBanner: View {
         }
         .padding(14)
         .background(AppPalette.primarySoft.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
     }
 }
 
@@ -350,15 +351,15 @@ private struct TargetLevelConfirmationDialog: View {
                     if !isSubmitting { cancel() }
                 }
 
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: requiresReward ? "play.rectangle.fill" : "checkmark.seal.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                Text(requiresReward ? "Self Assessment 단계를 변경할까요?" : "이 단계로 시작할까요?")
+                Text(requiresReward ? "난이도를 바꿀까요?" : "이 난이도로 시작할까요?")
                     .font(.title3.bold())
                     .foregroundStyle(AppPalette.ink)
                     .multilineTextAlignment(.center)
-                Text("\(level.title) · \(level.estimatedRange)에 맞춰 새 문제가 준비됩니다.")
+                Text("\(level.title) · \(level.estimatedRange)")
                     .font(.headline)
                     .foregroundStyle(AppPalette.primary)
                 Text(message)
@@ -368,34 +369,34 @@ private struct TargetLevelConfirmationDialog: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 PrimaryButton(
-                    title: requiresReward ? "광고 시청 후 변경" : "시작하기",
+                    title: requiresReward ? "광고 보고 바꾸기" : "시작하기",
                     systemImage: requiresReward ? "play.rectangle.fill" : "mic.fill",
                     isLoading: isSubmitting,
                     isDisabled: isSubmitting,
                     action: confirm
                 )
-                Button("다시 선택") { cancel() }
+                Button("다시 고르기") { cancel() }
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .disabled(isSubmitting)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 340)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
         .transition(.opacity)
     }
 
     private var message: String {
         if requiresReward {
-            return "Self Assessment 단계를 바꾸면 기존 데일리 문제가 새로 생성됩니다. 보상형 광고를 끝까지 시청한 뒤 변경이 적용됩니다."
+            return "난이도를 바꾸면 새 질문이 만들어져요. 광고를 끝까지 보면 바뀐 난이도가 적용돼요."
         }
-        return "선택한 단계를 기준으로 데일리 문제가 생성됩니다. Q7 이후 후반 난이도를 다시 선택합니다."
+        return "고른 난이도로 질문이 만들어져요. 모의고사 중간에 한 번 조정할 수 있어요."
     }
 }

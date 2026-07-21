@@ -1,19 +1,20 @@
 import SwiftUI
 
-struct TranscriptPanel: View {
+/// Shows the user's spoken answer as recognized speech text.
+struct AnswerPanel: View {
     let finalText: String
     let partialText: String
     let isRecording: Bool
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Label(
-                isRecording ? "실시간 답변" : "답변 transcript",
+                isRecording ? "듣고 있어요" : "내 답변",
                 systemImage: isRecording ? "waveform" : "text.alignleft"
             )
             .font(.headline)
             if finalText.isEmpty && partialText.isEmpty {
-                Text(isRecording ? "영어로 답변해 주세요." : "녹음을 시작하면 답변이 표시됩니다.")
+                Text(isRecording ? "영어로 답변해 주세요." : "녹음을 시작하면 답변이 여기에 표시돼요.")
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
                 LazyVStack(alignment: .leading, spacing: 8) {

@@ -70,7 +70,7 @@ final class MockExamViewModel {
             questionSet = current.questionSet
             if current.stage == .completed {
                 questionSet = nil
-                errorMessage = "오늘 모의고사는 이미 완료했습니다. 다음 KST 날짜에 새 시험을 시작할 수 있습니다."
+                errorMessage = "오늘 모의고사를 이미 완료했어요. 내일 새 모의고사가 열려요."
                 return
             }
         }
@@ -86,7 +86,7 @@ final class MockExamViewModel {
            serverSet.setId != draftSet.setId || serverSet.setHash != draftSet.setHash {
             AudioFileService.removeAll(draft.answers)
             try? persistence.clearDraft()
-            errorMessage = "서버 질문 세트와 일치하지 않는 임시 답변을 정리했습니다."
+            errorMessage = "이전에 저장된 답변을 정리했어요. 다시 시작해 주세요."
             return
         }
         let set = questionSet ?? draftSet
@@ -157,7 +157,7 @@ final class MockExamViewModel {
                 throw APIClientError.server(
                     status: 409,
                     code: "mock_session_resume_required",
-                    message: "오늘 시작한 모의고사가 있습니다. 저장된 답변으로 이어해 주세요."
+                    message: "오늘 진행 중인 모의고사가 있어요. 이어서 진행해 주세요."
                 )
             }
             let intent = try await api.createRewardIntent(
@@ -392,7 +392,7 @@ final class MockExamViewModel {
         answers = []
         currentIndex = 0
         evaluation = nil
-        errorMessage = hadSession ? "오늘 모의고사는 종료됐습니다. 다음 KST 날짜에 새 모의고사를 시작할 수 있습니다." : nil
+        errorMessage = hadSession ? "오늘 모의고사를 그만뒀어요. 내일 다시 도전할 수 있어요." : nil
         evaluationRetryContext = nil
         phase = .introduction
     }

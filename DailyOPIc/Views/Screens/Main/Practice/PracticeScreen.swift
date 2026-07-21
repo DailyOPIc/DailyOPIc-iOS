@@ -4,12 +4,14 @@ struct PracticeScreen: View {
     let viewModel: PracticeViewModel
     let preferences: AppPreferences
     @ObservedObject private var speech: SpeechRecognitionService
+    @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsSetup = false
 
     init(viewModel: PracticeViewModel, preferences: AppPreferences) {
         self.viewModel = viewModel
         self.preferences = preferences
         _speech = ObservedObject(wrappedValue: viewModel.speech)
+        _promptPlayback = ObservedObject(wrappedValue: viewModel.promptPlayback)
     }
 
     var body: some View {
@@ -69,18 +71,10 @@ struct PracticeScreen: View {
 
     private var practiceBody: some View {
         ScrollView {
-            VStack(spacing: 22) {
+            VStack(spacing: AppSpacing.lg) {
                 HStack {
-                    Text(viewModel.remainingText)
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(AppPalette.primary)
+                    DailyTokenBadge(count: viewModel.dailyTokenCount)
                     Spacer()
-                }
-                if let usage = viewModel.usage {
-                    Text("기본 분석 \(usage.dailyAnalysisFreeRemaining ?? usage.freeRemaining)회 · 광고 보상 \(usage.dailyAnalysisRewardRemaining ?? usage.bonusRemaining)회")
-                        .font(.caption)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                        .frame(maxWidth: .infinity, alignment: .leading)
                 }
 
                 if let message = viewModel.errorMessage {
@@ -90,44 +84,73 @@ struct PracticeScreen: View {
                 }
 
                 if viewModel.phase == .loading {
-                    ProgressView("맞춤 문제를 준비하고 있어요")
-                        .frame(maxWidth: .infinity, minHeight: 260)
+                    VStack(spacing: AppSpacing.md) {
+                        AppLoadingIndicator()
+                        Text("맞춤 질문을 준비하고 있어요")
+                            .font(AppTypography.callout)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                    }
+                    .frame(maxWidth: .infinity, minHeight: 260)
                 } else if let question = viewModel.currentQuestion {
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
+                        .id(question.number)
+                        .transition(.asymmetric(
+                            insertion: .move(edge: .trailing).combined(with: .opacity),
+                            removal: .opacity
+                        ))
 
-                    VStack(spacing: 14) {
+                    promptControls(for: question)
+
+                    VStack(spacing: AppSpacing.md) {
                         RecordingButton(
                             isRecording: speech.isListening,
                             isDisabled: viewModel.phase == .analyzing
                         ) {
                             Task { await viewModel.toggleRecording() }
                         }
-                        Text(speech.isListening ? "Tap to Finish" : "Tap to Answer")
+                        Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
                             .font(.title3.bold())
-                        TranscriptPanel(
+                        AnswerPanel(
                             finalText: speech.finalTranscript,
                             partialText: speech.partialTranscript,
                             isRecording: speech.isListening
                         )
                     }
-                    .padding(.vertical, 32)
+                    .padding(.vertical, AppSpacing.xl)
 
-                    if viewModel.phase == .analyzing {
-                        ProgressView("답변을 정교하게 분석하고 있어요")
-                    } else if viewModel.pendingRecording != nil {
-                        PrimaryButton(title: "평가 다시 시도", systemImage: "arrow.clockwise") {
+                    if viewModel.pendingRecording != nil, viewModel.phase != .analyzing {
+                        PrimaryButton(title: "분석 다시 시도", systemImage: "arrow.clockwise") {
                             Task { await viewModel.retryEvaluation() }
                         }
                     }
-                    Button("다른 질문으로 넘어가기") { viewModel.skipQuestion() }
+                    Button("다른 질문 받기") { viewModel.skipQuestion() }
                         .buttonStyle(.bordered)
                         .controlSize(.large)
                 }
                 BannerAdView()
                     .frame(height: 50)
             }
-            .padding(20)
+            .padding(AppSpacing.lg)
+            .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.currentQuestion?.number)
         }
         .refreshable { await viewModel.reloadQuestions() }
+        .task(id: viewModel.currentQuestion?.number) {
+            viewModel.playCurrentPromptAutomatically()
+        }
+    }
+
+    @ViewBuilder
+    private func promptControls(for question: GeneratedQuestion) -> some View {
+        HStack {
+            Label(
+                promptPlayback.isSpeaking ? "질문 듣는 중" : "질문 듣기",
+                systemImage: promptPlayback.isSpeaking ? "speaker.wave.2.fill" : "speaker.fill"
+            )
+            .foregroundStyle(AppPalette.secondaryInk)
+            Spacer()
+            Button("다시 듣기") { viewModel.replayCurrentPrompt() }
+                .disabled(!promptPlayback.canReplay(question) || speech.isListening)
+        }
+        .font(.subheadline)
     }
 }

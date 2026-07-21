@@ -7,8 +7,8 @@ struct GuideEntryButton: View {
         Button {
             preferences.beginGuide()
         } label: {
-            Label("오픽이 처음이신가요?", systemImage: "questionmark.circle")
+            Label("도움말", systemImage: "questionmark.circle")
         }
-        .accessibilityHint("OPIc 학습 가이드를 다시 엽니다")
+        .accessibilityHint("데일리오픽 사용법과 오픽 시험 안내를 엽니다")
     }
 }

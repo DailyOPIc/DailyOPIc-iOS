@@ -57,7 +57,7 @@ struct RubricBandsView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 16) {
-            Text("5단계 말하기 루브릭").font(.headline)
+            Text("항목별 피드백").font(.headline)
             ForEach(rubrics) { rubric in
                 VStack(alignment: .leading, spacing: 7) {
                     HStack {
@@ -85,35 +85,65 @@ struct RubricBandsView: View {
 
 struct FeedbackSection: View {
     let title: String
-    let text: String
+    private let items: [String]
     var tint = AppPalette.primarySoft
+
+    /// Single free-text block.
+    init(title: String, text: String, tint: Color = AppPalette.primarySoft) {
+        self.title = title
+        self.items = [text]
+        self.tint = tint
+    }
+
+    /// Bulleted list; each entry gets its own leading bullet (fixes the
+    /// previous "\n• " join that dropped the first item's bullet).
+    init(title: String, bullets: [String], tint: Color = AppPalette.primarySoft) {
+        self.title = title
+        self.items = bullets
+        self.tint = tint
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text(title)
                 .font(.headline)
                 .foregroundStyle(AppPalette.primary)
-            Text(text)
+            if items.count > 1 {
+                VStack(alignment: .leading, spacing: 8) {
+                    ForEach(Array(items.enumerated()), id: \.offset) { _, item in
+                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                            Text("•")
+                            Text(item)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                    }
+                }
                 .font(AppTypography.body)
                 .foregroundStyle(AppPalette.ink)
                 .textSelection(.enabled)
+            } else {
+                Text(items.first ?? "")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.ink)
+                    .textSelection(.enabled)
+            }
         }
-        .padding(20)
+        .padding(AppSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(tint)
-        .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
     }
 }
 
 extension View {
-    func cardStyle() -> some View {
-        padding(20)
-            .frame(maxWidth: .infinity, alignment: .leading)
+    func cardStyle(alignment: Alignment = .leading) -> some View {
+        padding(AppSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: alignment)
             .background(.background)
             .overlay {
-                RoundedRectangle(cornerRadius: 22, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous)
                     .stroke(AppPalette.primary.opacity(0.22), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
     }
 }

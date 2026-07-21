@@ -5,34 +5,44 @@ struct AILoadingOverlay: View {
     let blocksInteraction: Bool
     let canContinueInBackground: Bool
     @Environment(\.accessibilityReduceMotion) private var reduceMotion
-    @State private var detail = "잠시만 기다려 주세요."
+    @State private var takingLonger = false
+    @State private var appeared = false
 
     var body: some View {
         ZStack {
             if blocksInteraction { Color.black.opacity(0.28).ignoresSafeArea() }
-            VStack(spacing: 16) {
-                ProgressView()
-                    .controlSize(.large)
-                Text(kind.title).font(.headline)
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
+            VStack(spacing: AppSpacing.md) {
+                AppLoadingIndicator(dotSize: 12)
+                    .padding(.bottom, AppSpacing.xs)
+                Text(kind.title)
+                    .font(.headline)
                     .multilineTextAlignment(.center)
+                if takingLonger {
+                    Text("조금만 더 기다려 주세요.")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .transition(.opacity)
+                }
                 if canContinueInBackground {
-                    Text("화면을 닫아도 서버 작업은 백그라운드에서 계속됩니다.")
-                        .font(.caption)
+                    Text("화면을 닫아도 계속 진행돼요.")
+                        .font(AppTypography.caption)
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.xl)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
-            .padding(28)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+            .padding(AppSpacing.xl)
+            .scaleEffect(appeared ? 1 : 0.92)
+            .opacity(appeared ? 1 : 0)
+        }
+        .onAppear {
+            if reduceMotion { appeared = true }
+            else { withAnimation(.spring(response: 0.35, dampingFraction: 0.8)) { appeared = true } }
         }
         .task {
-            guard !reduceMotion else { return }
             try? await Task.sleep(for: .seconds(8))
-            detail = "안전하게 처리 중이에요. 조금 더 걸릴 수 있습니다."
+            withAnimation(.easeInOut(duration: 0.25)) { takingLonger = true }
         }
         .accessibilityElement(children: .combine)
         .accessibilityAddTraits(.updatesFrequently)

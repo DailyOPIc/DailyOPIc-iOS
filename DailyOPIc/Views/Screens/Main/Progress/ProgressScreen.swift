@@ -56,7 +56,8 @@ struct ProgressScreen: View {
             VStack(alignment: .leading, spacing: 26) {
                 VStack(alignment: .leading, spacing: 6) {
                     Text("통계").font(AppTypography.title)
-                    Text("이 기기에 저장된 연습과 모의고사 결과입니다.")
+                    Text("이 기기에 저장된 나의 연습 기록이에요.")
+                        .font(AppTypography.callout)
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
                 Picker("통계 기간", selection: $period) {
@@ -65,7 +66,7 @@ struct ProgressScreen: View {
                 .pickerStyle(.segmented)
                 summary
                 if corruptRecordCount > 0 {
-                    ErrorBanner(message: "읽을 수 없는 로컬 기록 \(corruptRecordCount)개가 있습니다. 기록은 숨기지 않고 오류로 집계했습니다.")
+                    ErrorBanner(message: "불러올 수 없는 기록 \(corruptRecordCount)개가 있어요.")
                 }
                 if !distribution.isEmpty { distributionView }
                 HStack {
@@ -98,7 +99,7 @@ struct ProgressScreen: View {
                 .foregroundStyle(AppPalette.primary)
                 .padding(.horizontal, 22)
                 .padding(.vertical, 9)
-                .background(.white)
+                .background(AppPalette.elevatedSurface)
                 .overlay { Capsule().stroke(AppPalette.primary.opacity(0.5)) }
                 .offset(y: -22)
             HStack(spacing: 12) {

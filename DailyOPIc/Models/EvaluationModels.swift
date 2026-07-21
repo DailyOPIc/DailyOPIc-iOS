@@ -48,9 +48,9 @@ enum RubricBand: String, Codable, Sendable {
         switch self {
         case .foundation: "기초"
         case .developing: "발전 중"
-        case .functional: "기능적"
-        case .strong: "강함"
-        case .advanced: "고급"
+        case .functional: "무난함"
+        case .strong: "우수함"
+        case .advanced: "탁월함"
         }
     }
 }
@@ -64,10 +64,10 @@ enum RubricDimension: String, Codable, Sendable {
 
     var label: String {
         switch self {
-        case .taskFulfillment: "과제 충족"
+        case .taskFulfillment: "질문 이해"
         case .grammar: "문법"
         case .vocabulary: "어휘"
-        case .discourse: "담화 구성"
+        case .discourse: "말의 흐름"
         case .fluency: "유창성"
         }
     }

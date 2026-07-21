@@ -1,11 +1,50 @@
 import SwiftUI
+import UIKit
 
+/// Central color tokens. Every color adapts to light/dark mode via a dynamic
+/// `UIColor` provider so the whole app stays legible in either appearance.
 enum AppPalette {
-    static let primary = Color(red: 75 / 255, green: 36 / 255, blue: 1)
-    static let primarySoft = Color(red: 237 / 255, green: 233 / 255, blue: 1)
-    static let primaryMid = Color(red: 155 / 255, green: 135 / 255, blue: 245 / 255)
-    static let ink = Color(red: 17 / 255, green: 24 / 255, blue: 39 / 255)
-    static let secondaryInk = Color(red: 107 / 255, green: 114 / 255, blue: 128 / 255)
-    static let successSoft = Color(red: 236 / 255, green: 253 / 255, blue: 245 / 255)
-    static let danger = Color(red: 239 / 255, green: 68 / 255, blue: 68 / 255)
+    static let primary = dynamic(
+        light: rgb(75, 36, 255),
+        dark: rgb(150, 122, 255)
+    )
+    static let primarySoft = dynamic(
+        light: rgb(237, 233, 255),
+        dark: rgb(46, 38, 86)
+    )
+    static let primaryMid = dynamic(
+        light: rgb(155, 135, 245),
+        dark: rgb(120, 100, 210)
+    )
+    static let ink = dynamic(
+        light: rgb(17, 24, 39),
+        dark: rgb(240, 242, 248)
+    )
+    static let secondaryInk = dynamic(
+        light: rgb(107, 114, 128),
+        dark: rgb(160, 166, 178)
+    )
+    static let successSoft = dynamic(
+        light: rgb(236, 253, 245),
+        dark: rgb(24, 52, 43)
+    )
+    static let danger = dynamic(
+        light: rgb(239, 68, 68),
+        dark: rgb(248, 113, 113)
+    )
+
+    /// Base surface for cards; adapts to system background.
+    static let surface = Color(.secondarySystemBackground)
+    /// Elevated surface (dialogs, sheets).
+    static let elevatedSurface = Color(.systemBackground)
+
+    private static func rgb(_ r: Double, _ g: Double, _ b: Double) -> UIColor {
+        UIColor(red: r / 255, green: g / 255, blue: b / 255, alpha: 1)
+    }
+
+    private static func dynamic(light: UIColor, dark: UIColor) -> Color {
+        Color(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? dark : light
+        })
+    }
 }

@@ -19,10 +19,10 @@ struct DailyRefreshDialog: View {
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
                 VStack(spacing: 8) {
-                    Text("광고를 보고 새 질문을 받을까요?")
+                    Text("광고 보고 새 질문 받기")
                         .font(.title3.bold())
                         .foregroundStyle(AppPalette.ink)
-                    Text("질문 새로고침은 분석 횟수를 사용하지 않습니다. 광고를 끝까지 시청하고 원하는 난이도의 새 질문을 받습니다.")
+                    Text("새 질문은 데일리 토큰을 쓰지 않아요. 광고를 끝까지 보면 원하는 난이도의 새 질문을 받아요.")
                         .font(AppTypography.body)
                         .foregroundStyle(AppPalette.secondaryInk)
                         .multilineTextAlignment(.center)
@@ -31,8 +31,7 @@ struct DailyRefreshDialog: View {
 
                 if let progressMessage {
                     HStack(spacing: 10) {
-                        ProgressView()
-                            .tint(AppPalette.primary)
+                        AppLoadingIndicator(dotSize: 7)
                         Text(progressMessage)
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(AppPalette.primary)

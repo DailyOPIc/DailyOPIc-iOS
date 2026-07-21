@@ -46,12 +46,12 @@ enum SelfAssessmentLevel: Int, Codable, CaseIterable, Identifiable, Sendable {
 
     var summary: String {
         switch self {
-        case .level1: "단순 묘사와 현재 시제 중심의 매우 짧은 답변"
-        case .level2: "간단한 루틴과 짧은 경험 설명"
-        case .level3: "일상 주제에서 경험과 이유 설명 시작"
-        case .level4: "경험, 이유, 간단한 비교와 변화 설명"
-        case .level5: "경험, 비교, 변화, 롤플레이를 포함하는 실전 표준 난이도"
-        case .level6: "복합 경험, 문제 해결, 추상 의견과 사회적 영향 분석"
+        case .level1: "짧은 한두 문장으로 답해요"
+        case .level2: "익숙한 주제를 간단히 말해요"
+        case .level3: "일상 이야기에 이유를 덧붙여요"
+        case .level4: "경험을 순서대로 설명해요"
+        case .level5: "비교와 역할극까지, 실전 수준이에요"
+        case .level6: "복잡한 주제도 자연스럽게 말해요"
         }
     }
 

@@ -16,9 +16,9 @@ struct SetupView: View {
         NavigationStack {
             ZStack {
                 List {
-                    Section("Self Assessment") {
+                    Section("난이도") {
                         HStack {
-                            Text("현재 선택 단계")
+                            Text("현재 난이도")
                             Spacer()
                             Text(preferences.initialLevel?.title ?? "-")
                                 .fontWeight(.bold)
@@ -29,10 +29,10 @@ struct SetupView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
-                        Text("Self Assessment 단계를 변경하면 새 문제가 다시 생성되며, 변경 시 보상형 광고를 끝까지 시청해야 합니다.")
+                        Text("난이도를 바꾸면 새 질문이 만들어져요. 변경하려면 광고를 끝까지 봐야 해요.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        Button("Self Assessment 설정") {
+                        Button("난이도 바꾸기") {
                             withAnimation(.easeInOut(duration: 0.18)) {
                                 showsGoalLevelDialog = true
                             }
@@ -45,7 +45,7 @@ struct SetupView: View {
                                 preferences.beginGuide()
                             }
                         } label: {
-                            Label("OPIc 가이드 다시 보기", systemImage: "questionmark.circle")
+                            Label("도움말 다시 보기", systemImage: "questionmark.circle")
                         }
                         Button("개인정보처리방침") {
                             openPrivacyPolicy()
@@ -144,23 +144,23 @@ private struct GoalLevelRoutingDialog: View {
                 Image(systemName: "target")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                Text("Self Assessment 단계를 변경할까요?")
+                Text("난이도를 바꿀까요?")
                     .font(.title3.bold())
                     .foregroundStyle(AppPalette.ink)
                     .multilineTextAlignment(.center)
                 if let currentLevel {
-                    Text("현재 예상 등급: \(currentLevel.rawValue)")
+                    Text("현재 예상 등급 \(currentLevel.rawValue)")
                         .font(.headline)
                         .foregroundStyle(AppPalette.primary)
                 }
-                Text("Self Assessment 단계를 바꾸면 기존 데일리 문제가 새로 생성됩니다. 단계를 최종 변경할 때 보상형 광고를 끝까지 시청해야 합니다.")
+                Text("난이도를 바꾸면 지금 질문이 새로 만들어져요. 최종 변경할 때 광고를 끝까지 봐야 해요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
                 PrimaryButton(
-                    title: "단계 선택으로 이동",
+                    title: "난이도 선택하기",
                     systemImage: "arrow.right.circle.fill",
                     action: confirm
                 )

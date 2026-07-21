@@ -13,13 +13,14 @@ struct DifficultyAdjustmentDialog: View {
                 Image(systemName: "slider.horizontal.below.rectangle")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                Text("후반 난이도를 선택하세요")
+                Text("남은 문제 난이도를 골라주세요")
                     .font(.title3.bold())
                     .foregroundStyle(AppPalette.ink)
-                Text("실제 OPIc처럼 전반 7문항 이후 난이도를 다시 조정합니다. 선택한 난이도에 맞춰 남은 문제가 생성됩니다.")
+                Text("실제 시험처럼 앞 7문항 뒤에 난이도를 한 번 조정해요. 고른 난이도로 남은 문제가 만들어져요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
+                    .fixedSize(horizontal: false, vertical: true)
 
                 VStack(spacing: 10) {
                     ForEach(DifficultyAdjustment.allCases) { adjustment in
@@ -42,26 +43,30 @@ struct DifficultyAdjustmentDialog: View {
                                 Spacer()
                             }
                             .padding(14)
-                            .background(Color.white.opacity(0.82))
-                            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+                            .background(AppPalette.elevatedSurface)
+                            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
                         }
-                        .buttonStyle(.plain)
+                        .buttonStyle(PressableButtonStyle())
                         .disabled(isLoading)
                     }
                 }
 
                 if isLoading {
-                    ProgressView("남은 문제를 생성하는 중입니다.")
-                        .font(.footnote)
+                    HStack(spacing: 10) {
+                        AppLoadingIndicator(dotSize: 7)
+                        Text("남은 문제를 만들고 있어요")
+                            .font(AppTypography.footnote)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                    }
                 }
             }
             .padding(24)
             .frame(maxWidth: 360)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
-                    .stroke(Color.white.opacity(0.35), lineWidth: 1)
+                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
+                    .stroke(Color.white.opacity(0.2), lineWidth: 1)
             }
             .padding(24)
         }
