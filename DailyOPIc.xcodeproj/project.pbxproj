@@ -7,6 +7,7 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		12E0B90D3010F9DC007A3E0C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 12E0B90C3010F9DC007A3E0C /* StoreKit.framework */; };
 		F30000000000000000000001 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000001 /* FirebaseCore */; };
 		F30000000000000000000002 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000002 /* FirebaseAuth */; };
 		F30000000000000000000003 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000003 /* FirebaseAppCheck */; };
@@ -34,6 +35,7 @@
 		1212B2BA2FE961E700E59D24 /* DailyOPIc.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = DailyOPIc.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		1212B2C92FE961E800E59D24 /* DailyOPIcTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DailyOPIcTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		1212B2D32FE961E800E59D24 /* DailyOPIcUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = DailyOPIcUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		12E0B90C3010F9DC007A3E0C /* StoreKit.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = StoreKit.framework; path = System/Library/Frameworks/StoreKit.framework; sourceTree = SDKROOT; };
 		C10000000000000000000001 /* Config/Debug.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Debug.xcconfig; sourceTree = "<group>"; };
 		C10000000000000000000002 /* Config/Release.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Config/Release.xcconfig; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -78,6 +80,7 @@
 			files = (
 				F30000000000000000000001 /* FirebaseCore in Frameworks */,
 				F30000000000000000000002 /* FirebaseAuth in Frameworks */,
+				12E0B90D3010F9DC007A3E0C /* StoreKit.framework in Frameworks */,
 				F30000000000000000000003 /* FirebaseAppCheck in Frameworks */,
 				F30000000000000000000004 /* GoogleMobileAds in Frameworks */,
 			);
@@ -108,6 +111,7 @@
 				1212B2BC2FE961E700E59D24 /* DailyOPIc */,
 				1212B2CC2FE961E800E59D24 /* DailyOPIcTests */,
 				1212B2D62FE961E800E59D24 /* DailyOPIcUITests */,
+				12E0B90B3010F9DC007A3E0C /* Frameworks */,
 				1212B2BB2FE961E700E59D24 /* Products */,
 			);
 			sourceTree = "<group>";
@@ -120,6 +124,14 @@
 				1212B2D32FE961E800E59D24 /* DailyOPIcUITests.xctest */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		12E0B90B3010F9DC007A3E0C /* Frameworks */ = {
+			isa = PBXGroup;
+			children = (
+				12E0B90C3010F9DC007A3E0C /* StoreKit.framework */,
+			);
+			name = Frameworks;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -146,6 +158,7 @@
 				F20000000000000000000002 /* FirebaseAuth */,
 				F20000000000000000000003 /* FirebaseAppCheck */,
 				F20000000000000000000004 /* GoogleMobileAds */,
+				F20000000000000000000005 /* RevenueCat */,
 			);
 			productName = DailyOPIc;
 			productReference = 1212B2BA2FE961E700E59D24 /* DailyOPIc.app */;
@@ -232,6 +245,7 @@
 			packageReferences = (
 				F10000000000000000000001 /* XCRemoteSwiftPackageReference "firebase-ios-sdk" */,
 				F10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */,
+				F10000000000000000000003 /* XCRemoteSwiftPackageReference "purchases-ios" */,
 			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 1212B2BB2FE961E700E59D24 /* Products */;
@@ -640,6 +654,14 @@
 				minimumVersion = 13.5.0;
 			};
 		};
+		F10000000000000000000003 /* XCRemoteSwiftPackageReference "purchases-ios" */ = {
+			isa = XCRemoteSwiftPackageReference;
+			repositoryURL = "https://github.com/RevenueCat/purchases-ios.git";
+			requirement = {
+				kind = upToNextMajorVersion;
+				minimumVersion = 5.0.0;
+			};
+		};
 /* End XCRemoteSwiftPackageReference section */
 
 /* Begin XCSwiftPackageProductDependency section */
@@ -662,6 +684,11 @@
 			isa = XCSwiftPackageProductDependency;
 			package = F10000000000000000000002 /* XCRemoteSwiftPackageReference "swift-package-manager-google-mobile-ads" */;
 			productName = GoogleMobileAds;
+		};
+		F20000000000000000000005 /* RevenueCat */ = {
+			isa = XCSwiftPackageProductDependency;
+			package = F10000000000000000000003 /* XCRemoteSwiftPackageReference "purchases-ios" */;
+			productName = RevenueCat;
 		};
 /* End XCSwiftPackageProductDependency section */
 	};
