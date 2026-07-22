@@ -26,6 +26,7 @@ final class MockExamViewModel {
     private let ads: AdService
     private let preferences: AppPreferences
     private let persistence: PersistenceService
+    private let environment: AppEnvironment
 
     var phase: Phase = .introduction
     var session: MockSession?
@@ -48,11 +49,36 @@ final class MockExamViewModel {
     private var timerTask: Task<Void, Never>?
 
     init(environment: AppEnvironment) {
+        self.environment = environment
         api = environment.api
         ads = environment.ads
         preferences = environment.preferences
         persistence = environment.persistence
         surveyDraft = environment.preferences.mockSurvey ?? .defaultSurvey
+    }
+
+    var plan: PlanEntitlement { environment.currentPlan }
+
+    /// 모의고사 광고 게이트용 리워드 논스 획득.
+    /// 무료 플랜은 리워드 광고를 시청하고, 유료 플랜은 서버 auto-verify로 광고 없이 통과.
+    private func acquireRewardNonce(
+        purpose: RewardPurpose,
+        sessionHash: String?
+    ) async throws -> String {
+        let intent = try await api.createRewardIntent(
+            purpose: purpose,
+            sessionHash: sessionHash,
+            requestID: UUID()
+        )
+        if environment.currentPlan.isPaid {
+            return intent.nonce
+        }
+        try await ads.showRewardedAd(
+            userIdentifier: intent.userIdentifier,
+            customData: intent.customData
+        )
+        _ = try await api.waitForReward(nonce: intent.nonce)
+        return intent.nonce
     }
 
     var initialLevel: SelfAssessmentLevel { preferences.initialLevel ?? .level5 }
@@ -204,19 +230,13 @@ final class MockExamViewModel {
                 startOperationID = nil
                 return
             }
-            let intent = try await api.createRewardIntent(
+            let rewardNonce = try await acquireRewardNonce(
                 purpose: .mockStart,
-                sessionHash: session.sessionHash,
-                requestID: UUID()
+                sessionHash: session.sessionHash
             )
-            try await ads.showRewardedAd(
-                userIdentifier: intent.userIdentifier,
-                customData: intent.customData
-            )
-            _ = try await api.waitForReward(nonce: intent.nonce)
             let started = try await api.startMockSession(
                 sessionId: session.sessionId,
-                rewardNonce: intent.nonce,
+                rewardNonce: rewardNonce,
                 requestID: operationID
             )
             guard let set = started.questionSet else {
@@ -345,18 +365,12 @@ final class MockExamViewModel {
             return
         }
         do {
-            let intent = try await api.createRewardIntent(
+            let rewardNonce = try await acquireRewardNonce(
                 purpose: .mockResult,
-                sessionHash: session?.sessionHash ?? questionSet.setHash,
-                requestID: UUID()
+                sessionHash: session?.sessionHash ?? questionSet.setHash
             )
-            try await ads.showRewardedAd(
-                userIdentifier: intent.userIdentifier,
-                customData: intent.customData
-            )
-            _ = try await api.waitForReward(nonce: intent.nonce)
             let context = EvaluationRetryContext(
-                rewardNonce: intent.nonce,
+                rewardNonce: rewardNonce,
                 requestID: UUID()
             )
             evaluationRetryContext = context
@@ -467,20 +481,14 @@ final class MockExamViewModel {
         operationState = .running(operationId: operationID, startedAt: .now)
         errorMessage = nil
         do {
-            let intent = try await api.createRewardIntent(
+            let rewardNonce = try await acquireRewardNonce(
                 purpose: .mockAdjustment,
-                sessionHash: session.sessionHash,
-                requestID: UUID()
+                sessionHash: session.sessionHash
             )
-            try await ads.showRewardedAd(
-                userIdentifier: intent.userIdentifier,
-                customData: intent.customData
-            )
-            _ = try await api.waitForReward(nonce: intent.nonce)
             let adjustedSession = try await api.adjustMockSession(
                 sessionId: session.sessionId,
                 adjustment: adjustment,
-                rewardNonce: intent.nonce,
+                rewardNonce: rewardNonce,
                 requestID: operationID
             )
             guard let updated = adjustedSession.questionSet else {

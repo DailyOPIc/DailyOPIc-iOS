@@ -268,6 +268,17 @@ struct Capabilities: Codable, Sendable {
         let dailyRefreshRewards: Int
         let mockSessionsPerDay: Int
         let mockRewardGates: Int
+        // 플랜별 기능 게이트(신규 필드는 구 서버 호환을 위해 옵셔널).
+        let practiceDaily: Int?
+        let practiceAdBonus: Int?
+        let historyDays: Int?
+        let analysisDepth: String?
+        let gradeTrend: String?
+        let weaknessAnalysis: String?
+        let reviewSet: Bool?
+        let weeklyReport: Bool?
+        let mockComparison: String?
+        let adsEnabled: Bool?
     }
 
     let minimumSupportedAppVersion: String
@@ -276,6 +287,7 @@ struct Capabilities: Codable, Sendable {
     let evaluationRubricV2: Bool
     let practiceRefresh: Bool
     let guideSchemaVersion: Int
+    let plan: String?
     let quotaPolicy: QuotaPolicy
 }
 

@@ -34,6 +34,11 @@ enum AppConfiguration {
         configuredURL(Bundle.main.object(forInfoDictionaryKey: "DAILYOPIC_PRIVACY_POLICY_URL") as? String)
     }
 
+    /// RevenueCat 공개 SDK 키(App Store). xcconfig의 REVENUECAT_API_KEY → Info.plist.
+    nonisolated static var revenueCatAPIKey: String? {
+        configuredString(Bundle.main.object(forInfoDictionaryKey: "REVENUECAT_API_KEY") as? String)
+    }
+
     nonisolated static func validateForLaunch() throws {
         #if !DEBUG
         let url = apiBaseURL

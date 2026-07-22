@@ -17,6 +17,9 @@ final class PracticeViewModel {
     private let ads: AdService
     private let preferences: AppPreferences
     private let persistence: PersistenceService
+    private let environment: AppEnvironment
+    /// 유료 플랜 한도 소진 등 결제 유도가 필요할 때 true.
+    var showsPaywall = false
 
     var phase: Phase = .loading
     var questionSet: QuestionSet?
@@ -39,11 +42,14 @@ final class PracticeViewModel {
     private var refreshOperationID: UUID?
 
     init(environment: AppEnvironment) {
+        self.environment = environment
         api = environment.api
         ads = environment.ads
         preferences = environment.preferences
         persistence = environment.persistence
     }
+
+    var plan: PlanEntitlement { environment.currentPlan }
 
     var initialLevel: SelfAssessmentLevel { preferences.initialLevel ?? .level5 }
     var targetLevel: OPIcLevel { questionSet?.expectedTargetLevel ?? preferences.targetLevel ?? .IM2 }
@@ -193,6 +199,12 @@ final class PracticeViewModel {
     private func evaluatePendingRecording() async throws {
         guard let pendingRecording, let questionSet, let question = currentQuestion else { return }
         if usage?.totalRemaining == 0 {
+            if environment.currentPlan.isPaid {
+                // 유료 플랜은 광고 대신 상위 플랜 결제 유도(플랜 한도 소진 시).
+                showsPaywall = true
+                phase = .idle
+                return
+            }
             try await unlockPracticeCredits()
         }
         phase = .analyzing
@@ -336,11 +348,14 @@ final class PracticeViewModel {
             purpose: .practiceRefresh,
             requestID: UUID()
         )
-        try await ads.showRewardedAd(
-            userIdentifier: intent.userIdentifier,
-            customData: intent.customData
-        )
-        _ = try await api.waitForReward(nonce: intent.nonce)
+        // 유료 플랜은 서버 auto-verify로 광고 없이 리프레시. 무료만 광고 시청.
+        if !environment.currentPlan.isPaid {
+            try await ads.showRewardedAd(
+                userIdentifier: intent.userIdentifier,
+                customData: intent.customData
+            )
+            _ = try await api.waitForReward(nonce: intent.nonce)
+        }
         refreshProgressMessage = "새 질문을 준비하고 있어요."
         let updated = try await api.refreshPracticeSet(
             request: PracticeRefreshRequest(

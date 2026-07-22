@@ -38,6 +38,11 @@ actor AuthenticationService {
         _ = try await appCheckToken()
     }
 
+    /// RevenueCat 등에서 서버와 동일한 사용자 식별자(Firebase uid)로 로그인하기 위한 접근자.
+    func currentUserID() async throws -> String {
+        try await firebaseUserID()
+    }
+
     func headers(forceRefreshAuthToken: Bool = false) async throws -> [String: String] {
         var values = [
             "X-DailyOPIc-User-ID": try installationID(),

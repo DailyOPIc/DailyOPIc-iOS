@@ -7,10 +7,12 @@ import GoogleMobileAds
 #if canImport(GoogleMobileAds)
 struct BannerAdView: View {
     @EnvironmentObject private var ads: AdService
+    @Environment(AppEnvironment.self) private var environment
 
     var body: some View {
         Group {
-            if ads.canRequestAds {
+            // 유료 플랜은 광고를 숨긴다(서버 capabilities 정책 기준).
+            if environment.showsAds && ads.canRequestAds {
                 GoogleBannerView()
             } else {
                 Color.clear

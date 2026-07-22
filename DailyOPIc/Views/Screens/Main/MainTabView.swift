@@ -33,5 +33,6 @@ struct MainTabView: View {
             .tag(2)
         }
         .environmentObject(environment.ads)
+        .environment(environment)
     }
 }

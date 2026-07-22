@@ -26,9 +26,23 @@ struct PracticeScreen: View {
                     }
                     .accessibilityLabel("학습 설정")
                 }
+                if !viewModel.plan.isPaid {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button { viewModel.showsPaywall = true } label: {
+                            Image(systemName: "crown.fill")
+                        }
+                        .accessibilityLabel("구독 업그레이드")
+                    }
+                }
             }
             .sheet(isPresented: $showsSetup) {
                 SetupView(preferences: preferences)
+            }
+            .sheet(isPresented: Binding(
+                get: { viewModel.showsPaywall },
+                set: { viewModel.showsPaywall = $0 }
+            )) {
+                PaywallView()
             }
             .onChange(of: preferences.initialLevel) {
                 Task { await viewModel.reloadQuestions() }
