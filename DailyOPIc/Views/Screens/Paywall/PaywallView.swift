@@ -36,6 +36,7 @@ struct PaywallView: View {
                 .padding(AppSpacing.md)
             }
             .background(AppPalette.surface.ignoresSafeArea())
+            .task { await store.refreshCustomerInfo() }
             .navigationTitle("데일리오픽 프리미엄")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
@@ -97,7 +98,7 @@ struct PaywallView: View {
                     tier: tier,
                     isCurrent: isCurrent,
                     priceText: priceText(for: tier, package: package),
-                    isPurchasing: purchasing == package?.id,
+                    isPurchasing: purchasing != nil && purchasing == package?.id,
                     isPurchasable: purchasable
                 )
                 .contentShape(RoundedRectangle(cornerRadius: AppRadius.md))
@@ -166,7 +167,13 @@ struct PaywallView: View {
         defer { purchasing = nil }
         do {
             try await store.purchase(package)
-            if currentPlan.isPaid { dismiss() }
+            if currentPlan == package.plan {
+                // 업그레이드/신규 구독은 즉시 적용 → 닫기.
+                dismiss()
+            } else {
+                // 다운그레이드는 App Store 정책상 다음 결제일에 적용된다.
+                infoMessage = "요금제 변경이 예약되었습니다. 현재 구독 기간이 끝나면 \(package.plan.displayName)(으)로 전환됩니다."
+            }
         } catch StoreError.purchaseCancelled {
             // 사용자가 취소 — 조용히 무시.
         } catch {

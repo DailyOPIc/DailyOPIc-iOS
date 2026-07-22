@@ -48,6 +48,7 @@ final class StoreService {
 
     #if canImport(RevenueCat)
     private var rcPackages: [String: Package] = [:]
+    private var infoObserverTask: Task<Void, Never>?
 
     func configure(userId: String) {
         guard !isConfigured else { return }
@@ -58,6 +59,33 @@ final class StoreService {
         Purchases.logLevel = .warn
         Purchases.configure(withAPIKey: apiKey, appUserID: userId)
         isConfigured = true
+        startCustomerInfoObserver()
+    }
+
+    /// RevenueCat CustomerInfo 변경(구매·갱신·해지·만료)을 실시간으로 반영.
+    private func startCustomerInfoObserver() {
+        infoObserverTask?.cancel()
+        infoObserverTask = Task { [weak self] in
+            for await info in Purchases.shared.customerInfoStream {
+                guard let self else { return }
+                let previous = self.localEntitlement
+                self.updateLocalEntitlement(from: info)
+                if self.localEntitlement != previous {
+                    await self.onEntitlementMayHaveChanged?()
+                }
+            }
+        }
+    }
+
+    /// 서버 캐시가 아닌 최신 상태를 강제로 다시 읽어 즉시 반영(포그라운드 복귀·페이월 진입 시).
+    func refreshCustomerInfo() async {
+        guard isConfigured else { return }
+        do {
+            let info = try await Purchases.shared.customerInfo(fetchPolicy: .fetchCurrent)
+            updateLocalEntitlement(from: info)
+        } catch {
+            print("[DailyOPIc][Store] refreshCustomerInfo failed: \(error)")
+        }
     }
 
     func refresh() async {
@@ -159,6 +187,7 @@ final class StoreService {
     // RevenueCat 미설치: 컴파일 가능한 no-op 스텁.
     func configure(userId: String) {}
     func refresh() async {}
+    func refreshCustomerInfo() async {}
     func purchase(_ package: StorePackage) async throws { throw StoreError.notConfigured }
     func restore() async throws { throw StoreError.notConfigured }
     func manageSubscriptions() async throws { throw StoreError.notConfigured }
