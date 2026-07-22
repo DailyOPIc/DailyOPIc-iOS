@@ -26,13 +26,16 @@ struct PracticeScreen: View {
                     }
                     .accessibilityLabel("학습 설정")
                 }
-                if !viewModel.plan.isPaid {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        Button { viewModel.showsPaywall = true } label: {
-                            Image(systemName: "crown.fill")
-                        }
-                        .accessibilityLabel("구독 업그레이드")
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { viewModel.showsPaywall = true } label: {
+                        Image(systemName: viewModel.plan.isPaid ? "crown.fill" : "crown")
+                            .foregroundStyle(
+                                viewModel.plan.isPaid
+                                    ? Color(AppPalette.primary)
+                                    : Color(AppPalette.secondaryInk)
+                            )
                     }
+                    .accessibilityLabel(viewModel.plan.isPaid ? "구독 관리" : "구독 업그레이드")
                 }
             }
             .sheet(isPresented: $showsSetup) {

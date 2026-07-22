@@ -116,6 +116,16 @@ final class StoreService {
         }
     }
 
+    /// App Store 구독 관리 시트(해지/변경)를 표시한다.
+    func manageSubscriptions() async throws {
+        guard isConfigured else { throw StoreError.notConfigured }
+        do {
+            try await Purchases.shared.showManageSubscriptions()
+        } catch {
+            throw StoreError.unknown(error.localizedDescription)
+        }
+    }
+
     private func syncLocalEntitlement() async {
         do {
             let info = try await Purchases.shared.customerInfo()
@@ -151,5 +161,6 @@ final class StoreService {
     func refresh() async {}
     func purchase(_ package: StorePackage) async throws { throw StoreError.notConfigured }
     func restore() async throws { throw StoreError.notConfigured }
+    func manageSubscriptions() async throws { throw StoreError.notConfigured }
     #endif
 }

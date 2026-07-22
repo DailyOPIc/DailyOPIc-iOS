@@ -1,7 +1,8 @@
 import SwiftUI
 
-/// 구독/시험대비 패스 결제 화면. 티어 비교 + 상품 구매 + 복원.
-/// 상품 목록은 RevenueCat(StoreService)에서 오며, 미설정 시 티어 안내만 노출한다.
+/// 데일리오픽 프리미엄 구독 화면.
+/// 티어 카드 자체가 구매 버튼이며, 현재 플랜 표시 + 플랜 변경 + 복원 + 구독 관리를 제공한다.
+/// 상품/가격은 RevenueCat(StoreService)에서 오며, 미설정 시 안내 문구만 노출한다.
 struct PaywallView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -9,10 +10,17 @@ struct PaywallView: View {
 
     @State private var purchasing: String?
     @State private var restoring = false
+    @State private var managing = false
     @State private var errorMessage: String?
+    @State private var infoMessage: String?
 
     private var store: StoreService { environment.store }
     private var currentPlan: PlanEntitlement { environment.currentPlan }
+
+    /// 플랜별 실제 구매 상품(현지화 가격/구매 트리거 소스).
+    private var packagesByPlan: [PlanEntitlement: StorePackage] {
+        Dictionary(store.packages.map { ($0.plan, $0) }, uniquingKeysWith: { first, _ in first })
+    }
 
     var body: some View {
         NavigationStack {
@@ -20,17 +28,15 @@ struct PaywallView: View {
                 VStack(spacing: AppSpacing.lg) {
                     header
                     tierCards
-                    if !store.packages.isEmpty {
-                        purchaseSection
-                    } else {
+                    if store.packages.isEmpty {
                         unavailableNotice
                     }
-                    restoreAndLegal
+                    footer
                 }
                 .padding(AppSpacing.md)
             }
             .background(AppPalette.surface.ignoresSafeArea())
-            .navigationTitle("가성비 OPIc 구독")
+            .navigationTitle("데일리오픽 프리미엄")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -42,82 +48,94 @@ struct PaywallView: View {
             } message: {
                 Text(errorMessage ?? "")
             }
+            .alert("안내", isPresented: .constant(infoMessage != nil)) {
+                Button("확인") { infoMessage = nil }
+            } message: {
+                Text(infoMessage ?? "")
+            }
         }
     }
 
     private var header: some View {
         VStack(spacing: AppSpacing.xs) {
-            Text("가성비 있게 오픽 공부하자")
+            Text("데일리오픽 프리미엄")
                 .font(AppTypography.title)
                 .foregroundStyle(Color(AppPalette.ink))
                 .multilineTextAlignment(.center)
-            Text("광고 없이 매일 연습 + 즉시 AI 피드백.\n학원 한 강좌보다 저렴하게.")
+            Text("광고 없이 매일 연습하고, AI가 약점까지 잡아줍니다.")
                 .font(AppTypography.callout)
                 .foregroundStyle(Color(AppPalette.secondaryInk))
                 .multilineTextAlignment(.center)
+            currentPlanBadge
         }
         .frame(maxWidth: .infinity)
         .padding(.top, AppSpacing.sm)
     }
 
+    private var currentPlanBadge: some View {
+        HStack(spacing: AppSpacing.xs) {
+            Image(systemName: currentPlan.isPaid ? "crown.fill" : "person")
+            Text("현재 플랜 · \(currentPlan.displayName)")
+                .font(AppTypography.footnote.weight(.semibold))
+        }
+        .foregroundStyle(Color(AppPalette.primary))
+        .padding(.horizontal, AppSpacing.sm)
+        .padding(.vertical, AppSpacing.xs)
+        .background(Color(AppPalette.primarySoft))
+        .clipShape(Capsule())
+        .padding(.top, AppSpacing.xs)
+    }
+
     private var tierCards: some View {
         VStack(spacing: AppSpacing.sm) {
             ForEach(PaywallTier.all) { tier in
+                let package = packagesByPlan[tier.plan]
+                let isCurrent = tier.plan == currentPlan
+                let purchasable = tier.plan != .free && !isCurrent && package != nil
+
                 PaywallTierCard(
                     tier: tier,
-                    isCurrent: tier.plan == currentPlan
+                    isCurrent: isCurrent,
+                    priceText: priceText(for: tier, package: package),
+                    isPurchasing: purchasing == package?.id,
+                    isPurchasable: purchasable
                 )
+                .contentShape(RoundedRectangle(cornerRadius: AppRadius.md))
+                .onTapGesture {
+                    guard purchasable, let package else { return }
+                    Task { await purchase(package) }
+                }
+                .opacity(purchasing != nil && purchasing != package?.id ? 0.5 : 1)
             }
         }
+        .disabled(purchasing != nil)
     }
 
-    private var purchaseSection: some View {
-        VStack(spacing: AppSpacing.sm) {
-            Text("구독 선택")
-                .font(AppTypography.sectionTitle)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .foregroundStyle(Color(AppPalette.ink))
-            ForEach(store.packages) { package in
-                Button {
-                    Task { await purchase(package) }
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(package.plan.displayName)
-                                .font(AppTypography.callout)
-                            Text(package.isSubscription ? "월 구독" : "시험 대비 패스")
-                                .font(AppTypography.footnote)
-                                .foregroundStyle(Color(AppPalette.secondaryInk))
-                        }
-                        Spacer()
-                        if purchasing == package.id {
-                            ProgressView()
-                        } else {
-                            Text(package.localizedPrice)
-                                .font(AppTypography.callout.weight(.bold))
-                        }
-                    }
-                    .padding(AppSpacing.md)
-                    .frame(maxWidth: .infinity)
-                    .background(Color(AppPalette.primarySoft))
-                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.md))
-                }
-                .buttonStyle(.plain)
-                .disabled(purchasing != nil)
-            }
-        }
+    private func priceText(for tier: PaywallTier, package: StorePackage?) -> String {
+        if tier.plan == .free { return "무료" }
+        // 하드코딩 금지 원칙: 현지화 가격 우선, 미로딩 시에만 임시 표기.
+        return package?.localizedPrice ?? "불러오는 중…"
     }
 
     private var unavailableNotice: some View {
-        Text("상품 정보를 불러오는 중입니다. 스토어 설정이 완료되면 여기에서 바로 구독할 수 있어요.")
+        Text("상품 정보를 불러오는 중입니다. 스토어 설정이 완료되면 카드를 눌러 바로 구독할 수 있어요.")
             .font(AppTypography.footnote)
             .foregroundStyle(Color(AppPalette.secondaryInk))
             .multilineTextAlignment(.center)
             .padding(AppSpacing.md)
     }
 
-    private var restoreAndLegal: some View {
+    private var footer: some View {
         VStack(spacing: AppSpacing.sm) {
+            if currentPlan.isPaid {
+                Button {
+                    Task { await manage() }
+                } label: {
+                    if managing { ProgressView() } else { Text("구독 관리 · 해지").font(AppTypography.callout) }
+                }
+                .disabled(managing)
+            }
+
             Button {
                 Task { await restore() }
             } label: {
@@ -162,7 +180,18 @@ struct PaywallView: View {
         do {
             try await store.restore()
             if currentPlan.isPaid { dismiss() }
-            else { errorMessage = "복원할 구독을 찾지 못했습니다." }
+            else { errorMessage = "복원할 활성 구독이 없습니다." }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func manage() async {
+        managing = true
+        defer { managing = false }
+        do {
+            try await store.manageSubscriptions()
+            await environment.refreshCapabilities()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -173,25 +202,36 @@ struct PaywallView: View {
 struct PaywallTier: Identifiable {
     let plan: PlanEntitlement
     let highlights: [String]
+    /// 오픈 기념 할인 등 프로모션 배지(없으면 nil).
+    let promoBadge: String?
+    let promoNote: String?
 
     var id: String { plan.rawValue }
 
     static let all: [PaywallTier] = [
         PaywallTier(
             plan: .free,
-            highlights: ["데일리 1회 + 광고 보너스 1회", "모의고사 체험 1회", "예상 등급·요약", "광고 있음"]
+            highlights: ["데일리 1회 + 광고 보너스 1회", "모의고사 체험 1회", "예상 등급·요약", "광고 있음"],
+            promoBadge: nil,
+            promoNote: nil
         ),
         PaywallTier(
             plan: .basic,
-            highlights: ["광고 제거", "데일리 하루 3회", "매일 모의고사(기본 분석)", "기록 30일"]
+            highlights: ["광고 제거", "데일리 하루 3회", "매일 모의고사(기본 분석)", "기록 30일"],
+            promoBadge: "오픈 기념 할인",
+            promoNote: "오픈 초기 특가 진행 중 — 지금 가장 저렴하게 시작하세요."
         ),
         PaywallTier(
             plan: .plus,
-            highlights: ["데일리 하루 10회", "상세 분석(교정·모범답안)", "예상 등급 추이·취약 유형(기본)"]
+            highlights: ["데일리 하루 10회", "상세 분석(교정·모범답안)", "예상 등급 추이·취약 유형(기본)"],
+            promoBadge: nil,
+            promoNote: nil
         ),
         PaywallTier(
             plan: .pro,
-            highlights: ["데일리 하루 20회", "집중 분석 + 취약점 복습 세트", "주간 리포트 · 고급 취약 분석", "기록 전체"]
+            highlights: ["데일리 하루 20회", "집중 분석 + 취약점 복습 세트", "주간 리포트 · 고급 취약 분석", "기록 전체"],
+            promoBadge: nil,
+            promoNote: nil
         ),
     ]
 }
@@ -199,6 +239,9 @@ struct PaywallTier: Identifiable {
 private struct PaywallTierCard: View {
     let tier: PaywallTier
     let isCurrent: Bool
+    let priceText: String
+    let isPurchasing: Bool
+    let isPurchasable: Bool
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xs) {
@@ -206,8 +249,8 @@ private struct PaywallTierCard: View {
                 Text(tier.plan.displayName)
                     .font(AppTypography.cardTitle)
                     .foregroundStyle(Color(AppPalette.ink))
-                if tier.plan == .basic {
-                    Text("가성비")
+                if let badge = tier.promoBadge {
+                    Text(badge)
                         .font(AppTypography.caption)
                         .padding(.horizontal, AppSpacing.xs)
                         .padding(.vertical, 2)
@@ -216,9 +259,18 @@ private struct PaywallTierCard: View {
                         .clipShape(Capsule())
                 }
                 Spacer()
-                Text(tier.plan == .free ? "무료" : "₩\(tier.plan.monthlyPriceKRW.formatted())/월")
-                    .font(AppTypography.callout.weight(.bold))
-                    .foregroundStyle(Color(AppPalette.primaryMid))
+                if isPurchasing {
+                    ProgressView()
+                } else {
+                    Text(tier.plan == .free ? "무료" : "\(priceText)\(tier.plan == .free ? "" : "/월")")
+                        .font(AppTypography.callout.weight(.bold))
+                        .foregroundStyle(Color(AppPalette.primaryMid))
+                }
+            }
+            if let note = tier.promoNote {
+                Text(note)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(Color(AppPalette.primary))
             }
             ForEach(tier.highlights, id: \.self) { line in
                 Label(line, systemImage: "checkmark.circle.fill")
@@ -226,11 +278,7 @@ private struct PaywallTierCard: View {
                     .foregroundStyle(Color(AppPalette.secondaryInk))
                     .labelStyle(.titleAndIcon)
             }
-            if isCurrent {
-                Text("현재 이용 중")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(Color(AppPalette.primary))
-            }
+            statusLine
         }
         .padding(AppSpacing.md)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -243,5 +291,18 @@ private struct PaywallTierCard: View {
                 )
         )
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.md))
+    }
+
+    @ViewBuilder
+    private var statusLine: some View {
+        if isCurrent {
+            Text("현재 이용 중")
+                .font(AppTypography.caption.weight(.semibold))
+                .foregroundStyle(Color(AppPalette.primary))
+        } else if isPurchasable {
+            Text("탭하여 시작하기 →")
+                .font(AppTypography.caption.weight(.semibold))
+                .foregroundStyle(Color(AppPalette.primaryMid))
+        }
     }
 }
