@@ -8,6 +8,7 @@
 
 /* Begin PBXBuildFile section */
 		12E0B90D3010F9DC007A3E0C /* StoreKit.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 12E0B90C3010F9DC007A3E0C /* StoreKit.framework */; };
+		12E0BB003010FB6E007A3E0C /* RevenueCat in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000005 /* RevenueCat */; };
 		F30000000000000000000001 /* FirebaseCore in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000001 /* FirebaseCore */; };
 		F30000000000000000000002 /* FirebaseAuth in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000002 /* FirebaseAuth */; };
 		F30000000000000000000003 /* FirebaseAppCheck in Frameworks */ = {isa = PBXBuildFile; productRef = F20000000000000000000003 /* FirebaseAppCheck */; };
@@ -78,6 +79,7 @@
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				12E0BB003010FB6E007A3E0C /* RevenueCat in Frameworks */,
 				F30000000000000000000001 /* FirebaseCore in Frameworks */,
 				F30000000000000000000002 /* FirebaseAuth in Frameworks */,
 				12E0B90D3010F9DC007A3E0C /* StoreKit.framework in Frameworks */,
@@ -450,7 +452,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DailyOPIc/DailyOPIc.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -460,7 +462,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.3;
+				MARKETING_VERSION = 2.0.4;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
@@ -484,7 +486,7 @@
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
 				CODE_SIGN_ENTITLEMENTS = DailyOPIc/DailyOPIc.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 10;
+				CURRENT_PROJECT_VERSION = 11;
 				DEVELOPMENT_TEAM = GQ89YG5G9R;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = NO;
@@ -494,7 +496,7 @@
 					"$(inherited)",
 					"@executable_path/Frameworks",
 				);
-				MARKETING_VERSION = 2.0.3;
+				MARKETING_VERSION = 2.0.4;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
 					"-ObjC",
