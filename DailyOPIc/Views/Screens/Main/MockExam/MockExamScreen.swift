@@ -6,6 +6,8 @@ struct MockExamScreen: View {
     @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsResetConfirmation = false
     @State private var showsSavedSurveyDialog = false
+    @State private var showsPaywall = false
+    @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: MockExamViewModel) {
         self.viewModel = viewModel
@@ -32,8 +34,12 @@ struct MockExamScreen: View {
                 MockLoadingView(message: "답변을 종합 분석하고 있어요")
             case .completed:
                 if let evaluation = viewModel.evaluation {
-                    MockResultView(evaluation: evaluation, targetLevel: viewModel.targetLevel) {
-                        // A completed KST-day session remains the single result for today.
+                    MockResultView(
+                        evaluation: evaluation,
+                        targetLevel: viewModel.targetLevel,
+                        showsResetButton: true
+                    ) {
+                        viewModel.finishReview()
                     }
                 }
             }
@@ -76,7 +82,42 @@ struct MockExamScreen: View {
                 )
             }
         }
-        .task { await viewModel.restoreDraftIfAvailable() }
+        .task {
+            await viewModel.restoreDraftIfAvailable()
+            await viewModel.refreshUsage()
+        }
+        .onChange(of: viewModel.plan) {
+            Task { await viewModel.refreshUsage() }
+        }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await viewModel.refreshUsage() } }
+        }
+        .sheet(isPresented: $showsPaywall) { PaywallView() }
+    }
+
+    private var mockUpsell: some View {
+        VStack(spacing: AppSpacing.sm) {
+            Image(systemName: "lock.fill")
+                .font(.title2)
+                .foregroundStyle(AppPalette.primary)
+            Text("오늘 모의고사를 모두 사용했어요")
+                .font(AppTypography.cardTitle)
+                .foregroundStyle(AppPalette.ink)
+            Text(viewModel.plan.isPaid
+                 ? "내일 다시 도전하거나, 상위 플랜으로 하루 응시 횟수를 늘려보세요."
+                 : "플랜을 업그레이드하면 모의고사를 매일 더 많이 풀 수 있어요.")
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            PrimaryButton(title: "플랜 업그레이드", systemImage: "crown.fill") {
+                showsPaywall = true
+            }
+        }
+        .padding(AppSpacing.lg)
+        .frame(maxWidth: .infinity)
+        .background(AppPalette.primarySoft.opacity(0.5))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
     }
 
     private var canResetExam: Bool {
@@ -111,7 +152,12 @@ struct MockExamScreen: View {
                         .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
                         .multilineTextAlignment(.center)
-                } else {
+                } else if viewModel.mockAvailable {
+                    if let remaining = viewModel.mockRemaining {
+                        Text("오늘 남은 모의고사 \(remaining)회 / 하루 \(viewModel.mockDailyLimit)회")
+                            .font(AppTypography.footnote.weight(.semibold))
+                            .foregroundStyle(AppPalette.primary)
+                    }
                     if viewModel.savedSurvey != nil {
                         PrimaryButton(title: "저장된 설문으로 시작", systemImage: "play.fill") {
                             showsSavedSurveyDialog = true
@@ -123,6 +169,8 @@ struct MockExamScreen: View {
                     ) {
                         viewModel.showSurvey()
                     }
+                } else {
+                    mockUpsell
                 }
                 BannerAdView().frame(height: 50)
             }

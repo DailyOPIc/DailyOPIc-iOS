@@ -147,3 +147,51 @@ extension View {
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
     }
 }
+
+/// 결과 분석 화면의 플랜별 잠금 해제 사다리.
+/// 무료=예상등급+강점, 베이직=+개선점·루브릭, 플러스=+목표갭·교정·모범, 프로=+항목별 피드백.
+struct ResultUnlock {
+    let plan: PlanEntitlement
+
+    var showsImprovements: Bool { plan >= .basic }
+    var showsRubrics: Bool { plan >= .basic }
+    var showsTargetGap: Bool { plan >= .plus }
+    var showsCorrectionAndSample: Bool { plan >= .plus }
+    var showsPerQuestion: Bool { plan >= .pro }
+}
+
+/// 유료 잠금 섹션. 탭하면 페이월을 연다.
+struct LockedFeedbackSection: View {
+    let title: String
+    let requiredPlan: PlanEntitlement
+    let onUpgrade: () -> Void
+
+    var body: some View {
+        Button(action: onUpgrade) {
+            VStack(alignment: .leading, spacing: 8) {
+                HStack(spacing: 8) {
+                    Image(systemName: "lock.fill")
+                        .font(.subheadline)
+                    Text(title)
+                        .font(.headline)
+                    Spacer()
+                    Text("\(requiredPlan.displayName)에서 잠금 해제")
+                        .font(AppTypography.caption.weight(.semibold))
+                }
+                .foregroundStyle(AppPalette.primary)
+                Text("업그레이드하면 이 항목을 볼 수 있어요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            .padding(AppSpacing.lg)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppPalette.primarySoft.opacity(0.5))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+            .overlay {
+                RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous)
+                    .stroke(AppPalette.primary.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4]))
+            }
+        }
+        .buttonStyle(.plain)
+    }
+}

@@ -6,6 +6,7 @@ struct PracticeScreen: View {
     @ObservedObject private var speech: SpeechRecognitionService
     @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsSetup = false
+    @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: PracticeViewModel, preferences: AppPreferences) {
         self.viewModel = viewModel
@@ -50,6 +51,15 @@ struct PracticeScreen: View {
             .onChange(of: preferences.initialLevel) {
                 Task { await viewModel.reloadQuestions() }
             }
+            // 플랜 변경(결제/복원/해지)·포그라운드 복귀 시 토큰·게이팅 즉시 최신화.
+            .onChange(of: viewModel.plan) {
+                Task { await viewModel.refreshUsage() }
+            }
+            .onChange(of: scenePhase) { _, phase in
+                if phase == .active {
+                    Task { await viewModel.refreshUsage() }
+                }
+            }
             .overlay {
                 if viewModel.operationState.isRunning,
                    viewModel.phase == .analyzing || viewModel.isRefreshingQuestions {
@@ -72,7 +82,10 @@ struct PracticeScreen: View {
                     )
                 }
             }
-            .task { await viewModel.load() }
+            .task {
+                await viewModel.load()
+                await viewModel.refreshUsage()
+            }
     }
 
     private var practiceBody: some View {
@@ -130,7 +143,8 @@ struct PracticeScreen: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: AppSpacing.xs) {
                 ForEach(0..<viewModel.questionCount, id: \.self) { index in
-                    let number = index + 1
+                    // 실제 문항 번호(데일리 Q2~Q15). index+1이 아니라 세트의 number 사용.
+                    let number = viewModel.questionNumber(at: index) ?? (index + 1)
                     let isCurrent = index == viewModel.questionIndex
                     let done = viewModel.isAnalyzed(number)
                     Button {

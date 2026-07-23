@@ -141,6 +141,7 @@ struct UsageStatus: Codable, Sendable {
     let dailyAnalysisRewardRemaining: Int?
     let dailyRefreshRemaining: Int?
     let mockAvailable: Bool?
+    let mockRemaining: Int?
     let mockSessionStage: String?
 
     var totalRemaining: Int {

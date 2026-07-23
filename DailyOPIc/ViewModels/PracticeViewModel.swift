@@ -70,6 +70,18 @@ final class PracticeViewModel {
     var questionCount: Int { questionSet?.questions.count ?? 0 }
     var analyzedNumbers: Set<Int> { Set(analyzedResults.keys) }
     func isAnalyzed(_ number: Int) -> Bool { analyzedResults[number] != nil }
+    /// 진행바 등에서 사용할 실제 문항 번호(데일리는 Q2~Q15). 인덱스+1이 아님.
+    func questionNumber(at index: Int) -> Int? {
+        guard let questions = questionSet?.questions, questions.indices.contains(index) else {
+            return nil
+        }
+        return questions[index].number
+    }
+
+    /// 사용량(토큰) 재조회. 플랜 변경·탭 재진입·포그라운드 복귀 시 호출.
+    func refreshUsage() async {
+        usage = try? await api.usage()
+    }
     /// Saved result for the currently displayed question, if it was analyzed.
     var currentResult: AnalyzedResult? {
         guard let number = currentQuestion?.number else { return nil }
@@ -198,15 +210,7 @@ final class PracticeViewModel {
 
     private func evaluatePendingRecording() async throws {
         guard let pendingRecording, let questionSet, let question = currentQuestion else { return }
-        if usage?.totalRemaining == 0 {
-            if environment.currentPlan.isPaid {
-                // 유료 플랜은 광고 대신 상위 플랜 결제 유도(플랜 한도 소진 시).
-                showsPaywall = true
-                phase = .idle
-                return
-            }
-            try await unlockPracticeCredits()
-        }
+        // 토큰 모델: 토큰은 세트를 받을 때 소모되고, 세트 내 평가는 무제한. 여기서 쿼터 확인하지 않음.
         phase = .analyzing
         operationKind = .speechAnalysis
         let operationID = evaluationOperationID ?? UUID()
@@ -320,7 +324,8 @@ final class PracticeViewModel {
         refreshProgressMessage = "새 질문을 준비하고 있어요."
         errorMessage = nil
         do {
-            let updated = try await refreshAfterVerifiedAd(
+            // 토큰 모델: 새 문제 세트 = 토큰 1개. 광고/리워드 없이 바로 요청.
+            let updated = try await requestRefreshedSet(
                 adjustment: adjustment,
                 operationID: operationID
             )
@@ -329,6 +334,8 @@ final class PracticeViewModel {
             refreshOperationID = nil
         } catch is CancellationError {
             operationState = .idle
+        } catch let error as APIClientError where error.isPracticeQuotaExhausted {
+            await handleRefreshQuotaExhausted(adjustment: adjustment)
         } catch {
             errorMessage = error.localizedDescription
             operationState = .recoverableFailure(
@@ -340,30 +347,46 @@ final class PracticeViewModel {
         isRefreshingQuestions = false
     }
 
-    private func refreshAfterVerifiedAd(
+    /// 토큰 소진 시: 무료는 광고 보너스 세트로 재시도, 유료는 상위 플랜 결제 유도.
+    private func handleRefreshQuotaExhausted(adjustment: DifficultyAdjustment) async {
+        guard !environment.currentPlan.isPaid else {
+            showsRefreshDialog = false
+            showsPaywall = true
+            operationState = .idle
+            return
+        }
+        do {
+            try await unlockPracticeCredits()  // 광고 → 보너스 세트 토큰
+            let updated = try await requestRefreshedSet(
+                adjustment: adjustment,
+                operationID: UUID()  // 재시도는 새 idempotency key
+            )
+            applyRefreshedQuestionSet(updated)
+            operationState = .completed
+            refreshOperationID = nil
+        } catch is CancellationError {
+            operationState = .idle
+        } catch let error as APIClientError where error.isPracticeQuotaExhausted {
+            showsRefreshDialog = false
+            showsPaywall = true
+            operationState = .idle
+        } catch {
+            errorMessage = error.localizedDescription
+            operationState = .idle
+        }
+    }
+
+    private func requestRefreshedSet(
         adjustment: DifficultyAdjustment,
         operationID: UUID
     ) async throws -> QuestionSet {
-        let intent = try await api.createRewardIntent(
-            purpose: .practiceRefresh,
-            requestID: UUID()
-        )
-        // 유료 플랜은 서버 auto-verify로 광고 없이 리프레시. 무료만 광고 시청.
-        if !environment.currentPlan.isPaid {
-            try await ads.showRewardedAd(
-                userIdentifier: intent.userIdentifier,
-                customData: intent.customData
-            )
-            _ = try await api.waitForReward(nonce: intent.nonce)
-        }
         refreshProgressMessage = "새 질문을 준비하고 있어요."
         let updated = try await api.refreshPracticeSet(
             request: PracticeRefreshRequest(
                 initialLevel: initialLevel,
                 background: preferences.backgroundProfile,
                 survey: preferences.mockSurvey ?? .defaultSurvey,
-                adjustment: adjustment,
-                rewardNonce: intent.nonce
+                adjustment: adjustment
             ),
             requestID: operationID
         )

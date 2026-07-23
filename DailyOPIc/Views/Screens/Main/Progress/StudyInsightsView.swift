@@ -20,21 +20,15 @@ struct StudyInsightsSection: View {
 
     @ViewBuilder
     private var gradeTrendCard: some View {
-        let limited = plan == .free
-        let points = limited ? Array(insights.trend.suffix(3)) : insights.trend
+        // 전 플랜 공개: 전체 추이 표시.
         InsightCard(title: "예상 등급 추이", locked: false) {
-            if points.count < 2 {
+            if insights.trend.count < 2 {
                 Text("기록이 2개 이상 쌓이면 추이가 표시돼요.")
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
-                GradeTrendChart(points: points)
+                GradeTrendChart(points: insights.trend)
                     .frame(height: 120)
-                if limited {
-                    Text("무료 플랜은 최근 3개만 표시돼요. 전체 추이는 유료 플랜에서.")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                }
             }
         }
     }
@@ -43,35 +37,11 @@ struct StudyInsightsSection: View {
 
     @ViewBuilder
     private var weaknessCard: some View {
-        // 매트릭스: free/basic 없음, plus 기본(최상위 1), pro 고급(전체).
-        let tier = plan.weaknessTier
-        InsightCard(
-            title: "취약 유형 분석",
-            locked: tier == .none,
-            onUpgrade: onUpgrade
-        ) {
+        // 전 플랜 공개: 5차원 전체를 약한 순으로 표시.
+        InsightCard(title: "취약 유형 분석", locked: false) {
             if let averages = insights.dimensionAverages, !averages.isEmpty {
-                switch tier {
-                case .none:
-                    Text("내 답변에서 가장 약한 영역을 짚어드려요. (플러스 이상)")
-                        .font(AppTypography.footnote)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                case .basic:
-                    if let weakest = averages.min(by: { $0.score < $1.score }) {
-                        Text("가장 보완이 필요한 영역")
-                            .font(AppTypography.footnote)
-                            .foregroundStyle(AppPalette.secondaryInk)
-                        DimensionBar(name: weakest.name, score: weakest.score, highlight: true)
-                    }
-                case .advanced:
-                    ForEach(averages.sorted { $0.score < $1.score }, id: \.name) { item in
-                        DimensionBar(name: item.name, score: item.score, highlight: false)
-                    }
-                    if plan == .pro {
-                        Text("가장 약한 영역 위주로 '복습 세트'를 만들면 효율이 올라가요.")
-                            .font(AppTypography.caption)
-                            .foregroundStyle(AppPalette.secondaryInk)
-                    }
+                ForEach(averages.sorted { $0.score < $1.score }, id: \.name) { item in
+                    DimensionBar(name: item.name, score: item.score, highlight: false)
                 }
             } else {
                 Text("연습 기록이 쌓이면 영역별 분석이 표시돼요.")
@@ -85,27 +55,18 @@ struct StudyInsightsSection: View {
 
     @ViewBuilder
     private var weeklyReportCard: some View {
-        InsightCard(
-            title: "주간 리포트",
-            locked: plan != .pro,
-            onUpgrade: onUpgrade
-        ) {
-            if plan == .pro {
-                if let report = insights.weeklyReport {
-                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                        reportRow("이번 주 응시", "\(report.attempts)회")
-                        reportRow("평균 예상 등급", report.averageLevel?.rawValue ?? "-")
-                        if let weakest = report.weakestDimension {
-                            reportRow("집중 보완 영역", weakest)
-                        }
+        // 전 플랜 공개.
+        InsightCard(title: "주간 리포트", locked: false) {
+            if let report = insights.weeklyReport {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    reportRow("이번 주 응시", "\(report.attempts)회")
+                    reportRow("평균 예상 등급", report.averageLevel?.rawValue ?? "-")
+                    if let weakest = report.weakestDimension {
+                        reportRow("집중 보완 영역", weakest)
                     }
-                } else {
-                    Text("이번 주 기록이 없어요.")
-                        .font(AppTypography.footnote)
-                        .foregroundStyle(AppPalette.secondaryInk)
                 }
             } else {
-                Text("매주 학습 요약을 리포트로 받아보세요. (프로)")
+                Text("이번 주 기록이 없어요.")
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
             }

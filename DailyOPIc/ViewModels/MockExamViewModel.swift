@@ -40,6 +40,7 @@ final class MockExamViewModel {
     var remainingSeconds = 180
     var operationState: AsyncOperationState = .idle
     var operationKind: AsyncOperationKind = .dataLoading
+    var usage: UsageStatus?
     private var evaluationRetryContext: EvaluationRetryContext?
     private var startOperationID: UUID?
     private var adjustmentOperationID: UUID?
@@ -58,6 +59,18 @@ final class MockExamViewModel {
     }
 
     var plan: PlanEntitlement { environment.currentPlan }
+
+    /// 오늘 남은 모의고사 횟수(서버 기준). nil이면 아직 미조회.
+    var mockRemaining: Int? { usage?.mockRemaining }
+    /// 오늘 모의고사 응시 가능 여부(진행 중이거나 남은 횟수 있음).
+    var mockAvailable: Bool { usage?.mockAvailable ?? true }
+    /// 하루 응시 한도(플랜별). intro 안내 문구용.
+    var mockDailyLimit: Int { environment.capabilities?.quotaPolicy.mockSessionsPerDay ?? 1 }
+
+    /// 모의고사 가용성/남은 횟수 최신화. 탭 진입·플랜 변경 시 호출.
+    func refreshUsage() async {
+        usage = try? await api.usage()
+    }
 
     /// 모의고사 광고 게이트용 리워드 논스 획득.
     /// 무료 플랜은 리워드 광고를 시청하고, 유료 플랜은 서버 auto-verify로 광고 없이 통과.
@@ -447,6 +460,21 @@ final class MockExamViewModel {
         evaluation = nil
         errorMessage = hadSession ? "오늘 모의고사를 그만뒀어요. 내일 다시 도전할 수 있어요." : nil
         evaluationRetryContext = nil
+        phase = .introduction
+    }
+
+    /// 결과 확인 후 처음(intro) 화면으로 돌아간다. 그만두기와 달리 긍정 안내를 표시.
+    func finishReview() {
+        speech.cancel()
+        promptPlayback.stop()
+        timerTask?.cancel()
+        questionSet = nil
+        session = nil
+        answers = []
+        currentIndex = 0
+        evaluation = nil
+        evaluationRetryContext = nil
+        errorMessage = nil
         phase = .introduction
     }
 

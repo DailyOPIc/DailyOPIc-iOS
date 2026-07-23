@@ -285,7 +285,8 @@ struct PracticeRefreshRequest: Codable, Sendable {
     let recentQuestionHashes: [String]
     let survey: BackgroundSurvey?
     let adjustment: DifficultyAdjustment
-    let rewardNonce: String
+    // 토큰 모델 전환: 리프레시는 데일리 토큰을 소모하며 광고/리워드를 쓰지 않는다.
+    let rewardNonce: String?
 
     init(
         initialLevel: SelfAssessmentLevel,
@@ -293,7 +294,7 @@ struct PracticeRefreshRequest: Codable, Sendable {
         recentQuestionHashes: [String] = [],
         survey: BackgroundSurvey?,
         adjustment: DifficultyAdjustment,
-        rewardNonce: String
+        rewardNonce: String? = nil
     ) {
         self.initialLevel = initialLevel.rawValue
         self.background = background
