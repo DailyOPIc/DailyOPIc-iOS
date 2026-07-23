@@ -40,6 +40,10 @@ enum APIClientError: LocalizedError {
         statusCode == 402 && code == "practice_quota_exhausted"
     }
 
+    var isRewardQuotaExhausted: Bool {
+        statusCode == 402 && code == "reward_quota_exhausted"
+    }
+
     var isAIUnavailable: Bool {
         statusCode == 503 && code == "ai_unavailable"
     }

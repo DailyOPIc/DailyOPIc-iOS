@@ -66,6 +66,8 @@ final class MockExamViewModel {
     var mockAvailable: Bool { usage?.mockAvailable ?? true }
     /// 하루 응시 한도(플랜별). intro 안내 문구용.
     var mockDailyLimit: Int { environment.capabilities?.quotaPolicy.mockSessionsPerDay ?? 1 }
+    /// 무료 플랜은 '평생 최초 1회 체험'. 유료는 하루 N회.
+    var mockIsTrial: Bool { !environment.currentPlan.isPaid }
 
     /// 모의고사 가용성/남은 횟수 최신화. 탭 진입·플랜 변경 시 호출.
     func refreshUsage() async {

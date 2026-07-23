@@ -28,6 +28,11 @@ struct PaywallView: View {
                 VStack(spacing: AppSpacing.lg) {
                     header
                     tierCards
+                    Text("예상 등급 추이 · 취약 유형 분석 · 주간 리포트는 모든 플랜에서 무료로 제공돼요.")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(Color(AppPalette.secondaryInk))
+                        .multilineTextAlignment(.center)
+                        .frame(maxWidth: .infinity)
                     if store.packages.isEmpty {
                         unavailableNotice
                     }
@@ -221,25 +226,47 @@ struct PaywallTier: Identifiable {
     static let all: [PaywallTier] = [
         PaywallTier(
             plan: .free,
-            highlights: ["데일리 1회 + 광고 보너스 1회", "모의고사 체험 1회", "예상 등급·요약", "광고 있음"],
+            highlights: [
+                "데일리 새 문제 세트 하루 1회 (+광고 보너스 1회)",
+                "모의고사 최초 1회 체험",
+                "결과: 예상 등급 + 강점",
+                "학습 기록 최근 7일",
+                "광고 있음",
+            ],
             promoBadge: nil,
             promoNote: nil
         ),
         PaywallTier(
             plan: .basic,
-            highlights: ["광고 제거", "데일리 하루 3회", "매일 모의고사(기본 분석)", "기록 30일"],
+            highlights: [
+                "광고 완전 제거",
+                "데일리 새 문제 세트 하루 3회",
+                "모의고사 하루 1회",
+                "결과: + 개선점 · 5차원 루브릭 분석",
+                "학습 기록 최근 30일",
+            ],
             promoBadge: "오픈 기념 할인",
             promoNote: "오픈 초기 특가 진행 중 — 지금 가장 저렴하게 시작하세요."
         ),
         PaywallTier(
             plan: .plus,
-            highlights: ["데일리 하루 10회", "상세 분석(교정·모범답안)", "예상 등급 추이·취약 유형(기본)"],
+            highlights: [
+                "데일리 새 문제 세트 하루 10회",
+                "모의고사 하루 3회",
+                "결과: + 교정답안 · 모범답안 · 목표 등급까지",
+                "학습 기록 최근 30일",
+            ],
             promoBadge: nil,
             promoNote: nil
         ),
         PaywallTier(
             plan: .pro,
-            highlights: ["데일리 하루 20회", "집중 분석 + 취약점 복습 세트", "주간 리포트 · 고급 취약 분석", "기록 전체"],
+            highlights: [
+                "데일리 새 문제 세트 하루 20회",
+                "모의고사 하루 5회",
+                "결과: + 모의고사 항목별(문항별) 피드백",
+                "학습 기록 전체",
+            ],
             promoBadge: nil,
             promoNote: nil
         ),

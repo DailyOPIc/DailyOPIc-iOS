@@ -279,6 +279,10 @@ struct OnboardingView: View {
             "[DailyOPIc][Rewards] intent created nonce=\(intent.nonce) "
             + "status=\(intent.status)"
         )
+        // 유료 플랜은 광고 없이 서버 auto-verify로 즉시 변경(하루 1회).
+        if environment.currentPlan.isPaid {
+            return intent.nonce
+        }
         progressMessage = "광고를 불러오고 있어요."
         try await environment.ads.showRewardedAd(
             userIdentifier: intent.userIdentifier,
@@ -310,7 +314,11 @@ struct OnboardingView: View {
 
     private func failSelection(_ error: Error) {
         print("[DailyOPIc][TargetLevel] update failed error=\(error.localizedDescription)")
-        errorMessage = "\(error.localizedDescription) 다시 시도해 주세요."
+        if let apiError = error as? APIClientError, apiError.isRewardQuotaExhausted {
+            errorMessage = "난이도 변경은 하루 한 번만 가능해요. 내일 다시 시도해 주세요."
+        } else {
+            errorMessage = "\(error.localizedDescription) 다시 시도해 주세요."
+        }
         progressMessage = nil
         isSubmitting = false
         withAnimation(.easeOut(duration: 0.18)) {

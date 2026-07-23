@@ -100,12 +100,12 @@ struct MockExamScreen: View {
             Image(systemName: "lock.fill")
                 .font(.title2)
                 .foregroundStyle(AppPalette.primary)
-            Text("오늘 모의고사를 모두 사용했어요")
+            Text(viewModel.mockIsTrial ? "무료 체험을 모두 사용했어요" : "오늘 모의고사를 모두 사용했어요")
                 .font(AppTypography.cardTitle)
                 .foregroundStyle(AppPalette.ink)
             Text(viewModel.plan.isPaid
                  ? "내일 다시 도전하거나, 상위 플랜으로 하루 응시 횟수를 늘려보세요."
-                 : "플랜을 업그레이드하면 모의고사를 매일 더 많이 풀 수 있어요.")
+                 : "플랜을 업그레이드하면 모의고사를 매일 응시할 수 있어요.")
                 .font(AppTypography.footnote)
                 .foregroundStyle(AppPalette.secondaryInk)
                 .multilineTextAlignment(.center)
@@ -135,7 +135,9 @@ struct MockExamScreen: View {
                 Text("실전처럼 15문항에 답해보세요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
-                Text("하루 한 번, 총 15문항이에요. 중간에 멈춰도 오늘 안에는 이어서 진행할 수 있어요.")
+                Text(viewModel.mockIsTrial
+                     ? "OPIc 모의고사를 최초 1회 무료로 체험해볼 수 있어요. 실전처럼 총 15문항!"
+                     : "하루 \(viewModel.mockDailyLimit)회 응시할 수 있어요. 총 15문항, 중간에 멈춰도 오늘 안에는 이어서 진행할 수 있어요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .multilineTextAlignment(.center)
@@ -154,7 +156,9 @@ struct MockExamScreen: View {
                         .multilineTextAlignment(.center)
                 } else if viewModel.mockAvailable {
                     if let remaining = viewModel.mockRemaining {
-                        Text("오늘 남은 모의고사 \(remaining)회 / 하루 \(viewModel.mockDailyLimit)회")
+                        Text(viewModel.mockIsTrial
+                             ? "무료 체험 \(remaining)회 남음"
+                             : "오늘 남은 모의고사 \(remaining)회 / 하루 \(viewModel.mockDailyLimit)회")
                             .font(AppTypography.footnote.weight(.semibold))
                             .foregroundStyle(AppPalette.primary)
                     }
