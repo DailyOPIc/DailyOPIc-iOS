@@ -149,11 +149,14 @@ struct PaywallView: View {
             }
             .disabled(restoring)
 
-            if let privacy = AppConfiguration.privacyPolicyURL {
-                Button("개인정보 처리방침") { openURL(privacy) }
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(Color(AppPalette.secondaryInk))
+            HStack(spacing: AppSpacing.md) {
+                if let privacy = AppConfiguration.privacyPolicyURL {
+                    Button("개인정보 처리방침") { openURL(privacy) }
+                }
+                Button("이용약관(EULA)") { openURL(AppConfiguration.termsOfUseURL) }
             }
+            .font(AppTypography.footnote)
+            .foregroundStyle(Color(AppPalette.secondaryInk))
             Text("구독은 App Store 계정으로 청구되며 기간 종료 24시간 전까지 해지하지 않으면 자동 갱신됩니다. 설정 > Apple ID에서 언제든 관리할 수 있습니다.")
                 .font(AppTypography.caption)
                 .foregroundStyle(Color(AppPalette.secondaryInk))

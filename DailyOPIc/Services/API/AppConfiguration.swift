@@ -34,6 +34,16 @@ enum AppConfiguration {
         configuredURL(Bundle.main.object(forInfoDictionaryKey: "DAILYOPIC_PRIVACY_POLICY_URL") as? String)
     }
 
+    /// 이용약관(EULA). App Store 자동갱신 구독 심사 필수 링크.
+    /// xcconfig의 DAILYOPIC_TERMS_URL로 자체 약관을 지정할 수 있으며, 없으면
+    /// Apple 표준 EULA로 폴백한다.
+    nonisolated static var termsOfUseURL: URL {
+        if let url = configuredURL(Bundle.main.object(forInfoDictionaryKey: "DAILYOPIC_TERMS_URL") as? String) {
+            return url
+        }
+        return URL(string: "https://www.apple.com/legal/internet-services/itunes/dev/stdeula/")!
+    }
+
     /// RevenueCat 공개 SDK 키(App Store). xcconfig의 REVENUECAT_API_KEY → Info.plist.
     nonisolated static var revenueCatAPIKey: String? {
         configuredString(Bundle.main.object(forInfoDictionaryKey: "REVENUECAT_API_KEY") as? String)

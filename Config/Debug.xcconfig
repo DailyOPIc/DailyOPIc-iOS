@@ -16,5 +16,8 @@ GAD_TEST_DEVICE_IDS =210fa6282b33570fc7f95c3de26fc4d5
 
 DAILYOPIC_PRIVACY_POLICY_URL = https:/$()/battle-princess-097.notion.site/2d05d51fd9518084a95ce3b9193eb5ed?source=copy_link
 
+// 이용약관(EULA). 비워두면 Apple 표준 EULA로 폴백됨. 자체 약관이 있으면 여기에 URL 지정.
+DAILYOPIC_TERMS_URL =
+
 // RevenueCat public SDK key (App Store). 대시보드 > API Keys 에서 발급.
 REVENUECAT_API_KEY = appl_PIFuXXinTfXfrLCVtTNFQMEArcd

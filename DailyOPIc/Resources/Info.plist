@@ -24,6 +24,8 @@
 	<string>$(DAILYOPIC_API_BASE_URL)</string>
 	<key>DAILYOPIC_PRIVACY_POLICY_URL</key>
 	<string>$(DAILYOPIC_PRIVACY_POLICY_URL)</string>
+	<key>DAILYOPIC_TERMS_URL</key>
+	<string>$(DAILYOPIC_TERMS_URL)</string>
 	<key>GADApplicationIdentifier</key>
 	<string>ca-app-pub-5460686409666356~8798659058</string>
 	<key>GADBannerAdUnitID</key>
