@@ -59,6 +59,7 @@ struct OnboardingView: View {
                     TargetLevelConfirmationDialog(
                         level: selectedLevel,
                         requiresReward: requiresReward(for: selectedLevel),
+                        isPaidPlan: environment.currentPlan.isPaid,
                         isSubmitting: isSubmitting,
                         confirm: {
                             Task { await submitSelection(selectedLevel) }
@@ -347,9 +348,14 @@ private struct ProgressBanner: View {
 private struct TargetLevelConfirmationDialog: View {
     let level: SelfAssessmentLevel
     let requiresReward: Bool
+    let isPaidPlan: Bool
     let isSubmitting: Bool
     let confirm: () -> Void
     let cancel: () -> Void
+
+    /// 유료 플랜은 광고 없이 하루 1회 무료 변경, 무료 플랜은 광고 시청 변경.
+    private var paidChange: Bool { requiresReward && isPaidPlan }
+    private var adChange: Bool { requiresReward && !isPaidPlan }
 
     var body: some View {
         ZStack {
@@ -360,7 +366,7 @@ private struct TargetLevelConfirmationDialog: View {
                 }
 
             VStack(spacing: AppSpacing.md) {
-                Image(systemName: requiresReward ? "play.rectangle.fill" : "checkmark.seal.fill")
+                Image(systemName: adChange ? "play.rectangle.fill" : "checkmark.seal.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
                 Text(requiresReward ? "난이도를 바꿀까요?" : "이 난이도로 시작할까요?")
@@ -377,8 +383,8 @@ private struct TargetLevelConfirmationDialog: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 PrimaryButton(
-                    title: requiresReward ? "광고 보고 바꾸기" : "시작하기",
-                    systemImage: requiresReward ? "play.rectangle.fill" : "mic.fill",
+                    title: paidChange ? "무료로 바꾸기" : (adChange ? "광고 보고 바꾸기" : "시작하기"),
+                    systemImage: paidChange ? "checkmark.seal.fill" : (adChange ? "play.rectangle.fill" : "mic.fill"),
                     isLoading: isSubmitting,
                     isDisabled: isSubmitting,
                     action: confirm
@@ -402,8 +408,11 @@ private struct TargetLevelConfirmationDialog: View {
     }
 
     private var message: String {
-        if requiresReward {
-            return "난이도를 바꾸면 새 질문이 만들어져요. 광고를 끝까지 보면 바뀐 난이도가 적용돼요."
+        if paidChange {
+            return "난이도를 바꾸면 새 질문이 만들어져요. 유료 플랜은 하루 1회 광고 없이 무료로 변경할 수 있어요."
+        }
+        if adChange {
+            return "난이도를 바꾸면 새 질문이 만들어져요. 광고를 끝까지 보면 바뀐 난이도가 적용돼요. (하루 1회)"
         }
         return "고른 난이도로 질문이 만들어져요. 모의고사 중간에 한 번 조정할 수 있어요."
     }
