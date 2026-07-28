@@ -8,6 +8,9 @@ import GoogleMobileAds
 #if canImport(UserMessagingPlatform)
 import UserMessagingPlatform
 #endif
+#if canImport(AppTrackingTransparency)
+import AppTrackingTransparency
+#endif
 
 @MainActor
 final class AdService: NSObject, ObservableObject {
@@ -79,6 +82,9 @@ final class AdService: NSObject, ObservableObject {
         print("[DailyOPIc][UMP] UserMessagingPlatform unavailable. canRequestAds=true")
         #endif
 
+        // UMP 동의 이후 ATT(추적 투명성) 요청. 사용자가 허용해야 개인화 광고/IDFA 사용.
+        await requestTrackingAuthorizationIfNeeded()
+
         #if canImport(GoogleMobileAds)
         configureGADTestDevicesIfNeeded()
         guard canRequestAds else {
@@ -94,6 +100,15 @@ final class AdService: NSObject, ObservableObject {
             MobileAds.shared.start { _ in continuation.resume() }
         }
         print("[DailyOPIc][Ads] Mobile Ads started")
+        #endif
+    }
+
+    /// App Tracking Transparency 권한 요청(최초 1회). 미결정 상태일 때만 프롬프트.
+    private func requestTrackingAuthorizationIfNeeded() async {
+        #if canImport(AppTrackingTransparency)
+        guard ATTrackingManager.trackingAuthorizationStatus == .notDetermined else { return }
+        let status = await ATTrackingManager.requestTrackingAuthorization()
+        print("[DailyOPIc][ATT] tracking authorization status=\(status.rawValue)")
         #endif
     }
 
