@@ -8,6 +8,8 @@ struct OnboardingView: View {
     @State private var isSubmitting = false
     @State private var progressMessage: String?
     @State private var errorMessage: String?
+    /// 난이도 변경 하루 1회 초과 시 재시도 대신 홈으로 돌아가기 버튼을 노출.
+    @State private var reachedDailyLimit = false
     @State private var updateOperationID: UUID?
     @State private var step: Step
 
@@ -124,17 +126,27 @@ struct OnboardingView: View {
                     .fixedSize(horizontal: false, vertical: true)
 
                 if let message = errorMessage {
-                    ErrorBanner(
-                        message: message,
-                        retry: selectedLevel.map { level in
-                            {
-                                withAnimation(.easeInOut(duration: 0.18)) {
-                                    showsConfirmation = true
-                                }
-                                Task { await submitSelection(level) }
+                    if reachedDailyLimit {
+                        // 하루 변경 한도 초과: 재시도 대신 홈으로 돌아가기.
+                        VStack(spacing: AppSpacing.sm) {
+                            ErrorBanner(message: message)
+                            PrimaryButton(title: "홈으로 돌아가기", systemImage: "house.fill") {
+                                returnToHome()
                             }
                         }
-                    )
+                    } else {
+                        ErrorBanner(
+                            message: message,
+                            retry: selectedLevel.map { level in
+                                {
+                                    withAnimation(.easeInOut(duration: 0.18)) {
+                                        showsConfirmation = true
+                                    }
+                                    Task { await submitSelection(level) }
+                                }
+                            }
+                        )
+                    }
                 }
 
                 if let progressMessage {
@@ -235,6 +247,7 @@ struct OnboardingView: View {
         guard !isSubmitting else { return }
         isSubmitting = true
         errorMessage = nil
+        reachedDailyLimit = false
         progressMessage = "난이도를 저장하고 있어요."
         print("[DailyOPIc][TargetLevel] update requested initialLevel=\(level.rawValue)")
         do {
@@ -317,14 +330,26 @@ struct OnboardingView: View {
         print("[DailyOPIc][TargetLevel] update failed error=\(error.localizedDescription)")
         if let apiError = error as? APIClientError, apiError.isRewardQuotaExhausted {
             errorMessage = "난이도 변경은 하루 한 번만 가능해요. 내일 다시 시도해 주세요."
+            reachedDailyLimit = true
         } else {
             errorMessage = "\(error.localizedDescription) 다시 시도해 주세요."
+            reachedDailyLimit = false
         }
         progressMessage = nil
         isSubmitting = false
         withAnimation(.easeOut(duration: 0.18)) {
             showsConfirmation = false
         }
+    }
+
+    /// 난이도 변경 한도 초과 시 난이도 선택 화면을 닫고 홈(메인)으로 돌아간다.
+    private func returnToHome() {
+        errorMessage = nil
+        reachedDailyLimit = false
+        progressMessage = nil
+        isSubmitting = false
+        showsConfirmation = false
+        preferences.isPresentingLevelSelection = false
     }
 }
 
