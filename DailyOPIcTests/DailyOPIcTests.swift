@@ -3,6 +3,47 @@ import Testing
 @testable import DailyOPIc
 
 struct DailyOPIcTests {
+    @MainActor
+    @Test func storeAppUserIDPreservesSDKValueExactly() {
+        let identifiers = [
+            "FirebaseUIDExample1234567890AB",
+            "$RCAnonymousID:1234567890abcdef1234567890abcdef"
+        ]
+
+        for identifier in identifiers {
+            let store = StoreService(appUserIDProvider: { identifier })
+            store.refreshAppUserID()
+            #expect(store.appUserID == identifier)
+        }
+    }
+
+    @MainActor
+    @Test func storeAppUserIDTreatsMissingOrEmptyValueAsUnavailable() {
+        let missingStore = StoreService(appUserIDProvider: { nil })
+        missingStore.refreshAppUserID()
+        #expect(missingStore.appUserID == nil)
+
+        let emptyStore = StoreService(appUserIDProvider: { "" })
+        emptyStore.refreshAppUserID()
+        #expect(emptyStore.appUserID == nil)
+    }
+
+    @MainActor
+    @Test func refreshingStoreAppUserIDDoesNotGenerateOrChangeTheIdentifier() {
+        let identifier = "StableFirebaseUID1234567890AB"
+        var providerCallCount = 0
+        let store = StoreService(appUserIDProvider: {
+            providerCallCount += 1
+            return identifier
+        })
+
+        store.refreshAppUserID()
+        store.refreshAppUserID()
+
+        #expect(providerCallCount == 2)
+        #expect(store.appUserID == identifier)
+    }
+
     @Test func levelOrderIsStable() {
         #expect(OPIcLevel.NL.rank < OPIcLevel.IM2.rank)
         #expect(OPIcLevel.IM2.rank < OPIcLevel.IH.rank)

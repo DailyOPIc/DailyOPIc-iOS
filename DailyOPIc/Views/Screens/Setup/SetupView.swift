@@ -1,12 +1,20 @@
 import SwiftUI
+import UIKit
 
 struct SetupView: View {
     let preferences: AppPreferences
+    @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     @EnvironmentObject private var ads: AdService
     @State private var alert: SetupAlert?
     @State private var showsGoalLevelDialog = false
+    @State private var copyFeedbackTrigger = 0
+
+    private var appUserID: String? {
+        guard let value = environment.store.appUserID, !value.isEmpty else { return nil }
+        return value
+    }
 
     init(preferences: AppPreferences) {
         self.preferences = preferences
@@ -56,6 +64,49 @@ struct SetupView: View {
                             }
                         }
                     }
+                    Section("고객 지원") {
+                        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                            Text("사용자 식별 ID")
+                                .font(.headline)
+                            Text("문의나 이용권 지급 요청 시 필요한 ID입니다.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+
+                            if let appUserID {
+                                Text(appUserID)
+                                    .font(.footnote.monospaced())
+                                    .foregroundStyle(AppPalette.secondaryInk)
+                                    .lineLimit(nil)
+                                    .fixedSize(horizontal: false, vertical: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .textSelection(.enabled)
+                                    .accessibilityElement(children: .ignore)
+                                    .accessibilityLabel("사용자 식별 ID")
+                                    .accessibilityValue(appUserID)
+                            } else {
+                                Text("사용자 식별 ID를 불러올 수 없습니다.")
+                                    .font(.footnote)
+                                    .foregroundStyle(AppPalette.secondaryInk)
+                                Button("다시 시도") {
+                                    environment.store.refreshAppUserID()
+                                }
+                            }
+
+                            Button {
+                                copyAppUserID()
+                            } label: {
+                                Label("ID 복사", systemImage: "doc.on.doc")
+                            }
+                            .disabled(appUserID == nil)
+                            .accessibilityHint("고객 지원에 전달할 사용자 식별 ID를 복사합니다.")
+
+                            Text("문의, 구독 지원 또는 이벤트 참여 시 위 사용자 식별 ID를 함께 보내주세요.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        .padding(.vertical, AppSpacing.xs)
+                    }
                 }
 
                 if showsGoalLevelDialog {
@@ -71,6 +122,10 @@ struct SetupView: View {
                 }
             }
             .navigationTitle("학습 설정")
+            .task {
+                environment.store.refreshAppUserID()
+            }
+            .sensoryFeedback(.success, trigger: copyFeedbackTrigger)
             .alert(item: $alert) { item in
                 Alert(
                     title: Text(item.title),
@@ -109,6 +164,16 @@ struct SetupView: View {
                 )
             }
         }
+    }
+
+    private func copyAppUserID() {
+        guard let appUserID, !appUserID.isEmpty else { return }
+        UIPasteboard.general.string = appUserID
+        copyFeedbackTrigger += 1
+        alert = SetupAlert(
+            title: "복사 완료",
+            message: "사용자 식별 ID가 복사되었습니다."
+        )
     }
 
     private func presentAdPrivacyOptions() async {

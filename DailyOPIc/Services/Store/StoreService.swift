@@ -37,14 +37,46 @@ enum StoreError: LocalizedError {
 @MainActor
 @Observable
 final class StoreService {
+    typealias AppUserIDProvider = @MainActor () -> String?
+
     private(set) var packages: [StorePackage] = []
     private(set) var isConfigured = false
     private(set) var isLoading = false
+    /// RevenueCat SDK가 현재 사용 중인 실제 App User ID. 별도 ID를 생성하거나 저장하지 않는다.
+    private(set) var appUserID: String?
     /// 구매 직후 CustomerInfo 기준 즉시 반영용 힌트(서버 반영 전 UI 잠금 해제).
     private(set) var localEntitlement: PlanEntitlement = .free
 
     /// 엔타이틀먼트가 바뀌었을 수 있을 때 호출(호출부에서 서버 capabilities 재조회).
     var onEntitlementMayHaveChanged: (() async -> Void)?
+
+    private let appUserIDProvider: AppUserIDProvider
+
+    init() {
+        appUserIDProvider = Self.currentRevenueCatAppUserID
+    }
+
+    init(appUserIDProvider: @escaping AppUserIDProvider) {
+        self.appUserIDProvider = appUserIDProvider
+    }
+
+    /// 설정 화면 진입 시 SDK의 현재 식별자를 다시 읽는다. 빈 값은 사용 가능한 ID로 취급하지 않는다.
+    func refreshAppUserID() {
+        guard let current = appUserIDProvider(), !current.isEmpty else {
+            appUserID = nil
+            return
+        }
+        appUserID = current
+    }
+
+    private static func currentRevenueCatAppUserID() -> String? {
+        #if canImport(RevenueCat)
+        guard Purchases.isConfigured else { return nil }
+        return Purchases.shared.appUserID
+        #else
+        return nil
+        #endif
+    }
 
     #if canImport(RevenueCat)
     private var rcPackages: [String: Package] = [:]
@@ -59,6 +91,7 @@ final class StoreService {
         Purchases.logLevel = .warn
         Purchases.configure(withAPIKey: apiKey, appUserID: userId)
         isConfigured = true
+        refreshAppUserID()
         startCustomerInfoObserver()
     }
 
