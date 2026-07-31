@@ -322,7 +322,7 @@ struct MockExamScreen: View {
                 Text(
                     viewModel.canRetryEvaluation
                         ? "같은 답변으로 AI 종합 평가를 다시 받아볼게요."
-                        : "광고를 시청하면 AI 종합 평가를 볼 수 있어요."
+                        : "AI가 15개 답변을 분석해 종합 결과를 알려드려요."
                 )
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
@@ -331,8 +331,8 @@ struct MockExamScreen: View {
                     .cardStyle(alignment: .center)
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
                 PrimaryButton(
-                    title: viewModel.canRetryEvaluation ? "AI 평가 다시 시도" : "광고 시청 후 종합 평가",
-                    systemImage: viewModel.canRetryEvaluation ? "arrow.clockwise" : "play.rectangle.fill"
+                    title: viewModel.canRetryEvaluation ? "AI 평가 다시 시도" : "결과보기",
+                    systemImage: viewModel.canRetryEvaluation ? "arrow.clockwise" : "doc.text.magnifyingglass"
                 ) {
                     Task {
                         if viewModel.canRetryEvaluation {
