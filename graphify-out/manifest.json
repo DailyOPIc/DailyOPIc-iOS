@@ -414,14 +414,14 @@
     "ast_hash": "57fbeb030a5eeb3422950dee8ee9b723",
     "semantic_hash": "57fbeb030a5eeb3422950dee8ee9b723"
   },
-  ".claude/.headroom_wrap_marker.json": {
-    "mtime": 1785931498.6560988,
-    "ast_hash": "6988385580010d62114cd21ab8dde53f",
-    "semantic_hash": "6988385580010d62114cd21ab8dde53f"
-  },
   ".claude/settings.local.json": {
-    "mtime": 1785932118.9899104,
-    "ast_hash": "6fbc7aaf70ffdc7d92b2b6723188d205",
-    "semantic_hash": "6fbc7aaf70ffdc7d92b2b6723188d205"
+    "mtime": 1785933529.825769,
+    "ast_hash": "3154ab9d7cd206be65d0e0e30b9da0c9",
+    "semantic_hash": ""
+  },
+  "docs/PRODUCT.md": {
+    "mtime": 1786094401.9195485,
+    "ast_hash": "41432a417a0cb372d81a0287931d86ca",
+    "semantic_hash": ""
   }
 }
