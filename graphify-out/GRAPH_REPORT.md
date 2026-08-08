@@ -1,16 +1,16 @@
 # Graph Report - DailyOPIc  (2026-08-08)
 
 ## Corpus Check
-- 85 files · ~130,664 words
+- 86 files · ~140,498 words
 - Verdict: corpus is large enough that graph structure adds value.
 
 ## Summary
-- 1612 nodes · 2930 edges · 123 communities (120 shown, 3 thin omitted)
+- 1777 nodes · 3094 edges · 139 communities (138 shown, 1 thin omitted)
 - Extraction: 91% EXTRACTED · 9% INFERRED · 0% AMBIGUOUS · INFERRED: 268 edges (avg confidence: 0.8)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `076b1bf4`
+- Built from commit: `9fea03f9`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
@@ -19,10 +19,10 @@
 - StoreService
 - SpeechRecognitionService
 - graphify Pipeline
-- String
+- Sendable
 - StudyInsightsSection
-- MockExamScreen
-- QuestionSet
+- MockExamScreen.swift
+- String
 - CodingKeys
 - PracticeViewModel
 - MockExamViewModel
@@ -35,38 +35,38 @@
 - View
 - AsyncOperationKind
 - OPIcLevel
-- OnboardingView
+- SelfAssessmentLevel
 - GuideTopic
 - Foundation
 - PrimaryButton
-- SelfAssessmentLevel
+- JSONCoding
 - AuthenticationService
 - FirebaseBootstrap
-- JSONCoding
+- DailyOPIcTests
 - AppPreferences
 - AppLoadingIndicator
 - ProgressScreen
 - DailyOPIcUITests
 - 7. 발견한 실제 UX 버그
-- .saveAnswer
+- .resetExam
 - AppPalette
-- .application
+- P5 — 백엔드 (독립 트랙 · **P0와 동시 착수**)
 - PromptPlaybackService
 - PlanEntitlement
 - AdService
 - DESIGN.md
 - GoogleBannerView
 - DifficultyAdjustment
-- PersistenceService
-- PracticeScreen
-- TargetLevelConfirmationDialog
+- MockExamScreen
+- .recorder
+- P6 — 페이월 · 광고 · 통계
 - SetupView
 - AppEnvironment
-- WeaknessTier
+- P-1 — 검증 인프라 (신규 선행 단계)
 - Phase
 - AdError
 - RewardedAdPresentationDelegate
-- SwiftUI
+- MockHistoryDetailView
 - SpeechRecognitionService.swift
 - 6. Design tokens
 - DailyOPIcApp
@@ -76,8 +76,8 @@
 - 4. 화면별 상태 감사
 - DailyRefreshDialog
 - RewardPurpose
-- RubricBand
-- RubricDimension
+- P0 — 디자인 토큰 기반
+- P1 — 세션 보존 아키텍처
 - AuthenticationService.swift
 - ErrorBanner
 - AdService.swift
@@ -109,7 +109,7 @@
 - 22. Mock Exam
 - 23. Statistics
 - T7 — Ads policy
-- .mockBlueprintContainsExactlyFifteenQuestions
+- P2 — 모의고사 데드엔드 해소
 - 13. Card hierarchy
 - 17. Recording termination UX
 - 20. Practice screen
@@ -119,7 +119,7 @@
 - 28. Motion principles
 - 29. VoiceOver behavior
 - 31. Anti-patterns
-- LaunchState
+- P3 — 말하기 상태 머신
 - 11. 1차 audit 대비 변경 내역
 - 3. 주요 사용자 여정 — 실제 조작 기준 `[SIM]`
 - 8. 우선순위별 정리
@@ -132,12 +132,28 @@
 - 7. Dynamic Type strategy
 - 8. Light / Dark Mode strategy
 - DailyOPIc — DESIGN DECISION LOCK
-- DailyTokenBadge
+- SwiftUI
 - 10. 이번 단계에서도 확인하지 못한 것
 - 1. 현재 빌드 / 실행 상태
 - 3. Information architecture
 - DailyOPIcTests.swift
-- SplashView
+- P4 — 결과 신뢰도 + 명명 정리
+- P7 — 접근성 마감
+- HistoryItem
+- 2.3 DESIGN.md 순서 중 **그대로 구현하면 안 되는 것** (4건)
+- PracticeHistoryRecord
+- IMPLEMENTATION_PLAN.md
+- PersistenceService
+- RecordedAnswer
+- 10. Commit strategy
+- 1. Release safety principles
+- 5. Backend compatibility strategy
+- 9. Rollback strategy
+- 3. P0–P8 implementation roadmap
+- 7. Simulator / device verification matrix
+- 8. Production-safe rollout strategy
+- 4. Frontend / backend boundaries
+- 6. Testing matrix
 
 ## God Nodes (most connected - your core abstractions)
 1. `MockExamViewModel` - 71 edges
@@ -158,10 +174,10 @@
   DailyOPIc/Resources/Firebase/README.md → README.md
 - `Reserved Onboarding Video Assets` --conceptually_related_to--> `DailyOPIc iOS App`  [AMBIGUOUS]
   DailyOPIc/Resources/Videos/README.md → README.md
+- `.currentQuestion` --references--> `QuestionSet`  [INFERRED]
+  DailyOPIc/ViewModels/MockExamViewModel.swift → DailyOPIc/Models/QuestionModels.swift
 - `.body` --calls--> `AppLoadingIndicator`  [INFERRED]
-  DailyOPIc/Views/Screens/Main/MockExam/MockExamScreen.swift → DailyOPIc/Views/Components/AppLoadingIndicator.swift
-- `.body` --calls--> `PrimaryButton`  [INFERRED]
-  DailyOPIc/Views/Screens/Main/MockExam/MockExamScreen.swift → DailyOPIc/Views/Components/PrimaryButton.swift
+  DailyOPIc/Views/Components/AILoadingOverlay.swift → DailyOPIc/Views/Components/AppLoadingIndicator.swift
 
 ## Import Cycles
 - None detected.
@@ -172,59 +188,59 @@
 - **AdMob Rewarded SSV End-to-End Test Setup** — readme_admob_rewarded_ssv, readme_cloudflare_tunnel_debug_url, readme_api_base_url_resolution, readme_admob_ad_unit_ids, readme_gad_test_device_ids, readme_xcconfig_injection [EXTRACTED 1.00]
 - **AppIcon appearance variants (light / dark / tinted) rendering one brand mark** — dailyopic_assets_xcassets_appicon_appiconset_ic_dailyopic_light, dailyopic_assets_xcassets_appicon_appiconset_ic_dailyopic_dark, dailyopic_assets_xcassets_appicon_appiconset_ic_dailyopic_tinted, dailyopic_assets_xcassets_appicon_appiconset_d_microphone_lockup_mark [EXTRACTED 1.00]
 
-## Communities (123 total, 3 thin omitted)
+## Communities (139 total, 1 thin omitted)
 
 ### Community 0 - "APIClient"
-Cohesion: 0.08
+Cohesion: 0.07
 Nodes (33): async, APIClient, .rewardVerificationTimeoutMessage, APIClientError, .code, .errorDescription, invalidResponse, .isAIUnavailable (+25 more)
 
 ### Community 1 - "StoreService"
-Cohesion: 0.05
+Cohesion: 0.06
 Nodes (38): AppUserIDProvider, CustomerInfo, AppRadius, AppSpacing, AppTypography, CGFloat, StoreError, .errorDescription (+30 more)
 
 ### Community 2 - "SpeechRecognitionService"
-Cohesion: 0.15
-Nodes (10): AVAudioFile, SpeechRecognitionService, Bool, URL, .body, Notification, SFSpeechAudioBufferRecognitionRequest, SFSpeechRecognitionTask (+2 more)
+Cohesion: 0.18
+Nodes (10): AVAudioFile, SpeechRecognitionService, SpeechRecordingResult, Bool, URL, Notification, SFSpeechAudioBufferRecognitionRequest, SFSpeechRecognitionTask (+2 more)
 
 ### Community 3 - "graphify Pipeline"
 Cohesion: 0.06
 Nodes (45): graphify Skill Trigger Registration, Watch Debounce Window, URL Ingest into Corpus, Watch Mode Auto-Rebuild, FalkorDB Cypher Export, graphify MCP Stdio Server, Neo4j Cypher Export, Token Reduction Benchmark (+37 more)
 
-### Community 4 - "String"
-Cohesion: 0.15
-Nodes (38): Codable, Answer, AudioMetrics, Capabilities, ConfidenceBand, high, .label, low (+30 more)
+### Community 4 - "Sendable"
+Cohesion: 0.09
+Nodes (48): Codable, Answer, AudioMetrics, Capabilities, ConfidenceBand, high, .label, low (+40 more)
 
 ### Community 5 - "StudyInsightsSection"
-Cohesion: 0.08
-Nodes (36): CGPoint, CGRect, CGSize, Content, DimensionAverage, StudyInsights, Date, Int (+28 more)
+Cohesion: 0.09
+Nodes (31): Content, DimensionAverage, PlanEntitlement, .weaknessTier, StudyInsights, Date, Int, String (+23 more)
 
-### Community 6 - "MockExamScreen"
-Cohesion: 0.12
-Nodes (22): SurveyOption, .id, FlexibleChips, .body, MockExamScreen, .canResetExam, .mockUpsell, .survey (+14 more)
+### Community 6 - "MockExamScreen.swift"
+Cohesion: 0.11
+Nodes (27): CGPoint, CGRect, CGSize, Arrangement, FlexibleChips, .body, FlowLayout, Item (+19 more)
 
-### Community 7 - "QuestionSet"
-Cohesion: 0.13
-Nodes (18): GeneratedQuestion, .id, MockSession, PracticeRefreshRequest, QuestionSet, .debugTopicIDs, QuestionSetAdjustmentRequest, QuestionSetStatus (+10 more)
+### Community 7 - "String"
+Cohesion: 0.19
+Nodes (14): GeneratedQuestion, .id, MockSession, QuestionSet, .debugTopicIDs, QuestionSetStatus, awaitingAdjustment, complete (+6 more)
 
 ### Community 8 - "CodingKeys"
 Cohesion: 0.07
 Nodes (27): CodingKey, CodingKeys, afterAdjust, beforeAdjust, changed, legacyEffectiveLevel, legacyInitialLevel, legacyPreviousInitialLevel (+19 more)
 
 ### Community 9 - "PracticeViewModel"
-Cohesion: 0.07
-Nodes (29): AnalyzedResult, Phase, analyzing, completed, idle, loading, PracticeViewModel, .analyzedNumbers (+21 more)
+Cohesion: 0.06
+Nodes (35): AnalyzedResult, Phase, analyzing, completed, idle, loading, PracticeViewModel, .analyzedNumbers (+27 more)
 
 ### Community 10 - "MockExamViewModel"
 Cohesion: 0.09
-Nodes (24): EvaluationRetryContext, MockExamViewModel, .canResume, .canRetryEvaluation, .expectedQuestionCount, .initialLevel, .mockAvailable, .mockDailyLimit (+16 more)
+Nodes (25): EvaluationRetryContext, MockExamViewModel, .canResume, .canRetryEvaluation, .currentQuestion, .expectedQuestionCount, .initialLevel, .mockAvailable (+17 more)
 
 ### Community 11 - "RecordingState"
-Cohesion: 0.11
-Nodes (18): PermissionState, denied, granted, unknown, RecordingState, failed, idle, interrupted (+10 more)
+Cohesion: 0.12
+Nodes (17): PermissionState, denied, granted, unknown, RecordingState, failed, idle, interrupted (+9 more)
 
 ### Community 12 - "BackgroundSurvey"
-Cohesion: 0.22
-Nodes (7): BackgroundProfile, BackgroundSurvey, .isValid, .selectedTopicCount, Bool, Int, String
+Cohesion: 0.16
+Nodes (13): BackgroundProfile, BackgroundSurvey, .isValid, .selectedTopicCount, SurveyOption, .id, Bool, Int (+5 more)
 
 ### Community 13 - "PRODUCT.md — DailyOPIc(데일리오픽)"
 Cohesion: 0.12
@@ -243,60 +259,60 @@ Cohesion: 0.17
 Nodes (18): AppConfiguration, .apiBaseURL, .apiBaseURLSource, .bannerAdUnitID, .gadTestDeviceIdentifiers, .privacyPolicyURL, .resolvedAPIBaseURL, .revenueCatAPIKey (+10 more)
 
 ### Community 17 - "View"
-Cohesion: 0.13
-Nodes (24): Alignment, FeedbackSection, .body, LevelResultCard, .body, LockedFeedbackSection, ResultUnlock, .showsCorrectionAndSample (+16 more)
+Cohesion: 0.10
+Nodes (28): Alignment, FeedbackSection, .body, LevelResultCard, .body, LockedFeedbackSection, .body, ResultUnlock (+20 more)
 
 ### Community 18 - "AsyncOperationKind"
-Cohesion: 0.08
-Nodes (23): AsyncOperationKind, dataLoading, difficultyAdjustment, mockResult, questionGeneration, retry, speechAnalysis, .title (+15 more)
+Cohesion: 0.07
+Nodes (26): AsyncOperationKind, dataLoading, difficultyAdjustment, mockResult, questionGeneration, retry, speechAnalysis, .title (+18 more)
 
 ### Community 19 - "OPIcLevel"
-Cohesion: 0.09
-Nodes (35): MockDraftRecord, .answers, .questionSet, .targetLevel, MockHistoryRecord, .answers, .evaluation, .predictedLevel (+27 more)
+Cohesion: 0.13
+Nodes (15): .predictedLevel, .targetLevel, OPIcLevel, AL, .description, .id, IH, IL (+7 more)
 
-### Community 20 - "OnboardingView"
-Cohesion: 0.20
-Nodes (9): OnboardingView, .guidanceText, .levelSelection, .preferences, ProgressBanner, .body, Error, String (+1 more)
+### Community 20 - "SelfAssessmentLevel"
+Cohesion: 0.08
+Nodes (30): SelfAssessmentLevel, .estimatedRange, .expectedTargetLevel, .id, level1, level2, level3, level4 (+22 more)
 
 ### Community 21 - "GuideTopic"
 Cohesion: 0.15
-Nodes (16): GuidePage, GuideReaderView, .body, .pages, GuideTopic, exam, .icon, .id (+8 more)
+Nodes (18): GuidePage, GuideReaderView, .body, .pages, GuideTopic, exam, .icon, .id (+10 more)
 
 ### Community 22 - "Foundation"
-Cohesion: 0.20
-Nodes (5): JSONDecoder.DateDecodingStrategy, Foundation, Observation, RevenueCat, SwiftData
+Cohesion: 0.23
+Nodes (4): JSONDecoder.DateDecodingStrategy, Foundation, Observation, RevenueCat
 
 ### Community 23 - "PrimaryButton"
-Cohesion: 0.12
-Nodes (15): ButtonStyle, Configuration, PressableButtonStyle, PrimaryButton, .body, String, Void, AuthRecoveryView (+7 more)
-
-### Community 24 - "SelfAssessmentLevel"
 Cohesion: 0.15
-Nodes (13): SelfAssessmentLevel, .estimatedRange, .expectedTargetLevel, .id, level1, level2, level3, level4 (+5 more)
+Nodes (12): ButtonStyle, Configuration, PressableButtonStyle, PrimaryButton, .body, String, Void, .body (+4 more)
+
+### Community 24 - "JSONCoding"
+Cohesion: 0.23
+Nodes (14): MockDraftRecord, .answers, .questionSet, .targetLevel, MockHistoryRecord, .answers, .evaluation, .questionSet (+6 more)
 
 ### Community 25 - "AuthenticationService"
 Cohesion: 0.26
 Nodes (8): AuthenticationService, AuthError, appCheckUnavailable, .errorDescription, firebaseAuthUnavailable, installationIDUnavailable, Bool, String
 
 ### Community 26 - "FirebaseBootstrap"
-Cohesion: 0.29
-Nodes (7): FirebaseBootstrap, .buildConfiguration, .runtimeTarget, .shouldForceRefreshAppCheckToken, Bool, String, ISO8601DateFormatter
+Cohesion: 0.19
+Nodes (10): Any, Bool, FirebaseBootstrap, .buildConfiguration, .runtimeTarget, .shouldForceRefreshAppCheckToken, Bool, String (+2 more)
 
-### Community 27 - "JSONCoding"
-Cohesion: 0.13
-Nodes (7): object, .backgroundProfile, .mockSurvey, JSONCoding, DailyOPIcTests, JSONDecoder, JSONEncoder
+### Community 27 - "DailyOPIcTests"
+Cohesion: 0.16
+Nodes (3): DailyOPIcTests, Int, String
 
 ### Community 28 - "AppPreferences"
-Cohesion: 0.14
-Nodes (14): AppPreferences, .guideState, .hasCompletedOnboarding, .initialLevel, .isInitialLevelSyncPending, .isNewToOPIc, .lastGuidePage, .onboardingSchemaVersion (+6 more)
+Cohesion: 0.12
+Nodes (16): AppPreferences, .backgroundProfile, .guideState, .hasCompletedOnboarding, .initialLevel, .isInitialLevelSyncPending, .isNewToOPIc, .lastGuidePage (+8 more)
 
 ### Community 29 - "AppLoadingIndicator"
-Cohesion: 0.12
-Nodes (13): AILoadingOverlay, .body, Bool, AppLoadingIndicator, .body, CGFloat, Color, DifficultyAdjustmentDialog (+5 more)
+Cohesion: 0.17
+Nodes (10): AppLoadingIndicator, .body, CGFloat, Color, DifficultyAdjustmentDialog, .body, Bool, String (+2 more)
 
 ### Community 30 - "ProgressScreen"
-Cohesion: 0.10
-Nodes (22): HistoryItem, HistoryRow, .body, Kind, mock, practice, ProgressScreen, .corruptRecordCount (+14 more)
+Cohesion: 0.13
+Nodes (14): ProgressScreen, .corruptRecordCount, .currentPlan, .cutoff, .distribution, .distributionView, .insights, .latestLevel (+6 more)
 
 ### Community 31 - "DailyOPIcUITests"
 Cohesion: 0.14
@@ -306,17 +322,17 @@ Nodes (6): DailyOPIcUITests, DailyOPIcUITestsLaunchTests, .runsForEachTargetAppl
 Cohesion: 0.12
 Nodes (17): 7-10. 문항 네비게이션 chip 22~24pt — **P1** `[SIM]`+`[CODE]`, 7-11. 설정에 구독 관리·복원·EULA·문의 채널이 없다 — **P1** `[SIM]`+`[CODE]` 🆕, 7-12. 취약 유형 분석이 값을 전달하지 않는다 — **P2** `[SIM]` 🆕, 7-13. 다크 모드 accent 대비 — **P2** `[SIM]`+계산, 7-14. ATT를 가치 전달 전에 요청 — **P2** `[SIM]`, 7-15. AuthRecoveryView가 원인을 오도 — **P2** `[SIM]` (1차 P1에서 강등), 7-16. 타이머 만료 후 데드엔드 가능성 — **P3** `[UNVERIFIED]` (1차 P2에서 강등), 7-1. 도움말을 열면 진행 중인 학습 세션이 파괴된다 — **P0** `[SIM]`+`[CODE]` 🆕 (+9 more)
 
-### Community 33 - ".saveAnswer"
-Cohesion: 0.24
+### Community 33 - ".resetExam"
+Cohesion: 0.17
 Nodes (4): AudioFileService, Int, String, URL
 
 ### Community 34 - "AppPalette"
-Cohesion: 0.16
-Nodes (11): AppPalette, Color, Double, AnswerPanel, .body, Bool, String, GuideTopicCard (+3 more)
+Cohesion: 0.18
+Nodes (9): AppPalette, Color, Double, AnswerPanel, .body, Bool, String, .body (+1 more)
 
-### Community 35 - ".application"
-Cohesion: 0.50
-Nodes (3): Any, Bool, UIApplication
+### Community 35 - "P5 — 백엔드 (독립 트랙 · **P0와 동시 착수**)"
+Cohesion: 0.15
+Nodes (13): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation (프로덕션 트래픽 무영향 검증 방법), Objective, P5 — 백엔드 (독립 트랙 · **P0와 동시 착수**) (+5 more)
 
 ### Community 36 - "PromptPlaybackService"
 Cohesion: 0.17
@@ -327,7 +343,7 @@ Cohesion: 0.14
 Nodes (12): Comparable, PlanEntitlement, basic, .displayName, free, .isPaid, .monthlyPriceKRW, plus (+4 more)
 
 ### Community 38 - "AdService"
-Cohesion: 0.18
+Cohesion: 0.20
 Nodes (7): ConsentStatus, AdService, String, FormStatus, PrivacyOptionsRequirementStatus, RequestParameters, RewardedAd
 
 ### Community 39 - "DESIGN.md"
@@ -340,35 +356,35 @@ Nodes (5): BannerView, Context, .body, GoogleBannerView, UIViewRepresentable
 
 ### Community 41 - "DifficultyAdjustment"
 Cohesion: 0.12
-Nodes (16): CaseIterable, DifficultyAdjustment, easier, harder, .id, same, .subtitle, .title (+8 more)
+Nodes (16): CaseIterable, PerQuestionFeedback, .id, DifficultyAdjustment, easier, harder, .id, same (+8 more)
 
-### Community 42 - "PersistenceService"
-Cohesion: 0.24
-Nodes (3): PersistenceService, String, ModelContext
+### Community 42 - "MockExamScreen"
+Cohesion: 0.19
+Nodes (5): MockExamScreen, .body, .canResetExam, .introduction, .mockUpsell
 
-### Community 43 - "PracticeScreen"
-Cohesion: 0.10
-Nodes (17): Bool, PromptPlayButton, .body, .title, Bool, String, Void, RecordingButton (+9 more)
+### Community 43 - ".recorder"
+Cohesion: 0.11
+Nodes (15): Bool, PromptPlayButton, .title, Bool, String, Void, QuestionCard, RecordingButton (+7 more)
 
-### Community 44 - "TargetLevelConfirmationDialog"
-Cohesion: 0.25
-Nodes (8): .body, Bool, Void, TargetLevelConfirmationDialog, .adChange, .body, .message, .paidChange
+### Community 44 - "P6 — 페이월 · 광고 · 통계"
+Cohesion: 0.15
+Nodes (13): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P6 — 페이월 · 광고 · 통계 (+5 more)
 
 ### Community 45 - "SetupView"
 Cohesion: 0.31
 Nodes (5): SetupAlert, SetupView, .appUserID, .body, String
 
 ### Community 46 - "AppEnvironment"
-Cohesion: 0.17
-Nodes (9): AppEnvironment, .currentPlan, .showsAds, Bool, PlanEntitlement, AppRootView, .body, MainTabView (+1 more)
+Cohesion: 0.15
+Nodes (10): AppEnvironment, .currentPlan, .showsAds, LaunchState, failed, launching, ready, Bool (+2 more)
 
-### Community 47 - "WeaknessTier"
-Cohesion: 0.33
-Nodes (6): PlanEntitlement, .weaknessTier, WeaknessTier, advanced, basic, none
+### Community 47 - "P-1 — 검증 인프라 (신규 선행 단계)"
+Cohesion: 0.17
+Nodes (12): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P-1 — 검증 인프라 (신규 선행 단계) (+4 more)
 
 ### Community 48 - "Phase"
-Cohesion: 0.20
-Nodes (10): Phase, adjustment, analyzing, answering, completed, introduction, loading, readyForReward (+2 more)
+Cohesion: 0.22
+Nodes (9): Phase, adjustment, analyzing, answering, completed, introduction, loading, readyForReward (+1 more)
 
 ### Community 49 - "AdError"
 Cohesion: 0.29
@@ -378,9 +394,9 @@ Nodes (7): AdError, busy, .errorDescription, notEarned, privacyOptionsNotRequire
 Cohesion: 0.33
 Nodes (6): RewardedAdPresentationDelegate, Bool, Error, Void, FullScreenContentDelegate, FullScreenPresentingAd
 
-### Community 51 - "SwiftUI"
-Cohesion: 0.12
-Nodes (15): QuestionCard, MockResultView, .body, Void, PracticeResultView, .body, String, Void (+7 more)
+### Community 51 - "MockHistoryDetailView"
+Cohesion: 0.40
+Nodes (5): MockHistoryDetailView, .body, PracticeHistoryDetailView, .body, .records
 
 ### Community 52 - "SpeechRecognitionService.swift"
 Cohesion: 0.50
@@ -391,20 +407,20 @@ Cohesion: 0.14
 Nodes (14): 6.1 원칙, 6.2 Semantic colors, 6.3 Typography, 6.4 Spacing, 6.5 Radius, 6.6 Elevation / Material, 6. Design tokens, Material 사용 규칙 (+6 more)
 
 ### Community 54 - "DailyOPIcApp"
-Cohesion: 0.19
-Nodes (11): App, AppDelegate, DailyOPIcApp, .body, StorageRecoveryView, .body, String, ModelContainer (+3 more)
+Cohesion: 0.15
+Nodes (12): App, AppDelegate, DailyOPIcApp, .body, StorageRecoveryView, .body, String, .body (+4 more)
 
 ### Community 55 - "FlowTags"
 Cohesion: 0.38
 Nodes (6): .body, FlowTags, .body, String, TagChip, .body
 
 ### Community 56 - "State"
-Cohesion: 0.25
-Nodes (7): State, failed, idle, loading, presenting, ready, verifying
+Cohesion: 0.17
+Nodes (9): State, failed, idle, loading, presenting, ready, verifying, MainTabView (+1 more)
 
 ### Community 57 - "MockSessionStage"
-Cohesion: 0.15
-Nodes (12): MockSessionStage, answeringFront, answeringTail, awaitingAdjustmentAd, awaitingResultAd, awaitingStartAd, completed, evaluating (+4 more)
+Cohesion: 0.13
+Nodes (13): MockSessionStage, answeringFront, answeringTail, awaitingAdjustmentAd, awaitingResultAd, awaitingStartAd, completed, evaluating (+5 more)
 
 ### Community 58 - "4. 화면별 상태 감사"
 Cohesion: 0.17
@@ -415,28 +431,28 @@ Cohesion: 0.43
 Nodes (5): DailyRefreshDialog, .body, Bool, String, Void
 
 ### Community 60 - "RewardPurpose"
-Cohesion: 0.29
-Nodes (7): RewardPurpose, mockAdjustment, mockResult, mockStart, practiceCredits, practiceRefresh, targetLevelChange
+Cohesion: 0.18
+Nodes (9): object, RewardIntentRequest, RewardPurpose, mockAdjustment, mockResult, mockStart, practiceCredits, practiceRefresh (+1 more)
 
-### Community 61 - "RubricBand"
-Cohesion: 0.29
-Nodes (7): RubricBand, advanced, developing, foundation, functional, .label, strong
+### Community 61 - "P0 — 디자인 토큰 기반"
+Cohesion: 0.17
+Nodes (12): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P0 — 디자인 토큰 기반 (+4 more)
 
-### Community 62 - "RubricDimension"
-Cohesion: 0.29
-Nodes (7): RubricDimension, discourse, fluency, grammar, .label, taskFulfillment, vocabulary
+### Community 62 - "P1 — 세션 보존 아키텍처"
+Cohesion: 0.17
+Nodes (12): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P1 — 세션 보존 아키텍처 (+4 more)
 
 ### Community 63 - "AuthenticationService.swift"
 Cohesion: 0.33
 Nodes (5): DeviceCheck, FirebaseAppCheck, FirebaseAuth, FirebaseCore, Security
 
 ### Community 64 - "ErrorBanner"
-Cohesion: 0.15
-Nodes (11): BannerAdView, UIViewController, UIApplication, .topViewController, ErrorBanner, .body, String, Void (+3 more)
+Cohesion: 0.29
+Nodes (6): BannerAdView, ErrorBanner, .body, String, Void, .body
 
 ### Community 65 - "AdService.swift"
-Cohesion: 0.33
-Nodes (5): AppTrackingTransparency, UIViewController, UIApplication, .topViewController, UserMessagingPlatform
+Cohesion: 0.18
+Nodes (9): AppTrackingTransparency, UIViewController, UIApplication, .topViewController, UIViewController, UIApplication, .topViewController, GoogleMobileAds (+1 more)
 
 ### Community 66 - "16.2 상태별 UI 사양"
 Cohesion: 0.17
@@ -550,6 +566,10 @@ Nodes (7): 23.1 구성 (전부 현재 제공 중 · Q7 LOCKED로 전 플랜 무�
 Cohesion: 0.29
 Nodes (7): DESIGN DECISION NEEDED, DESIGN IMPACT, IMPLEMENTATION SCOPE, REQUIRES PRODUCT DECISION, T7 — Ads policy, UX PROBLEM, VERIFIED CURRENT POLICY
 
+### Community 94 - "P2 — 모의고사 데드엔드 해소"
+Cohesion: 0.17
+Nodes (12): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P2 — 모의고사 데드엔드 해소 (+4 more)
+
 ### Community 95 - "13. Card hierarchy"
 Cohesion: 0.33
 Nodes (6): 13.1 카드를 쓰지 않는 기본값, 13.2 카드를 쓰는 조건 (전부 만족할 때만), 13.3 카드 스펙, 13.4 카드 중첩 금지, 13.5 정보 밀도, 13. Card hierarchy
@@ -586,9 +606,9 @@ Nodes (6): 29.1 화면별 읽기 순서, 29.2 필수 발표 (Announcement), 29.3
 Cohesion: 0.33
 Nodes (6): 31.1 시각, 31.2 데이터 표현 (가장 중요), 31.3 인터랙션, 31.4 SwiftUI에 웹 패턴 이식 금지, 31.5 카피, 31. Anti-patterns
 
-### Community 104 - "LaunchState"
-Cohesion: 0.40
-Nodes (5): LaunchState, failed, launching, ready, String
+### Community 104 - "P3 — 말하기 상태 머신"
+Cohesion: 0.17
+Nodes (12): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P3 — 말하기 상태 머신 (+4 more)
 
 ### Community 105 - "11. 1차 audit 대비 변경 내역"
 Cohesion: 0.40
@@ -638,9 +658,9 @@ Nodes (5): 8.1 원칙, 8.2 모드별 차이 규칙, 8.3 하드코딩 금지, 8.4
 Cohesion: 0.40
 Nodes (4): DailyOPIc — DESIGN DECISION LOCK, Decisions — LOCKED (2026-08-08 제품 소유자 승인 완료), 구현 범위로 이월된 항목 (DESIGN.md 범위 밖, 별도 작업), 문서 상태
 
-### Community 117 - "DailyTokenBadge"
-Cohesion: 0.50
-Nodes (3): DailyTokenBadge, .body, Int
+### Community 117 - "SwiftUI"
+Cohesion: 0.12
+Nodes (13): AppRootView, .body, DailyTokenBadge, .body, Int, AuthRecoveryView, .body, String (+5 more)
 
 ### Community 118 - "10. 이번 단계에서도 확인하지 못한 것"
 Cohesion: 0.50
@@ -654,6 +674,74 @@ Nodes (4): 1.1 빌드 `[SIM]`, 1.2 런타임 `[SIM]` — **1차 대비 변경**,
 Cohesion: 0.50
 Nodes (4): 3.1 전체 구조, 3.2 계층 원칙, 3.3 명명 규칙 (T3 LOCKED 반영), 3. Information architecture
 
+### Community 122 - "P4 — 결과 신뢰도 + 명명 정리"
+Cohesion: 0.17
+Nodes (12): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Isolated backend validation, Objective, P4 — 결과 신뢰도 + 명명 정리 (+4 more)
+
+### Community 123 - "P7 — 접근성 마감"
+Cohesion: 0.18
+Nodes (11): Commit boundary, Compatibility requirements, Dependencies, Done criteria, Exact areas likely to change, Objective, P7 — 접근성 마감, Production risk (+3 more)
+
+### Community 124 - "HistoryItem"
+Cohesion: 0.22
+Nodes (9): HistoryItem, HistoryRow, .body, Kind, mock, practice, .historyRows, Date (+1 more)
+
+### Community 125 - "2.3 DESIGN.md 순서 중 **그대로 구현하면 안 되는 것** (4건)"
+Cohesion: 0.22
+Nodes (9): 2.1 그래프, 2.2 특별 의존성 심사 (요청 항목 전수), 2.3 DESIGN.md 순서 중 **그대로 구현하면 안 되는 것** (4건), 2.4 신규 선행 단계 — P-1 (DESIGN.md에 없음), 2. Dependency graph, 🔁 정정 1 — 페이월 `Button` 전환을 P6에 두지 않는다, 🔁 정정 2 — 백엔드(P5)를 P4 뒤에 놓지 않는다, ⚠️ 정정 3 — A/B/C를 "P4의 한 항목"으로 다루지 않는다 (+1 more)
+
+### Community 126 - "PracticeHistoryRecord"
+Cohesion: 0.25
+Nodes (6): PracticeHistoryRecord, .evaluation, .predictedLevel, .question, .targetLevel, SwiftData
+
+### Community 127 - "IMPLEMENTATION_PLAN.md"
+Cohesion: 0.25
+Nodes (7): 11. Definition of done per phase, 12.1 왜 이것이 첫 슬라이스인가, 12.2 슬라이스 구성 (커밋 4개), 12. Recommended first implementation slice, DailyOPIc — IMPLEMENTATION_PLAN.md, 부록 A. 이 계획이 근거로 삼은 신규 검증 사실, 부록 B. 이 단계에서 하지 않은 것
+
+### Community 128 - "PersistenceService"
+Cohesion: 0.43
+Nodes (3): PersistenceService, String, ModelContext
+
+### Community 129 - "RecordedAnswer"
+Cohesion: 0.40
+Nodes (4): RecordedAnswer, .audioURL, .id, URL
+
+### Community 130 - "10. Commit strategy"
+Cohesion: 0.33
+Nodes (6): 10.1 Conventional Commit 규약, 10.2 커밋 크기 규칙, 10.3 브랜치 · PR, 10. Commit strategy, Scope (이 프로젝트 확정 목록), Type
+
+### Community 131 - "1. Release safety principles"
+Cohesion: 0.40
+Nodes (5): 1.1 두 개의 게이트, 1.2 불변 규칙 (SP1–SP10), 1.3 "배포"의 정의 (이 저장소 한정 — 검증됨), 1.4 페이월 카피 원칙 (교차검증 결과 반영), 1. Release safety principles
+
+### Community 132 - "5. Backend compatibility strategy"
+Cohesion: 0.40
+Nodes (5): 5.1 응답 진화 규칙, 5.2 Firestore 진화 규칙, 5.3 클라이언트 하위 호환 실증 방법, 5.4 서버 기능 플래그 관례 (기존 패턴 재사용), 5. Backend compatibility strategy
+
+### Community 133 - "9. Rollback strategy"
+Cohesion: 0.40
+Nodes (5): 9.1 계층별 롤백 수단, 9.2 여기서 나오는 결론, 9.3 롤백 경계 (커밋 설계 원칙), 9.4 사후 조치, 9. Rollback strategy
+
+### Community 134 - "3. P0–P8 implementation roadmap"
+Cohesion: 0.50
+Nodes (4): 3. P0–P8 implementation roadmap, P8 — 기술 부채, P8a — 플랜 매핑 정리 (**P6 이전으로 승격**), P8b — 잔여 정리
+
+### Community 135 - "7. Simulator / device verification matrix"
+Cohesion: 0.50
+Nodes (4): 7.1 시뮬레이터 (기본 검증), 7.2 실기기 (필수 구간), 7.3 검증 계정·데이터 원칙, 7. Simulator / device verification matrix
+
+### Community 136 - "8. Production-safe rollout strategy"
+Cohesion: 0.50
+Nodes (4): 8.1 iOS 롤아웃, 8.2 백엔드 롤아웃, 8.3 릴리스 묶음 권장, 8. Production-safe rollout strategy
+
+### Community 137 - "4. Frontend / backend boundaries"
+Cohesion: 0.67
+Nodes (3): 4.1 경계 원칙, 4.2 이 경계에서 나오는 규칙, 4. Frontend / backend boundaries
+
+### Community 138 - "6. Testing matrix"
+Cohesion: 0.67
+Nodes (3): 6.1 현재 테스트 자산 (검증됨), 6.2 신설이 필요한 테스트, 6. Testing matrix
+
 ## Ambiguous Edges - Review These
 - `Whisper Video/Audio Transcription` → `Reserved Onboarding Video Assets`  [AMBIGUOUS]
   DailyOPIc/Resources/Videos/README.md · relation: conceptually_related_to
@@ -661,9 +749,9 @@ Nodes (4): 3.1 전체 구조, 3.2 계층 원칙, 3.3 명명 규칙 (T3 LOCKED �
   DailyOPIc/Resources/Videos/README.md · relation: conceptually_related_to
 
 ## Knowledge Gaps
-- **645 isolated node(s):** `이 문서의 규칙`, `디자인 방향`, `P1. Speaking first — 말하기가 화면의 주인이다`, `P2. Trustworthy over impressive — 모르는 것은 모른다고 말한다`, `P3. Nothing is lost — 사용자의 노력은 사라지지 않는다` (+640 more)
+- **786 isolated node(s):** `DailyOPIc — IMPLEMENTATION_PLAN.md`, `1.1 두 개의 게이트`, `1.2 불변 규칙 (SP1–SP10)`, `1.3 "배포"의 정의 (이 저장소 한정 — 검증됨)`, `1.4 페이월 카피 원칙 (교차검증 결과 반영)` (+781 more)
   These have ≤1 connection - possible missing edges or undocumented components.
-- **3 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+- **1 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
@@ -672,12 +760,12 @@ _Questions this graph is uniquely positioned to answer:_
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
 - **What is the exact relationship between `DailyOPIc iOS App` and `Reserved Onboarding Video Assets`?**
   _Edge tagged AMBIGUOUS (relation: conceptually_related_to) - confidence is low._
-- **Why does `View` connect `View` to `StoreService`, `StudyInsightsSection`, `MockExamScreen`, `OnboardingView`, `GuideTopic`, `PrimaryButton`, `AppPreferences`, `AppLoadingIndicator`, `ProgressScreen`, `AppPalette`, `PracticeScreen`, `TargetLevelConfirmationDialog`, `SetupView`, `AppEnvironment`, `SwiftUI`, `DailyOPIcApp`, `FlowTags`, `DailyRefreshDialog`, `ErrorBanner`, `DailyTokenBadge`, `SplashView`?**
-  _High betweenness centrality (0.096) - this node is a cross-community bridge._
-- **Why does `MockExamViewModel` connect `MockExamViewModel` to `APIClient`, `SpeechRecognitionService`, `String`, `MockExamScreen`, `QuestionSet`, `PracticeViewModel`, `BackgroundSurvey`, `AsyncOperationKind`, `OPIcLevel`, `Foundation`, `SelfAssessmentLevel`, `AppPreferences`, `.saveAnswer`, `PromptPlaybackService`, `AdService`, `PersistenceService`, `AppEnvironment`, `Phase`, `ErrorBanner`?**
-  _High betweenness centrality (0.068) - this node is a cross-community bridge._
-- **Why does `PracticeViewModel` connect `PracticeViewModel` to `APIClient`, `.saveAnswer`, `SpeechRecognitionService`, `String`, `PromptPlaybackService`, `AdService`, `QuestionSet`, `PersistenceService`, `RecordingState`, `PracticeScreen`, `AppEnvironment`, `AsyncOperationKind`, `OPIcLevel`, `Foundation`, `SelfAssessmentLevel`, `AppPreferences`?**
-  _High betweenness centrality (0.064) - this node is a cross-community bridge._
+- **Why does `View` connect `View` to `StoreService`, `StudyInsightsSection`, `MockExamScreen.swift`, `PracticeViewModel`, `AsyncOperationKind`, `SelfAssessmentLevel`, `GuideTopic`, `PrimaryButton`, `AppPreferences`, `AppLoadingIndicator`, `ProgressScreen`, `AppPalette`, `MockExamScreen`, `.recorder`, `SetupView`, `MockHistoryDetailView`, `DailyOPIcApp`, `FlowTags`, `State`, `DailyRefreshDialog`, `ErrorBanner`, `SwiftUI`, `HistoryItem`?**
+  _High betweenness centrality (0.093) - this node is a cross-community bridge._
+- **Why does `MockExamViewModel` connect `MockExamViewModel` to `APIClient`, `RecordedAnswer`, `PersistenceService`, `SpeechRecognitionService`, `Sendable`, `String`, `BackgroundSurvey`, `AsyncOperationKind`, `OPIcLevel`, `SelfAssessmentLevel`, `Foundation`, `AppPreferences`, `.resetExam`, `PromptPlaybackService`, `AdService`, `DifficultyAdjustment`, `MockExamScreen`, `AppEnvironment`, `Phase`, `State`?**
+  _High betweenness centrality (0.059) - this node is a cross-community bridge._
+- **Why does `PracticeViewModel` connect `PracticeViewModel` to `APIClient`, `PersistenceService`, `SpeechRecognitionService`, `.resetExam`, `Sendable`, `PromptPlaybackService`, `AdService`, `String`, `AppEnvironment`, `AsyncOperationKind`, `OPIcLevel`, `SelfAssessmentLevel`, `Foundation`, `State`, `AppPreferences`?**
+  _High betweenness centrality (0.052) - this node is a cross-community bridge._
 - **Are the 2 inferred relationships involving `MockExamViewModel` (e.g. with `PromptPlaybackService` and `SpeechRecognitionService`) actually correct?**
   _`MockExamViewModel` has 2 INFERRED edges - model-reasoned connections that need verification._
 - **Are the 2 inferred relationships involving `PracticeViewModel` (e.g. with `PromptPlaybackService` and `SpeechRecognitionService`) actually correct?**
