@@ -423,5 +423,20 @@
     "mtime": 1786094401.9195485,
     "ast_hash": "41432a417a0cb372d81a0287931d86ca",
     "semantic_hash": ""
+  },
+  "docs/DESIGN.md": {
+    "mtime": 1786173707.910603,
+    "ast_hash": "ddfab7459aa2f529c27e36938c85a25a",
+    "semantic_hash": ""
+  },
+  "docs/DESIGN_DECISIONS.md": {
+    "mtime": 1786172973.3576314,
+    "ast_hash": "37205c7a13057d59e68d737d47f86628",
+    "semantic_hash": ""
+  },
+  "docs/audit/UI_BASELINE_AUDIT.md": {
+    "mtime": 1786100821.885364,
+    "ast_hash": "f17c54359d59a32fceca263c6c96e9fd",
+    "semantic_hash": ""
   }
 }
