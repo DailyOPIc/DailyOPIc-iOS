@@ -21,3 +21,9 @@ DAILYOPIC_TERMS_URL =
 
 // RevenueCat public SDK key (App Store). 대시보드 > API Keys 에서 발급.
 REVENUECAT_API_KEY = appl_PIFuXXinTfXfrLCVtTNFQMEArcd
+
+// 개발자 로컬 오버라이드. 파일이 없으면 조용히 무시되므로 기본 동작은 위 값 그대로다.
+// Config/Local.xcconfig.template 를 Config/Debug.local.xcconfig 로 복사해서 쓴다.
+// 여기 아래에서 재정의한 값이 최종값이 된다 (xcconfig 는 나중 대입이 이긴다).
+// Release 빌드는 이 include 를 갖지 않는다. 프로덕션 설정은 절대 오버라이드되지 않는다.
+#include? "Debug.local.xcconfig"

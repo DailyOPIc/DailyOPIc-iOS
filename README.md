@@ -9,6 +9,52 @@ SwiftUI/iOS 17 앱입니다. 번들 ID는 기존 앱 업데이트용 `com.mark.o
 2. `DailyOPIc.xcodeproj`를 열고 iOS 17 이상 시뮬레이터 또는 실제 기기를 선택합니다.
 3. Debug는 `Config/Debug.xcconfig`의 `DAILYOPIC_API_BASE_URL`, 운영 AdMob Unit ID, 광고 테스트 디바이스 ID를 사용합니다.
 
+`DailyOPIc` 스킴은 `DailyOPIc.xcodeproj/xcshareddata/xcschemes/`에 공유되어 있으므로, 새로
+clone한 저장소에서도 Xcode를 먼저 열지 않고 바로 아래를 실행할 수 있습니다.
+
+```bash
+xcodebuild -project DailyOPIc.xcodeproj -list
+xcodebuild build -project DailyOPIc.xcodeproj -scheme DailyOPIc \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+xcodebuild test -project DailyOPIc.xcodeproj -scheme DailyOPIc \
+  -destination 'platform=iOS Simulator,name=iPhone 17 Pro'
+```
+
+## 로컬 개발 설정 (Config/Debug.local.xcconfig)
+
+**`Config/Debug.xcconfig`의 `DAILYOPIC_API_BASE_URL` 기본값은 운영 Cloud Run 주소입니다.**
+DailyOPIc은 실사용자가 있는 서비스이므로, 시뮬레이터로 기능을 반복 검증하면 운영 쪽의
+익명 사용자 문서, 일일 문제 세트 쿼터, AI 호출, 리워드 카운트가 실제로 소모됩니다.
+개발 중에는 로컬 백엔드를 가리켜 두는 것을 기본으로 하세요.
+
+추적되는 `Config/Debug.xcconfig`를 직접 고치는 대신, 커밋되지 않는 로컬 파일로 덮어씁니다.
+
+```bash
+cp Config/Local.xcconfig.template Config/Debug.local.xcconfig
+```
+
+필요한 줄만 주석 해제해서 값을 채웁니다. 예를 들어 시뮬레이터에서 Mac 로컬 서버를 쓰려면:
+
+```xcconfig
+DAILYOPIC_API_BASE_URL = http:/$()/localhost:8000
+```
+
+동작 방식과 경계:
+
+- `Config/Debug.xcconfig` 마지막 줄의 `#include? "Debug.local.xcconfig"`가 이 파일을 읽습니다.
+  `#include?`는 파일이 없으면 조용히 무시하므로, 파일을 만들지 않은 상태의 동작은 기존과 같습니다.
+- **Debug 구성에만 적용됩니다. Release는 이 파일을 include하지 않으므로 운영 설정이 바뀌지 않습니다.**
+- `Config/*.local.xcconfig`는 `.gitignore`에 있어 커밋되지 않습니다. **여기에 넣은 값은
+  절대 커밋하지 마세요.**
+- 시크릿은 넣지 않습니다. OpenAI 키 같은 서버 전용 값은 백엔드 `.env` 소관이고,
+  Firebase App Check 디버그 토큰은 xcconfig가 아니라 스킴 환경변수
+  (`FIRAAppCheckDebugToken`)로 세션 한정 주입합니다.
+- 광고를 다룰 때는 템플릿의 Google 공식 테스트 광고 단위 항목을 함께 켜세요.
+  운영 광고 단위로 개발 중 노출·클릭을 발생시키지 않습니다.
+
+시뮬레이터/기기 테스트는 **운영 API 쿼터를 소모할 목적으로 실행하지 않습니다.** 검증이
+운영 백엔드에 닿아야만 가능한 상황이면, 그대로 진행하지 말고 먼저 상의하세요.
+
 ## 실제 iPhone 무선 디버깅 API 주소
 
 실제 iPhone에서 `127.0.0.1`은 Mac이 아니라 iPhone 자기 자신입니다. iPhone 핫스팟 네트워크에서 Mac의 FastAPI 서버에 붙을 때는 `http://<Mac의 핫스팟 IP>:8000` 형식이어야 합니다. 다만 리워드 광고 SSV까지 테스트할 때는 AdMob 서버가 callback을 보낼 수 있는 public HTTPS 주소가 필요하므로, Debug 기본값은 Cloudflare Tunnel URL을 사용합니다.
@@ -28,7 +74,8 @@ ipconfig getifaddr en0
 
 현재 확인한 값은 `172.20.10.2`입니다. 네트워크를 다시 연결하면 바뀔 수 있습니다.
 
-3. `Config/Debug.xcconfig`에서 아래 값을 Mac IP로 바꿉니다.
+3. `Config/Debug.local.xcconfig`에서 아래 값을 Mac IP로 바꿉니다. (추적되는
+   `Config/Debug.xcconfig`를 직접 고치면 로컬 주소가 커밋될 수 있습니다.)
 
 ```xcconfig
 DAILYOPIC_DEBUG_SERVER_HOST = 172.20.10.2
