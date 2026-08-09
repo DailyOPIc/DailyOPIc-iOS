@@ -205,7 +205,7 @@ private struct GoalLevelRoutingDialog: View {
                 .ignoresSafeArea()
                 .onTapGesture(perform: cancel)
 
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "target")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
@@ -233,15 +233,15 @@ private struct GoalLevelRoutingDialog: View {
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 340)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
         .transition(.opacity)
     }

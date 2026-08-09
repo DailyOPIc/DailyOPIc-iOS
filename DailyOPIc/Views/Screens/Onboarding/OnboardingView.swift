@@ -186,11 +186,11 @@ struct OnboardingView: View {
                 selectedLevel = level
             }
         } label: {
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .top, spacing: AppSpacing.md) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundStyle(AppPalette.primary)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     HStack {
                         Text(level.title).font(.title3.bold())
                         Spacer()
@@ -213,13 +213,13 @@ struct OnboardingView: View {
             .padding(AppSpacing.md)
             .background(isSelected ? AppPalette.primarySoft : AppPalette.surface)
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                     .stroke(
                         AppPalette.primary.opacity(isSelected ? 0.75 : 0.18),
                         lineWidth: isSelected ? 1.8 : 1
                     )
             }
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isSubmitting)
@@ -357,16 +357,16 @@ private struct ProgressBanner: View {
     let message: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: AppSpacing.sm) {
             AppLoadingIndicator(dotSize: 8)
             Text(message)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(AppPalette.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
+        .padding(AppSpacing.md)
         .background(AppPalette.primarySoft.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     }
 }
 
@@ -422,9 +422,9 @@ private struct TargetLevelConfirmationDialog: View {
             .padding(AppSpacing.lg)
             .frame(maxWidth: 340)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
             .padding(AppSpacing.lg)

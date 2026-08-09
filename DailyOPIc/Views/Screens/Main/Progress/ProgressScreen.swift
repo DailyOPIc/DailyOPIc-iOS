@@ -65,7 +65,7 @@ struct ProgressScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     Text("통계").font(AppTypography.title)
                     Text("이 기기에 저장된 나의 연습 기록이에요.")
                         .font(AppTypography.callout)
@@ -143,7 +143,7 @@ struct ProgressScreen: View {
         .padding(AppSpacing.md)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
         .background(highlight ? AppPalette.primarySoft : AppPalette.surface)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 
     private var distributionView: some View {
@@ -186,7 +186,7 @@ struct ProgressScreen: View {
             )
             .frame(minHeight: 220)
         } else {
-            LazyVStack(spacing: 14) {
+            LazyVStack(spacing: AppSpacing.md) {
                 ForEach(rows) { row in
                     switch row.kind {
                     case let .practice(record):
@@ -247,7 +247,7 @@ private struct HistoryRow: View {
     let kind: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 Text(kind)
                     .font(.caption.bold())
@@ -256,8 +256,8 @@ private struct HistoryRow: View {
                 Text(level.rawValue)
                     .font(.subheadline.bold())
                     .foregroundStyle(AppPalette.primary)
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, AppSpacing.sm)
+                    .padding(.vertical, AppSpacing.xs)
                     .background(AppPalette.primarySoft)
                     .clipShape(Capsule())
             }

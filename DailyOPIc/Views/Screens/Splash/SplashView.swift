@@ -15,7 +15,7 @@ struct SplashView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 ZStack {
                     Circle()
                         .fill(AppPalette.primary)

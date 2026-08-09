@@ -117,7 +117,7 @@ struct MockExamScreen: View {
         .padding(AppSpacing.lg)
         .frame(maxWidth: .infinity)
         .background(AppPalette.primarySoft.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 
     private var canResetExam: Bool {
@@ -127,11 +127,11 @@ struct MockExamScreen: View {
 
     private var introduction: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 Image(systemName: "list.number")
                     .font(.system(size: 54, weight: .bold))
                     .foregroundStyle(AppPalette.primary)
-                    .padding(.top, 36)
+                    .padding(.top, AppSpacing.xl)
                 Text("실전처럼 15문항에 답해보세요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
@@ -178,14 +178,14 @@ struct MockExamScreen: View {
                 }
                 BannerAdView().frame(height: 50)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 
     private var survey: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     Text("나에 대해 알려주세요")
                         .font(AppTypography.title)
                     Text("관심사를 바탕으로 질문을 만들어요. 상태와 거주 형태를 고르고, 관심 주제를 3개 이상 선택해 주세요.")
@@ -252,13 +252,13 @@ struct MockExamScreen: View {
                     Task { await viewModel.startNewExam(survey: viewModel.surveyDraft) }
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 
     private var answering: some View {
         ScrollView {
-            VStack(spacing: 22) {
+            VStack(spacing: AppSpacing.lg) {
                 MockProgressHeader(currentQuestion: viewModel.currentIndex + 1)
                 if let question = viewModel.currentQuestion {
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
@@ -287,7 +287,7 @@ struct MockExamScreen: View {
                     .font(AppTypography.caption)
                     .foregroundStyle(AppPalette.secondaryInk)
             }
-            .padding(20)
+            .padding(AppSpacing.lg)
         }
         .interactiveDismissDisabled(speech.isListening)
     }
@@ -302,17 +302,17 @@ struct MockExamScreen: View {
             if let message = viewModel.errorMessage {
                 VStack {
                     ErrorBanner(message: message)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, AppSpacing.lg)
                     Spacer()
                 }
-                .padding(.top, 24)
+                .padding(.top, AppSpacing.lg)
             }
         }
     }
 
     private var rewardGate: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(AppPalette.primary)
@@ -345,7 +345,7 @@ struct MockExamScreen: View {
                 Button("모의고사 그만두기") { viewModel.resetExam() }
                     .foregroundStyle(AppPalette.dangerInk)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 }
@@ -356,7 +356,7 @@ private struct SingleChoiceSection: View {
     @Binding var selection: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text(title)
                 .font(.headline)
             FlexibleChips(options: options, selection: selection) { option in
@@ -373,7 +373,7 @@ private struct MultiChoiceSection: View {
     @Binding var selection: [String]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             HStack {
                 Text(title)
                     .font(.headline)
@@ -403,7 +403,7 @@ private struct MockProgressHeader: View {
     private let totalQuestions = 15
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 Text("\(currentQuestion) / \(totalQuestions)")
                     .font(.headline)
@@ -454,11 +454,11 @@ private struct SavedSurveyDialog: View {
             Color.black.opacity(0.34)
                 .ignoresSafeArea()
                 .onTapGesture(perform: cancel)
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "list.clipboard.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                VStack(spacing: 8) {
+                VStack(spacing: AppSpacing.sm) {
                     Text("저장된 설문으로 시작할까요?")
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
@@ -476,15 +476,15 @@ private struct SavedSurveyDialog: View {
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
             }
-            .padding(22)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 360)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
         .transition(.opacity)
     }
@@ -499,8 +499,8 @@ private struct ResetMockExamDialog: View {
             Color.black.opacity(0.34)
                 .ignoresSafeArea()
                 .onTapGesture(perform: cancel)
-            VStack(spacing: 18) {
-                VStack(spacing: 8) {
+            VStack(spacing: AppSpacing.md) {
+                VStack(spacing: AppSpacing.sm) {
                     Text("오늘 모의고사를 그만둘까요?")
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
@@ -510,14 +510,14 @@ private struct ResetMockExamDialog: View {
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                HStack(spacing: 12) {
+                HStack(spacing: AppSpacing.sm) {
                     Button("계속하기", action: cancel)
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     Button("그만두기", role: .destructive) {
                         confirm()
                     }
@@ -526,14 +526,14 @@ private struct ResetMockExamDialog: View {
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(AppPalette.danger)
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 }
             }
-            .padding(22)
+            .padding(AppSpacing.lg)
             .background(AppPalette.elevatedSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
-            .padding(.horizontal, 26)
+            .padding(.horizontal, AppSpacing.lg)
         }
     }
 }

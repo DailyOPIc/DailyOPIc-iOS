@@ -106,7 +106,7 @@ struct PaywallView: View {
                     isPurchasing: purchasing != nil && purchasing == package?.id,
                     isPurchasable: purchasable
                 )
-                .contentShape(RoundedRectangle(cornerRadius: AppRadius.md))
+                .contentShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
                 .onTapGesture {
                     guard purchasable, let package else { return }
                     Task { await purchase(package) }
@@ -321,13 +321,13 @@ private struct PaywallTierCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(AppPalette.elevatedSurface))
         .overlay(
-            RoundedRectangle(cornerRadius: AppRadius.md)
+            RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                 .stroke(
                     isCurrent ? Color(AppPalette.primary) : Color.clear,
                     lineWidth: 2
                 )
         )
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 
     @ViewBuilder

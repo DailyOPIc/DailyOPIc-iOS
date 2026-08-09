@@ -150,7 +150,7 @@ struct PracticeScreen: View {
                     Button {
                         viewModel.goToQuestion(index)
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xs) {
                             if done {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)

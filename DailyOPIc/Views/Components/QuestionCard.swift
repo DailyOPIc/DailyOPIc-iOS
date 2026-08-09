@@ -6,7 +6,7 @@ struct QuestionCard: View {
     var showsRubricFocus = true
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             HStack {
                 if showsNumber {
                     Text("Q\(question.number)")
@@ -17,8 +17,8 @@ struct QuestionCard: View {
                 Text(question.estimatedLevel?.rawValue ?? question.difficulty.rawValue)
                     .font(.caption.weight(.bold))
                     .foregroundStyle(AppPalette.actionOnPrimary)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 5)
+                    .padding(.horizontal, AppSpacing.sm)
+                    .padding(.vertical, AppSpacing.xs)
                     .background(AppPalette.primary)
                     .clipShape(Capsule())
                 Text(question.questionStyle?.label ?? question.examSection.label)
@@ -33,13 +33,13 @@ struct QuestionCard: View {
                 FlowTags(values: Array(question.rubricFocus.prefix(3)))
             }
         }
-        .padding(22)
+        .padding(AppSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(AppPalette.primarySoft)
         .overlay {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                 .stroke(AppPalette.primary.opacity(0.55), lineWidth: 1.5)
         }
-        .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 }

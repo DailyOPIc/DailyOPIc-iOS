@@ -31,7 +31,7 @@ struct AILoadingOverlay: View {
             }
             .padding(AppSpacing.xl)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .padding(AppSpacing.xl)
             .scaleEffect(appeared ? 1 : 0.92)
             .opacity(appeared ? 1 : 0)

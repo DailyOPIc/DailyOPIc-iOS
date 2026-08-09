@@ -58,7 +58,7 @@ private struct StorageRecoveryView: View {
     let message: String
 
     var body: some View {
-        VStack(spacing: 18) {
+        VStack(spacing: AppSpacing.md) {
             Image(systemName: "externaldrive.badge.exclamationmark")
                 .font(.system(size: 52))
                 .foregroundStyle(AppPalette.danger)
@@ -73,6 +73,6 @@ private struct StorageRecoveryView: View {
             Text(message).font(.caption).foregroundStyle(.secondary)
             #endif
         }
-        .padding(28)
+        .padding(AppSpacing.lg)
     }
 }

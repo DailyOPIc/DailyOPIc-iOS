@@ -9,7 +9,7 @@ struct PrimaryButton: View {
 
     var body: some View {
         Button(action: action) {
-            HStack(spacing: 10) {
+            HStack(spacing: AppSpacing.sm) {
                 if isLoading {
                     AppLoadingIndicator(tint: AppPalette.actionOnPrimary, dotSize: 7)
                 } else if let systemImage {
@@ -24,7 +24,7 @@ struct PrimaryButton: View {
             .frame(height: 54)
             .foregroundStyle(isDisabled ? AppPalette.actionOnDisabled : AppPalette.actionOnPrimary)
             .background(isDisabled ? AppPalette.primaryMid : AppPalette.primary)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
         .buttonStyle(PressableButtonStyle())
         .disabled(isDisabled || isLoading)

@@ -18,11 +18,11 @@ struct DailyRefreshDialog: View {
                     if !isLoading { cancel() }
                 }
 
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "sparkles.rectangle.stack.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                VStack(spacing: 8) {
+                VStack(spacing: AppSpacing.sm) {
                     Text(showsDifficulty ? "난이도 재설정" : "새 문제 받기")
                         .font(.title3.bold())
                         .foregroundStyle(AppPalette.ink)
@@ -34,16 +34,16 @@ struct DailyRefreshDialog: View {
                 }
 
                 if let progressMessage {
-                    HStack(spacing: 10) {
+                    HStack(spacing: AppSpacing.sm) {
                         AppLoadingIndicator(dotSize: 7)
                         Text(progressMessage)
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(AppPalette.primary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                    .padding(AppSpacing.md)
                     .background(AppPalette.primarySoft.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 }
 
                 if showsDifficulty {
@@ -75,15 +75,15 @@ struct DailyRefreshDialog: View {
                 .foregroundStyle(AppPalette.secondaryInk)
                 .disabled(isLoading)
             }
-            .padding(22)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 360)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
         .transition(.opacity)
     }
@@ -95,11 +95,11 @@ struct DailyRefreshDialog: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.sm) {
                 Image(systemName: icon)
                     .font(.headline)
                     .frame(width: 28)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(title).font(.headline)
                     Text(subtitle)
                         .font(.footnote)
@@ -108,9 +108,9 @@ struct DailyRefreshDialog: View {
                 Spacer()
             }
             .foregroundStyle(AppPalette.ink)
-            .padding(14)
+            .padding(AppSpacing.md)
             .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isLoading)

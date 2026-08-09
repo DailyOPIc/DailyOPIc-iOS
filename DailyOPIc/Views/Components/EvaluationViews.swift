@@ -9,14 +9,14 @@ struct LevelResultCard: View {
     @ScaledMetric(relativeTo: .largeTitle) private var gradeSize: CGFloat = 52
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("OPIc 예상 등급")
                 .font(.headline)
             HStack(alignment: .firstTextBaseline) {
                 Text(predicted.rawValue)
                     .font(.system(size: gradeSize, weight: .bold, design: .rounded))
                 Spacer()
-                VStack(alignment: .trailing, spacing: 6) {
+                VStack(alignment: .trailing, spacing: AppSpacing.xs) {
                     Text("목표 \(target.rawValue)")
                     Text("신뢰도 \(confidence.label)")
                 }
@@ -24,9 +24,9 @@ struct LevelResultCard: View {
             }
         }
         .foregroundStyle(AppPalette.actionOnPrimary)
-        .padding(24)
+        .padding(AppSpacing.lg)
         .background(AppPalette.primary)
-        .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 }
 
@@ -34,11 +34,11 @@ struct ScoreBars: View {
     let scores: EvaluationScores
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text("평가 항목")
                 .font(.headline)
             ForEach(scores.items, id: \.0) { label, score in
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     HStack {
                         Text(label)
                         Spacer()
@@ -59,18 +59,18 @@ struct RubricBandsView: View {
     let rubrics: [RubricAssessment]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 16) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text("항목별 피드백").font(.headline)
             ForEach(rubrics) { rubric in
-                VStack(alignment: .leading, spacing: 7) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     HStack {
                         Text(rubric.dimension.label).font(.subheadline.bold())
                         Spacer()
                         Text(rubric.band.label)
                             .font(.caption.bold())
                             .foregroundStyle(AppPalette.primary)
-                            .padding(.horizontal, 10)
-                            .padding(.vertical, 5)
+                            .padding(.horizontal, AppSpacing.sm)
+                            .padding(.vertical, AppSpacing.xs)
                             .background(AppPalette.primarySoft)
                             .clipShape(Capsule())
                     }
@@ -107,14 +107,14 @@ struct FeedbackSection: View {
     }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text(title)
                 .font(.headline)
                 .foregroundStyle(AppPalette.primary)
             if items.count > 1 {
-                VStack(alignment: .leading, spacing: 8) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     ForEach(Array(items.enumerated()), id: \.offset) { _, item in
-                        HStack(alignment: .firstTextBaseline, spacing: 8) {
+                        HStack(alignment: .firstTextBaseline, spacing: AppSpacing.sm) {
                             Text("•")
                             Text(item)
                                 .frame(maxWidth: .infinity, alignment: .leading)
@@ -134,7 +134,7 @@ struct FeedbackSection: View {
         .padding(AppSpacing.lg)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(tint)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 }
 
@@ -144,10 +144,10 @@ extension View {
             .frame(maxWidth: .infinity, alignment: alignment)
             .background(.background)
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                     .stroke(AppPalette.primary.opacity(0.22), lineWidth: 1)
             }
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 }
 
@@ -171,8 +171,8 @@ struct LockedFeedbackSection: View {
 
     var body: some View {
         Button(action: onUpgrade) {
-            VStack(alignment: .leading, spacing: 8) {
-                HStack(spacing: 8) {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                HStack(spacing: AppSpacing.sm) {
                     Image(systemName: "lock.fill")
                         .font(.subheadline)
                     Text(title)
@@ -189,9 +189,9 @@ struct LockedFeedbackSection: View {
             .padding(AppSpacing.lg)
             .frame(maxWidth: .infinity, alignment: .leading)
             .background(AppPalette.primarySoft.opacity(0.5))
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                     .stroke(AppPalette.primary.opacity(0.25), style: StrokeStyle(lineWidth: 1, dash: [4]))
             }
         }

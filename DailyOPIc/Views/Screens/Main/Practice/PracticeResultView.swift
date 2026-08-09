@@ -59,7 +59,7 @@ struct PracticeResultView: View {
             }
 
             DisclosureGroup("답변 자세히 보기") {
-                VStack(spacing: 14) {
+                VStack(spacing: AppSpacing.md) {
                     FeedbackSection(title: "내 답변", text: transcript, tint: AppPalette.surface)
                     if unlock.showsCorrectionAndSample {
                         if let text = evaluation.correctedAnswer, !text.isEmpty {
@@ -72,7 +72,7 @@ struct PracticeResultView: View {
                         LockedFeedbackSection(title: "교정·모범답안", requiredPlan: .plus) { showsPaywall = true }
                     }
                 }
-                .padding(.top, 12)
+                .padding(.top, AppSpacing.md)
             }
             .cardStyle()
 
