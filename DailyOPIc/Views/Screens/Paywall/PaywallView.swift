@@ -301,7 +301,7 @@ private struct PaywallTierCard: View {
                 } else {
                     Text(tier.plan == .free ? "무료" : "\(priceText)\(tier.plan == .free ? "" : "/월")")
                         .font(AppTypography.callout.weight(.bold))
-                        .foregroundStyle(Color(AppPalette.primaryMid))
+                        .foregroundStyle(Color(AppPalette.primary))
                 }
             }
             if let note = tier.promoNote {
@@ -339,7 +339,7 @@ private struct PaywallTierCard: View {
         } else if isPurchasable {
             Text("탭하여 시작하기 →")
                 .font(AppTypography.caption.weight(.semibold))
-                .foregroundStyle(Color(AppPalette.primaryMid))
+                .foregroundStyle(Color(AppPalette.primary))
         }
     }
 }
