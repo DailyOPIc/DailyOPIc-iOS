@@ -21,7 +21,9 @@ struct RecordingButton: View {
                 }
                 Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                     .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(.white)
+                    // Only the idle fill is `primary`; the recording fill is
+                    // `danger`, which has no on-colour token yet.
+                    .foregroundStyle(isRecording ? .white : AppPalette.actionOnPrimary)
                     .frame(width: 86, height: 86)
                     .background(isRecording ? AppPalette.danger : AppPalette.primary)
                     .clipShape(Circle())

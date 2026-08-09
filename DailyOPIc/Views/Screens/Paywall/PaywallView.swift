@@ -292,7 +292,7 @@ private struct PaywallTierCard: View {
                         .padding(.horizontal, AppSpacing.xs)
                         .padding(.vertical, 2)
                         .background(Color(AppPalette.primary))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppPalette.actionOnPrimary)
                         .clipShape(Capsule())
                 }
                 Spacer()

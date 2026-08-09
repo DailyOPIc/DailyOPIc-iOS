@@ -23,7 +23,7 @@ struct LevelResultCard: View {
                 .font(.subheadline.weight(.semibold))
             }
         }
-        .foregroundStyle(.white)
+        .foregroundStyle(AppPalette.actionOnPrimary)
         .padding(24)
         .background(AppPalette.primary)
         .clipShape(RoundedRectangle(cornerRadius: 26, style: .continuous))

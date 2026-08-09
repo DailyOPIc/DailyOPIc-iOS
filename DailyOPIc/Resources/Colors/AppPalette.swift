@@ -21,15 +21,25 @@ enum AppPalette {
         dark: rgb(240, 242, 248)
     )
     static let secondaryInk = dynamic(
-        light: rgb(107, 114, 128),
+        // #5B6472 rather than #6B7280: secondary text mostly sits on `surface`
+        // (#F2F2F7 in light), where the old value measured 4.33:1 and missed AA.
+        light: rgb(91, 100, 114),
         dark: rgb(160, 166, 178)
+    )
+    /// Foreground for content sitting on a `primary` fill. Dark mode uses dark
+    /// ink, not white: white on the dark accent (#967AFF) measures 3.22:1.
+    static let actionOnPrimary = dynamic(
+        light: rgb(255, 255, 255),
+        dark: rgb(17, 24, 39)
     )
     static let successSoft = dynamic(
         light: rgb(236, 253, 245),
         dark: rgb(24, 52, 43)
     )
     static let danger = dynamic(
-        light: rgb(239, 68, 68),
+        // #DC2626 rather than #EF4444, which measured 3.76:1 on white and was
+        // too light for body-size error text.
+        light: rgb(220, 38, 38),
         dark: rgb(248, 113, 113)
     )
 

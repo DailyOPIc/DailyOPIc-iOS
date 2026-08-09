@@ -551,7 +551,7 @@ private struct FlexibleChips<Selection: Equatable>: View {
                 } label: {
                     Text(option.label)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(isSelected(option) ? .white : AppPalette.primary)
+                        .foregroundStyle(isSelected(option) ? AppPalette.actionOnPrimary : AppPalette.primary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(isSelected(option) ? AppPalette.primary : AppPalette.primarySoft)

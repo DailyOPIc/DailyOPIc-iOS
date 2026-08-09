@@ -160,7 +160,7 @@ struct PracticeScreen: View {
                         }
                         .padding(.horizontal, AppSpacing.sm)
                         .padding(.vertical, 6)
-                        .foregroundStyle(isCurrent ? .white : (done ? AppPalette.primary : AppPalette.secondaryInk))
+                        .foregroundStyle(isCurrent ? AppPalette.actionOnPrimary : (done ? AppPalette.primary : AppPalette.secondaryInk))
                         .background(
                             isCurrent ? AppPalette.primary
                                 : (done ? AppPalette.primarySoft : AppPalette.surface),

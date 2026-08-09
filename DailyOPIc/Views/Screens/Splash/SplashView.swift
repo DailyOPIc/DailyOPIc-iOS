@@ -22,7 +22,7 @@ struct SplashView: View {
                         .frame(width: 92, height: 92)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 38, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppPalette.actionOnPrimary)
                 }
                 .scaleEffect(pulse ? 1.04 : 0.96)
                 Text("DailyOPIc")

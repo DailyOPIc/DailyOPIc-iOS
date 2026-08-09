@@ -11,7 +11,7 @@ struct PrimaryButton: View {
         Button(action: action) {
             HStack(spacing: 10) {
                 if isLoading {
-                    AppLoadingIndicator(tint: .white, dotSize: 7)
+                    AppLoadingIndicator(tint: AppPalette.actionOnPrimary, dotSize: 7)
                 } else if let systemImage {
                     Image(systemName: systemImage)
                 }
@@ -22,7 +22,10 @@ struct PrimaryButton: View {
             }
             .frame(maxWidth: .infinity)
             .frame(height: 54)
-            .foregroundStyle(.white)
+            // primaryMid inverts primary's polarity: white already passes on the
+            // dark disabled fill (4.61:1) and dark ink would not, so only the
+            // enabled fill takes the token.
+            .foregroundStyle(isDisabled ? .white : AppPalette.actionOnPrimary)
             .background(isDisabled ? AppPalette.primaryMid : AppPalette.primary)
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
         }

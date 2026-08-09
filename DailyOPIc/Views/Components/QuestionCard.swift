@@ -16,7 +16,7 @@ struct QuestionCard: View {
                 Spacer()
                 Text(question.estimatedLevel?.rawValue ?? question.difficulty.rawValue)
                     .font(.caption.weight(.bold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(AppPalette.actionOnPrimary)
                     .padding(.horizontal, 10)
                     .padding(.vertical, 5)
                     .background(AppPalette.primary)

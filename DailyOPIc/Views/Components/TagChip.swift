@@ -7,7 +7,7 @@ struct TagChip: View {
     var body: some View {
         Text(text.hasPrefix("#") ? text : "#\(text)")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(filled ? Color.white : AppPalette.primary)
+            .foregroundStyle(filled ? AppPalette.actionOnPrimary : AppPalette.primary)
             .padding(.horizontal, 12)
             .padding(.vertical, 7)
             .background(filled ? AppPalette.primary : AppPalette.primarySoft)
