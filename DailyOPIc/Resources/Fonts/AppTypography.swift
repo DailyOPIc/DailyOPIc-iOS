@@ -16,19 +16,29 @@ enum AppTypography {
     static let caption = Font.system(.caption, design: .rounded).weight(.semibold)
 }
 
-/// Consistent spacing scale (4pt base).
+/// Spacing scale on a strict 4pt grid (DESIGN.md §6.4). The previous values
+/// (6/10/16/22/28) were off-grid at three of five steps.
 enum AppSpacing {
-    static let xs: CGFloat = 6
-    static let sm: CGFloat = 10
+    /// Icon-to-label gaps and inline elements.
+    static let xs: CGFloat = 4
+    /// Tightly grouped elements; also the minimum gap between touch targets.
+    static let sm: CGFloat = 8
+    /// Default element spacing and card interior padding.
     static let md: CGFloat = 16
-    static let lg: CGFloat = 22
-    static let xl: CGFloat = 28
+    /// Section spacing and screen side margins.
+    static let lg: CGFloat = 24
+    /// Major block separation.
+    static let xl: CGFloat = 32
 }
 
-/// Consistent corner-radius scale.
+/// Corner-radius scale named by role rather than size (DESIGN.md §6.5), so a
+/// call site has to state what it is rather than pick a magnitude.
+/// Every corner uses `style: .continuous`.
 enum AppRadius {
-    static let sm: CGFloat = 12
-    static let md: CGFloat = 16
-    static let lg: CGFloat = 22
-    static let xl: CGFloat = 28
+    /// Buttons, chips, inputs.
+    static let control: CGFloat = 12
+    /// Cards and section containers.
+    static let card: CGFloat = 16
+    /// Bottom sheets, dialogs, large overlays.
+    static let sheet: CGFloat = 24
 }
