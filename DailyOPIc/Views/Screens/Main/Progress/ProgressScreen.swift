@@ -130,7 +130,7 @@ struct ProgressScreen: View {
                 .foregroundStyle(AppPalette.secondaryInk)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(AppTypography.title)
                     .foregroundStyle(highlight ? AppPalette.primary : AppPalette.ink)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {

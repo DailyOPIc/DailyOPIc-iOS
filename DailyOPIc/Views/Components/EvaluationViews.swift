@@ -4,6 +4,9 @@ struct LevelResultCard: View {
     let predicted: OPIcLevel
     let target: OPIcLevel
     let confidence: ConfidenceBand
+    /// The grade is the hero element of this card, so it stays larger than any
+    /// text style while still scaling with Dynamic Type via UIFontMetrics.
+    @ScaledMetric(relativeTo: .largeTitle) private var gradeSize: CGFloat = 52
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
@@ -11,7 +14,7 @@ struct LevelResultCard: View {
                 .font(.headline)
             HStack(alignment: .firstTextBaseline) {
                 Text(predicted.rawValue)
-                    .font(.system(size: 52, weight: .bold, design: .rounded))
+                    .font(.system(size: gradeSize, weight: .bold, design: .rounded))
                 Spacer()
                 VStack(alignment: .trailing, spacing: 6) {
                     Text("목표 \(target.rawValue)")
