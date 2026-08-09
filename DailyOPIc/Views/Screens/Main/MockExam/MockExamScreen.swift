@@ -243,7 +243,7 @@ struct MockExamScreen: View {
                 )
                 Text("선택한 관심 주제 \(viewModel.surveyDraft.selectedTopicCount)개")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(viewModel.surveyDraft.isValid ? AppPalette.primary : AppPalette.danger)
+                    .foregroundStyle(viewModel.surveyDraft.isValid ? AppPalette.primary : AppPalette.dangerInk)
                 PrimaryButton(
                     title: "15문항 시작",
                     systemImage: "play.fill",
@@ -278,7 +278,7 @@ struct MockExamScreen: View {
                     .font(.title3.bold())
                 Text("남은 시간 \(viewModel.remainingSeconds)초")
                     .font(.headline.monospacedDigit())
-                    .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.danger : AppPalette.secondaryInk)
+                    .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.dangerInk : AppPalette.secondaryInk)
                 Text(speech.transcript.isEmpty ? "답변을 마치면 다음 문항으로 넘어가요." : speech.transcript)
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
@@ -343,7 +343,7 @@ struct MockExamScreen: View {
                     }
                 }
                 Button("모의고사 그만두기") { viewModel.resetExam() }
-                    .foregroundStyle(AppPalette.danger)
+                    .foregroundStyle(AppPalette.dangerInk)
             }
             .padding(24)
         }
@@ -522,7 +522,7 @@ private struct ResetMockExamDialog: View {
                         confirm()
                     }
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppPalette.actionOnDanger)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(AppPalette.danger)
