@@ -90,7 +90,19 @@ private struct InsightCard<Content: View>: View {
     var onUpgrade: (() -> Void)? = nil
     @ViewBuilder let content: Content
 
+    @ViewBuilder
     var body: some View {
+        // 잠금 카드는 카드 전체가 페이월로 가는 단일 컨트롤이다(LockedFeedbackSection과 같은 패턴).
+        // 안쪽 "업그레이드"는 Button 중첩을 피하려고 안내 라벨로 둔다.
+        if locked {
+            Button { onUpgrade?() } label: { card }
+                .buttonStyle(.plain)
+        } else {
+            card
+        }
+    }
+
+    private var card: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 Text(title).font(AppTypography.cardTitle).foregroundStyle(AppPalette.ink)
@@ -101,17 +113,16 @@ private struct InsightCard<Content: View>: View {
                 }
                 Spacer()
                 if locked {
-                    Button("업그레이드") { onUpgrade?() }
+                    Text("업그레이드")
                         .font(AppTypography.caption)
                         .foregroundStyle(AppPalette.primary)
-                        .minimumTouchTarget()
                 }
             }
             content
         }
         .cardStyle()
+        // 카드 여백까지 탭 영역으로 유지한다(잠금 상태에서 Button 라벨의 히트 영역).
         .contentShape(Rectangle())
-        .onTapGesture { if locked { onUpgrade?() } }
     }
 }
 

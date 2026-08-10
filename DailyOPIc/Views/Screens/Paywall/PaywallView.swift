@@ -99,7 +99,7 @@ struct PaywallView: View {
                 let isCurrent = tier.plan == currentPlan
                 let purchasable = tier.plan != .free && !isCurrent && package != nil
 
-                PaywallTierCard(
+                let card = PaywallTierCard(
                     tier: tier,
                     isCurrent: isCurrent,
                     priceText: priceText(for: tier, package: package),
@@ -107,11 +107,21 @@ struct PaywallView: View {
                     isPurchasable: purchasable
                 )
                 .contentShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-                .onTapGesture {
-                    guard purchasable, let package else { return }
-                    Task { await purchase(package) }
-                }
                 .opacity(purchasing != nil && purchasing != package?.id ? 0.5 : 1)
+
+                // 구매 가능한 카드만 Button으로 노출한다(A3). 무료/현재 플랜 카드는
+                // 어떤 상태에서도 동작하지 않는 안내 카드라, 비활성 버튼이 아니라
+                // 컨트롤이 아닌 것으로 두는 편이 VoiceOver에 정확하다.
+                if purchasable, let package {
+                    Button {
+                        Task { await purchase(package) }
+                    } label: {
+                        card
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    card
+                }
             }
         }
         .disabled(purchasing != nil)
