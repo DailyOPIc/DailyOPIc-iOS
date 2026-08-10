@@ -76,6 +76,7 @@ struct DailyRefreshDialog: View {
                 }
                 .font(.headline)
                 .foregroundStyle(AppPalette.secondaryInk)
+                .minimumTouchTarget()
                 .disabled(isLoading)
             }
             .padding(AppSpacing.lg)
