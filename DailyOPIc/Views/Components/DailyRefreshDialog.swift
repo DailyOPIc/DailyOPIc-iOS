@@ -10,13 +10,16 @@ struct DailyRefreshDialog: View {
 
     @State private var showsDifficulty = false
 
+    /// 배경 탭과 이스케이프 제스처가 공유하는 단일 취소 경로. 로딩 중에는 닫지 않는다.
+    private func dismiss() {
+        if !isLoading { cancel() }
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.34)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    if !isLoading { cancel() }
-                }
+                .onTapGesture(perform: dismiss)
 
             VStack(spacing: AppSpacing.md) {
                 Image(systemName: "sparkles.rectangle.stack.fill")
@@ -84,6 +87,8 @@ struct DailyRefreshDialog: View {
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
             .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, dismiss)
         }
         .transition(.opacity)
     }

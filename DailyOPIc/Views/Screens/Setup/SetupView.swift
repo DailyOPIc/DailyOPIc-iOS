@@ -243,6 +243,8 @@ private struct GoalLevelRoutingDialog: View {
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
             .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, cancel)
         }
         .transition(.opacity)
     }

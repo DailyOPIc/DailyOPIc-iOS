@@ -379,6 +379,11 @@ private struct TargetLevelConfirmationDialog: View {
     let confirm: () -> Void
     let cancel: () -> Void
 
+    /// 배경 탭과 이스케이프 제스처가 공유하는 단일 취소 경로. 제출 중에는 닫지 않는다.
+    private func dismiss() {
+        if !isSubmitting { cancel() }
+    }
+
     /// 유료 플랜은 광고 없이 하루 1회 무료 변경, 무료 플랜은 광고 시청 변경.
     private var paidChange: Bool { requiresReward && isPaidPlan }
     private var adChange: Bool { requiresReward && !isPaidPlan }
@@ -387,9 +392,7 @@ private struct TargetLevelConfirmationDialog: View {
         ZStack {
             Color.black.opacity(0.32)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    if !isSubmitting { cancel() }
-                }
+                .onTapGesture(perform: dismiss)
 
             VStack(spacing: AppSpacing.md) {
                 Image(systemName: adChange ? "play.rectangle.fill" : "checkmark.seal.fill")
@@ -430,6 +433,8 @@ private struct TargetLevelConfirmationDialog: View {
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
             .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, dismiss)
         }
         .transition(.opacity)
     }

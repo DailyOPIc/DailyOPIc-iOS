@@ -488,6 +488,8 @@ private struct SavedSurveyDialog: View {
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
             .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, cancel)
         }
         .transition(.opacity)
     }
@@ -537,6 +539,8 @@ private struct ResetMockExamDialog: View {
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
             .padding(.horizontal, AppSpacing.lg)
+            // 배경 탭·"계속하기"와 같은 취소 경로. 파괴적 동작(그만두기)은 이스케이프로 실행되지 않는다.
+            .accessibilityAction(.escape, cancel)
         }
     }
 }
