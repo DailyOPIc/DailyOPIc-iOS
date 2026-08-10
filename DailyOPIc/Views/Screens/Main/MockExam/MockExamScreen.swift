@@ -344,6 +344,7 @@ struct MockExamScreen: View {
                 }
                 Button("모의고사 그만두기") { viewModel.resetExam() }
                     .foregroundStyle(AppPalette.dangerInk)
+                    .minimumTouchTarget()
             }
             .padding(AppSpacing.lg)
         }
@@ -472,9 +473,11 @@ private struct SavedSurveyDialog: View {
                 Button("설문 수정", action: edit)
                     .font(.headline)
                     .foregroundStyle(AppPalette.primary)
+                    .minimumTouchTarget()
                 Button("취소", action: cancel)
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .minimumTouchTarget()
             }
             .padding(AppSpacing.lg)
             .frame(maxWidth: 360)
@@ -562,6 +565,8 @@ private struct FlexibleChips<Selection: Equatable>: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .minimumTouchTarget()
+                .accessibilityAddTraits(isSelected(option) ? .isSelected : [])
             }
         }
     }

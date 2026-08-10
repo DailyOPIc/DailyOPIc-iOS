@@ -141,7 +141,9 @@ struct PracticeScreen: View {
 
     private var questionProgressBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: AppSpacing.xs) {
+            // sm(8) is DESIGN.md §14.1's chip gap and §30.1's minimum gap
+            // between adjacent 44pt hit areas; xs(4) would leave them 4pt apart.
+            HStack(spacing: AppSpacing.sm) {
                 ForEach(0..<viewModel.questionCount, id: \.self) { index in
                     // 실제 문항 번호(데일리 Q2~Q15). index+1이 아니라 세트의 number 사용.
                     let number = viewModel.questionNumber(at: index) ?? (index + 1)
@@ -168,6 +170,9 @@ struct PracticeScreen: View {
                         )
                     }
                     .buttonStyle(PressableButtonStyle())
+                    .minimumTouchTarget()
+                    .accessibilityLabel("\(number)번 문항, \(done ? "분석 완료" : "아직 답하지 않음")")
+                    .accessibilityAddTraits(isCurrent ? .isSelected : [])
                 }
             }
             .padding(.vertical, 2)

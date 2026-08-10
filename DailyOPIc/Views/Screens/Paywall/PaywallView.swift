@@ -139,6 +139,7 @@ struct PaywallView: View {
                 } label: {
                     if managing { ProgressView() } else { Text("구독 관리 · 해지").font(AppTypography.callout) }
                 }
+                .minimumTouchTarget()
                 .disabled(managing)
             }
 
@@ -152,13 +153,16 @@ struct PaywallView: View {
                         .font(AppTypography.callout)
                 }
             }
+            .minimumTouchTarget()
             .disabled(restoring)
 
             HStack(spacing: AppSpacing.md) {
                 if let privacy = AppConfiguration.privacyPolicyURL {
                     Button("개인정보 처리방침") { openURL(privacy) }
+                        .minimumTouchTarget()
                 }
                 Button("이용약관(EULA)") { openURL(AppConfiguration.termsOfUseURL) }
+                    .minimumTouchTarget()
             }
             .font(AppTypography.footnote)
             .foregroundStyle(Color(AppPalette.secondaryInk))

@@ -232,6 +232,7 @@ private struct GoalLevelRoutingDialog: View {
                 Button("취소", action: cancel)
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .minimumTouchTarget()
             }
             .padding(AppSpacing.lg)
             .frame(maxWidth: 340)

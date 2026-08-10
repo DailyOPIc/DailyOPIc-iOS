@@ -14,6 +14,7 @@ struct ErrorBanner: View {
             if let retry {
                 Button("재시도", action: retry)
                     .font(.footnote.weight(.bold))
+                    .minimumTouchTarget()
             }
         }
         .padding(AppSpacing.md)

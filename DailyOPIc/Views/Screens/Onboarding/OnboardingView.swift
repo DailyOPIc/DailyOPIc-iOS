@@ -103,6 +103,7 @@ struct OnboardingView: View {
             }
             .font(.headline)
             .foregroundStyle(AppPalette.primary)
+            .minimumTouchTarget()
             Spacer()
         }
         .padding(AppSpacing.lg)
@@ -417,6 +418,7 @@ private struct TargetLevelConfirmationDialog: View {
                 Button("다시 고르기") { cancel() }
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .minimumTouchTarget()
                     .disabled(isSubmitting)
             }
             .padding(AppSpacing.lg)

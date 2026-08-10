@@ -104,6 +104,7 @@ private struct InsightCard<Content: View>: View {
                     Button("업그레이드") { onUpgrade?() }
                         .font(AppTypography.caption)
                         .foregroundStyle(AppPalette.primary)
+                        .minimumTouchTarget()
                 }
             }
             content
