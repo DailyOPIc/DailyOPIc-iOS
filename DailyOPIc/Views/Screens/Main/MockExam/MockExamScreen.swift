@@ -45,7 +45,7 @@ struct MockExamScreen: View {
             }
         }
         .toolbar {
-            if canResetExam {
+            if viewModel.canAbandon {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("모의고사 포기") {
                         showsResetConfirmation = true
@@ -54,19 +54,21 @@ struct MockExamScreen: View {
             }
         }
         .overlay {
-            if viewModel.operationState.isRunning {
-                AILoadingOverlay(
-                    kind: viewModel.operationKind,
-                    blocksInteraction: true,
-                    canContinueInBackground: true
-                )
-            } else if showsResetConfirmation {
+            // 포기 확인은 로딩 오버레이보다 먼저 그린다. 뒤에 두면 진행 중인
+            // 작업이 끝날 때까지 포기 버튼이 아무 반응도 없는 것처럼 보인다.
+            if showsResetConfirmation {
                 ResetMockExamDialog(
                     cancel: { showsResetConfirmation = false },
                     confirm: {
                         showsResetConfirmation = false
                         viewModel.resetExam()
                     }
+                )
+            } else if viewModel.operationState.isRunning {
+                AILoadingOverlay(
+                    kind: viewModel.operationKind,
+                    blocksInteraction: true,
+                    canContinueInBackground: true
                 )
             } else if showsSavedSurveyDialog {
                 SavedSurveyDialog(
@@ -118,11 +120,6 @@ struct MockExamScreen: View {
         .frame(maxWidth: .infinity)
         .background(AppPalette.primarySoft.opacity(0.5))
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
-    }
-
-    private var canResetExam: Bool {
-        viewModel.phase != .completed
-            && (viewModel.questionSet != nil || !viewModel.answers.isEmpty)
     }
 
     private var introduction: some View {
@@ -506,10 +503,12 @@ private struct ResetMockExamDialog: View {
                 .onTapGesture(perform: cancel)
             VStack(spacing: AppSpacing.md) {
                 VStack(spacing: AppSpacing.sm) {
-                    Text("오늘 모의고사를 그만둘까요?")
+                    Text("지금 진행한 모의고사를 그만둘까요?")
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
-                    Text("지금까지 녹음한 답변이 사라지고, 오늘 모의고사는 다시 시작할 수 없어요.")
+                    // 포기한 회차는 응시 한도를 소진하지 않는다. 다시 시작할 수 없다고
+                    // 안내하면 사실과 다르다.
+                    Text("지금까지 녹음한 답변은 사라져요. 새 모의고사는 다시 시작할 수 있어요.")
                         .font(AppTypography.body)
                         .foregroundStyle(AppPalette.secondaryInk)
                         .multilineTextAlignment(.center)

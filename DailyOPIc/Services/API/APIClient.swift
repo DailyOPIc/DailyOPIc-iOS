@@ -119,6 +119,11 @@ actor APIClient {
         try await send(path: "/v1/mock-exams/current", method: "GET", body: nil)
     }
 
+    /// 진행 중인 회차를 서버에서도 닫는다. 이미 닫힌 회차에 다시 호출해도 안전하다.
+    func abandonMockSession(sessionId: String) async throws -> MockSession {
+        try await send(path: "/v1/mock-exams/\(sessionId)/abandon", method: "POST", body: nil)
+    }
+
     func startMockSession(
         sessionId: String,
         rewardNonce: String,

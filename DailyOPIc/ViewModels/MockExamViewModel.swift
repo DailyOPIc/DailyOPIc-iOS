@@ -42,8 +42,12 @@ final class MockExamViewModel {
     var operationKind: AsyncOperationKind = .dataLoading
     var usage: UsageStatus?
     private var evaluationRetryContext: EvaluationRetryContext?
+    private var createOperationID: UUID?
     private var startOperationID: UUID?
     private var adjustmentOperationID: UUID?
+    /// 이미 시청한 광고의 리워드 논스. 재시도에서 광고를 또 보게 하지 않으려고 들고 있는다.
+    private var startRewardNonce: String?
+    private var adjustmentRewardNonce: String?
     private var startTask: Task<Void, Never>?
     private var adjustmentTask: Task<Void, Never>?
     private var evaluationTask: Task<Void, Never>?
@@ -104,10 +108,26 @@ final class MockExamViewModel {
     var savedSurvey: BackgroundSurvey? { preferences.mockSurvey }
     var canRetryEvaluation: Bool { evaluationRetryContext != nil }
 
+    /// 서버가 아직 닫지 않은 오늘 회차가 있는가.
+    private var hasOpenSession: Bool {
+        guard let session else { return false }
+        return session.stage != .completed
+    }
+
     /// True when we're sitting on the intro but the server has an in-progress
     /// session — used to show an explicit "이어서 하기" button.
+    ///
+    /// setId가 없는 회차(awaiting_start_ad·generating_front)는 "이어서" 할 문제가
+    /// 아직 존재하지 않는다. 이때 이어서 하기만 노출하면 영원히 실패하는 버튼만
+    /// 남으므로, 시작 버튼을 그대로 보여주고 startNewExam이 같은 회차를 이어받게 한다.
     var canResume: Bool {
-        phase == .introduction && session != nil && session?.stage != .completed
+        phase == .introduction && hasOpenSession && session?.setId != nil
+    }
+
+    /// 진행 중인 회차가 있으면 언제나 포기할 수 있어야 한다. 문제를 못 불러온
+    /// 회차(questionSet == nil)도 포함해야 막다른 길이 생기지 않는다.
+    var canAbandon: Bool {
+        phase != .completed && (questionSet != nil || !answers.isEmpty || hasOpenSession)
     }
 
     func restoreDraftIfAvailable() async {
@@ -115,6 +135,12 @@ final class MockExamViewModel {
         if let current = try? await api.currentMockSession() {
             session = current
             if current.stage == .completed {
+                // 서버가 이미 마감한 회차의 로컬 초안은 지운다. 남겨두면 다음
+                // 오프라인 실행에서 끝난 시험이 되살아난다.
+                if let draft = try? persistence.latestDraft() {
+                    AudioFileService.removeAll(draft.answers)
+                }
+                try? persistence.clearDraft()
                 errorMessage = "오늘 모의고사를 이미 완료했어요. 내일 새 모의고사가 열려요."
                 return
             }
@@ -152,10 +178,16 @@ final class MockExamViewModel {
 
     private func enterResume(_ session: MockSession) async {
         var set = session.questionSet
-        if set == nil { set = (try? await api.currentMockSession())?.questionSet }
+        if set == nil, session.setId != nil {
+            set = (try? await api.currentMockSession())?.questionSet
+        }
         guard let set else {
             phase = .introduction
-            errorMessage = "이어서 진행할 문제를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+            // 아직 문제가 만들어지지 않은 회차(광고 대기)는 오류가 아니다.
+            // 시작 버튼이 그대로 노출되고 startNewExam이 같은 회차를 이어받는다.
+            errorMessage = session.setId == nil
+                ? nil
+                : "이어서 진행할 문제를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
             return
         }
         var recovered: [RecordedAnswer] = []
@@ -215,7 +247,8 @@ final class MockExamViewModel {
         }
         startTask = task
         await task.value
-        startTask = nil
+        // 그 사이 포기로 취소돼 새 작업이 들어왔다면 그것을 지우면 안 된다.
+        if startTask == task { startTask = nil }
     }
 
     private func performStart(survey: BackgroundSurvey) async {
@@ -226,6 +259,8 @@ final class MockExamViewModel {
         operationState = .running(operationId: operationID, startedAt: .now)
         errorMessage = nil
         evaluationRetryContext = nil
+        let createID = createOperationID ?? UUID()
+        createOperationID = createID
         do {
             preferences.mockSurvey = survey
             let session = try await api.createMockSession(
@@ -234,7 +269,7 @@ final class MockExamViewModel {
                     background: preferences.backgroundProfile,
                     survey: survey
                 ),
-                requestID: UUID()
+                requestID: createID
             )
             // An in-progress session already exists today → resume it instead of
             // dead-ending with a 409 error banner.
@@ -242,18 +277,33 @@ final class MockExamViewModel {
                 self.session = session
                 await enterResume(session)
                 operationState = .completed
+                createOperationID = nil
                 startOperationID = nil
                 return
             }
-            let rewardNonce = try await acquireRewardNonce(
-                purpose: .mockStart,
-                sessionHash: session.sessionHash
-            )
+            // 재시도라면 이미 본 광고의 논스를 그대로 쓴다. 서버는 실패한 요청의
+            // 논스를 consumed=false로 되돌리므로 재사용이 정상 경로이고,
+            // 정말 못 쓰는 논스면 402로 내려와 아래에서 버린다.
+            let rewardNonce: String
+            if let cached = startRewardNonce {
+                rewardNonce = cached
+            } else {
+                rewardNonce = try await acquireRewardNonce(
+                    purpose: .mockStart,
+                    sessionHash: session.sessionHash
+                )
+                startRewardNonce = rewardNonce
+            }
             let started = try await api.startMockSession(
                 sessionId: session.sessionId,
                 rewardNonce: rewardNonce,
                 requestID: operationID
             )
+            // 마지막 await 이후 포기가 들어왔을 수 있다. 정리된 화면을 되살리지 않는다.
+            guard !Task.isCancelled else {
+                operationState = .idle
+                return
+            }
             guard let set = started.questionSet else {
                 throw APIClientError.invalidResponse
             }
@@ -267,11 +317,17 @@ final class MockExamViewModel {
             try persistence.saveDraft(targetLevel: targetLevel, questionSet: set, answers: [])
             phase = .answering
             operationState = .completed
+            createOperationID = nil
             startOperationID = nil
-        } catch is CancellationError {
-            phase = .introduction
-            operationState = .idle
+            startRewardNonce = nil
         } catch {
+            // 포기(resetExam)로 취소된 경우엔 이미 정리된 화면을 덮어쓰지 않는다.
+            guard !Task.isCancelled else {
+                operationState = .idle
+                return
+            }
+            // 서버가 논스를 거부했으면 재사용해도 계속 실패한다. 그때만 광고를 다시 본다.
+            if (error as? APIClientError)?.isRewardRequired == true { startRewardNonce = nil }
             phase = .introduction
             errorMessage = error.localizedDescription
             operationState = .recoverableFailure(
@@ -359,7 +415,11 @@ final class MockExamViewModel {
     func previousQuestion() { }
 
     func evaluateAfterReward() async {
-        guard let questionSet, answers.count == 15 else { return }
+        // 조용히 return하면 "결과보기"가 죽은 버튼이 된다.
+        guard let questionSet, answers.count == 15 else {
+            errorMessage = Self.incompleteAnswersMessage
+            return
+        }
         if let evaluationTask {
             await evaluationTask.value
             return
@@ -370,13 +430,32 @@ final class MockExamViewModel {
         }
         evaluationTask = task
         await task.value
-        evaluationTask = nil
+        if evaluationTask == task { evaluationTask = nil }
     }
+
+    /// 오프라인 초안으로 복원했을 때는 session이 비어 있다. 채점 전에 반드시 복구해야
+    /// 광고만 소비하고 아무 일도 못 하는 상태가 생기지 않는다.
+    private func resolvedSession() async -> MockSession? {
+        if let session { return session }
+        session = try? await api.currentMockSession()
+        return session
+    }
+
+    private static let missingSessionMessage =
+        "모의고사 회차를 찾지 못했어요. 네트워크를 확인하고 다시 시도해 주세요."
+    private static let incompleteAnswersMessage =
+        "답변 15개를 모두 확인하지 못했어요. 모의고사를 다시 시작해 주세요."
 
     private func performEvaluationGate(questionSet: QuestionSet) async {
         errorMessage = nil
         if let evaluationRetryContext {
             await submitEvaluation(context: evaluationRetryContext)
+            return
+        }
+        // 광고를 보여주기 전에 회차부터 확인한다.
+        guard await resolvedSession() != nil else {
+            phase = .readyForReward
+            errorMessage = Self.missingSessionMessage
             return
         }
         do {
@@ -405,7 +484,17 @@ final class MockExamViewModel {
     }
 
     private func submitEvaluation(context: EvaluationRetryContext) async {
-        guard let questionSet, let session, answers.count == 15 else { return }
+        // 여기서 조용히 return하면 "다시 시도" 버튼이 아무 일도 하지 않는 죽은 버튼이 된다.
+        guard let questionSet, answers.count == 15 else {
+            phase = .readyForReward
+            errorMessage = Self.incompleteAnswersMessage
+            return
+        }
+        guard let session = await resolvedSession() else {
+            phase = .readyForReward
+            errorMessage = Self.missingSessionMessage
+            return
+        }
         phase = .analyzing
         operationKind = .mockResult
         operationState = .running(operationId: context.requestID, startedAt: .now)
@@ -419,6 +508,10 @@ final class MockExamViewModel {
                 rewardNonce: context.rewardNonce,
                 requestID: context.requestID
             )
+            guard !Task.isCancelled else {
+                operationState = .idle
+                return
+            }
             evaluation = result
             try persistence.saveMock(
                 targetLevel: targetLevel,
@@ -442,34 +535,66 @@ final class MockExamViewModel {
             phase = .readyForReward
             errorMessage = error.localizedDescription
         } catch {
+            guard !Task.isCancelled else {
+                operationState = .idle
+                return
+            }
             phase = .readyForReward
             errorMessage = error.localizedDescription
         }
     }
 
+    /// 진행 중인 작업을 모두 멈춘다. 남겨두면 포기한 뒤에 뒤늦게 끝난 요청이
+    /// phase·evaluation을 되살려 화면이 뒤집힌다.
+    private func cancelPendingOperations() {
+        timerTask?.cancel()
+        timerTask = nil
+        startTask?.cancel()
+        startTask = nil
+        adjustmentTask?.cancel()
+        adjustmentTask = nil
+        evaluationTask?.cancel()
+        evaluationTask = nil
+        operationState = .idle
+    }
+
     func resetExam() {
+        let abandoned = session
+        cancelPendingOperations()
         speech.cancel()
         promptPlayback.stop()
-        timerTask?.cancel()
         AudioFileService.removeAll(answers)
-        if let session { AudioFileService.removeMockSession(sessionID: session.sessionId) }
+        if let abandoned { AudioFileService.removeMockSession(sessionID: abandoned.sessionId) }
         try? persistence.clearDraft()
         questionSet = nil
-        let hadSession = session != nil
         session = nil
         answers = []
         currentIndex = 0
         evaluation = nil
-        errorMessage = hadSession ? "오늘 모의고사를 그만뒀어요. 내일 다시 도전할 수 있어요." : nil
+        // 포기는 응시 한도를 쓰지 않는다. "내일"이라고 안내하면 사실과 다르다.
+        errorMessage = abandoned != nil ? "모의고사를 그만뒀어요. 준비되면 새로 시작할 수 있어요." : nil
         evaluationRetryContext = nil
+        createOperationID = nil
+        startOperationID = nil
+        adjustmentOperationID = nil
+        // 이미 소비한 광고 기회는 복구하지 않는다. 논스만 버린다.
+        startRewardNonce = nil
+        adjustmentRewardNonce = nil
         phase = .introduction
+        // 회차 소유권은 서버에 있다. 로컬만 지우면 다음 /current 조회에서
+        // 같은 회차가 되살아나 "그만뒀다"는 안내와 어긋난다.
+        guard let abandoned, abandoned.stage != .completed else { return }
+        Task { @MainActor [weak self] in
+            _ = try? await self?.api.abandonMockSession(sessionId: abandoned.sessionId)
+            await self?.refreshUsage()
+        }
     }
 
     /// 결과 확인 후 처음(intro) 화면으로 돌아간다. 그만두기와 달리 긍정 안내를 표시.
     func finishReview() {
+        cancelPendingOperations()
         speech.cancel()
         promptPlayback.stop()
-        timerTask?.cancel()
         questionSet = nil
         session = nil
         answers = []
@@ -481,7 +606,13 @@ final class MockExamViewModel {
     }
 
     func applyAdjustment(_ adjustment: DifficultyAdjustment) async {
-        guard let questionSet, let session else { return }
+        guard let questionSet else { return }
+        // 오프라인 초안으로 복원하면 session이 비어 있다. 그대로 return하면
+        // 난이도 선택 버튼이 죽은 버튼이 되므로 먼저 회차를 복구한다.
+        guard let session = await resolvedSession() else {
+            errorMessage = Self.missingSessionMessage
+            return
+        }
         if let adjustmentTask {
             await adjustmentTask.value
             return
@@ -496,7 +627,7 @@ final class MockExamViewModel {
         }
         adjustmentTask = task
         await task.value
-        adjustmentTask = nil
+        if adjustmentTask == task { adjustmentTask = nil }
     }
 
     private func performAdjustment(
@@ -511,16 +642,28 @@ final class MockExamViewModel {
         operationState = .running(operationId: operationID, startedAt: .now)
         errorMessage = nil
         do {
-            let rewardNonce = try await acquireRewardNonce(
-                purpose: .mockAdjustment,
-                sessionHash: session.sessionHash
-            )
+            // 시작과 같은 규칙: 이미 본 광고의 논스를 재사용하고, 서버가 거부할 때만 새로 받는다.
+            let rewardNonce: String
+            if let cached = adjustmentRewardNonce {
+                rewardNonce = cached
+            } else {
+                rewardNonce = try await acquireRewardNonce(
+                    purpose: .mockAdjustment,
+                    sessionHash: session.sessionHash
+                )
+                adjustmentRewardNonce = rewardNonce
+            }
             let adjustedSession = try await api.adjustMockSession(
                 sessionId: session.sessionId,
                 adjustment: adjustment,
                 rewardNonce: rewardNonce,
                 requestID: operationID
             )
+            guard !Task.isCancelled else {
+                operationState = .idle
+                isApplyingAdjustment = false
+                return
+            }
             guard let updated = adjustedSession.questionSet else {
                 throw APIClientError.invalidResponse
             }
@@ -537,9 +680,16 @@ final class MockExamViewModel {
             phase = .answering
             operationState = .completed
             adjustmentOperationID = nil
-        } catch is CancellationError {
-            operationState = .idle
+            adjustmentRewardNonce = nil
         } catch {
+            guard !Task.isCancelled else {
+                operationState = .idle
+                isApplyingAdjustment = false
+                return
+            }
+            if (error as? APIClientError)?.isRewardRequired == true {
+                adjustmentRewardNonce = nil
+            }
             errorMessage = error.localizedDescription
             operationState = .recoverableFailure(
                 operationId: operationID,
