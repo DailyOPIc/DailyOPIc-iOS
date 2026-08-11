@@ -25,27 +25,26 @@ struct MockResultView: View {
 
     private var content: some View {
         let unlock = ResultUnlock(plan: environment.currentPlan)
+        // 순서: 전체 등급 → 시험 총평 → 잘한 패턴 → 약한 패턴 → 다음에 집중할 것 →
+        // 문항별 상세 → 마무리 행동.
         return VStack(spacing: AppSpacing.md) {
-            Text("AI 분석 결과는 실제 시험 점수와 다를 수 있어요.")
-                .font(AppTypography.footnote.weight(.semibold))
-                .foregroundStyle(AppPalette.secondaryInk)
-                .multilineTextAlignment(.center)
-                .cardStyle(alignment: .center)
             LevelResultCard(
                 predicted: evaluation.predictedLevel,
                 target: targetLevel,
-                confidence: evaluation.confidence
+                confidence: evaluation.confidence,
+                isPartial: evaluation.isPartial
             )
-            if evaluation.isPartial {
-                ErrorBanner(message: "일부 내용을 준비하지 못했어요. 핵심 결과만 보여드릴게요.")
-            }
-            FeedbackSection(title: "강점", bullets: evaluation.strengths, tint: AppPalette.successSoft)
 
             if unlock.showsImprovements {
-                FeedbackSection(title: "종합 피드백", text: evaluation.overallFeedback)
+                FeedbackSection(title: "시험 총평", text: evaluation.overallFeedback)
+            }
+
+            FeedbackSection(title: "잘한 점", bullets: evaluation.strengths, tint: AppPalette.successSoft)
+
+            if unlock.showsImprovements {
                 FeedbackSection(title: "개선할 점", bullets: evaluation.improvements)
             } else {
-                LockedFeedbackSection(title: "종합 피드백 · 개선할 점", requiredPlan: .basic) { showsPaywall = true }
+                LockedFeedbackSection(title: "시험 총평 · 개선할 점", requiredPlan: .basic) { showsPaywall = true }
             }
 
             if unlock.showsRubrics {
@@ -62,9 +61,14 @@ struct MockResultView: View {
                 LockedFeedbackSection(title: "목표 등급까지", requiredPlan: .plus) { showsPaywall = true }
             }
 
-            Text(evaluation.disclaimer)
-                .font(AppTypography.caption)
-                .foregroundStyle(AppPalette.secondaryInk)
+            PerQuestionFeedbackView(items: evaluation.perQuestion)
+
+            if !evaluation.disclaimer.isEmpty {
+                Text(evaluation.disclaimer)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
             if showsResetButton {
                 PrimaryButton(title: "완료", systemImage: "checkmark", action: reset)
             }

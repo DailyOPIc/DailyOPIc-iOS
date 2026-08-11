@@ -3,11 +3,13 @@ import Foundation
 enum ConfidenceBand: String, Codable, Sendable {
     case low, medium, high
 
-    var label: String {
+    /// confidence는 서버가 계산한 값이 아니라 AI의 자기 보고다(docs/DESIGN_DECISIONS.md T4:
+    /// 평가 프롬프트에 confidence 판단 기준이 한 줄도 없다). 그래서 "신뢰도 높음"처럼
+    /// 확신을 광고하지 않는다. AI가 스스로 불확실하다고 한 경우만 사용자에게 알린다.
+    var cautionMessage: String? {
         switch self {
-        case .low: "낮음"
-        case .medium: "보통"
-        case .high: "높음"
+        case .low: "AI가 이 답변만으로는 판단이 어렵다고 했어요. 예상 등급은 참고로만 봐주세요."
+        case .medium, .high: nil
         }
     }
 }
@@ -44,13 +46,26 @@ enum RubricBand: String, Codable, Sendable {
     case strong
     case advanced
 
+    /// 서버 밴드 5단계를 그대로 1:1로 옮긴 정성 표현. 숫자 점수(20/40/60/80/95)는
+    /// 밴드를 되돌린 값일 뿐이라 화면에 쓰지 않는다(docs/DESIGN_DECISIONS.md T4).
     var label: String {
         switch self {
-        case .foundation: "기초"
-        case .developing: "발전 중"
-        case .functional: "무난함"
-        case .strong: "우수함"
-        case .advanced: "탁월함"
+        case .foundation: "집중 필요"
+        case .developing: "개선 필요"
+        case .functional: "보통"
+        case .strong: "좋음"
+        case .advanced: "매우 좋음"
+        }
+    }
+
+    /// 색만으로 등급을 구분하지 않도록 밴드마다 다른 기호를 함께 쓴다.
+    var icon: String {
+        switch self {
+        case .foundation: "exclamationmark.circle.fill"
+        case .developing: "arrow.up.circle.fill"
+        case .functional: "equal.circle.fill"
+        case .strong: "hand.thumbsup.fill"
+        case .advanced: "star.fill"
         }
     }
 }
