@@ -113,8 +113,21 @@ struct OnboardingView: View {
         ScrollView {
             VStack(spacing: AppSpacing.md) {
                 HStack {
+                    // 난이도 재선택은 메인 탭 위에 덮인 임시 화면이므로 빠져나갈
+                    // 길이 있어야 한다. 첫 실행 온보딩에는 돌아갈 곳이 없어 숨긴다.
+                    if preferences.isPresentingLevelSelection {
+                        Button("닫기") { returnToHome() }
+                            .font(.headline)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                            .minimumTouchTarget()
+                            .disabled(isSubmitting)
+                    }
                     Spacer()
-                    GuideEntryButton(preferences: preferences)
+                    // 도움말은 온보딩 안에서는 자기 단계로 연다. 재선택 화면이
+                    // 이미 덮여 있는 상태에서 또 다른 화면을 띄우지 않기 위해서다.
+                    GuideEntryButton {
+                        withAnimation(.easeInOut(duration: 0.25)) { step = .guide }
+                    }
                 }
                 Text(preferences.initialLevel == nil ? "시작 난이도를 골라주세요" : "난이도를 바꿔볼까요?")
                     .font(AppTypography.title)

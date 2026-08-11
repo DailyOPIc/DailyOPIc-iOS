@@ -2,7 +2,12 @@ import SwiftUI
 import UIKit
 
 struct SetupView: View {
+    /// 설정에서 요청하는 루트 화면. 시트가 스스로 열지 않고 요청만 남기는 이유는
+    /// 시트가 완전히 닫힌 뒤에 열어야 표시 충돌이 없기 때문이다.
+    enum Route { case guide, levelSelection }
+
     let preferences: AppPreferences
+    let route: (Route) -> Void
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -16,8 +21,9 @@ struct SetupView: View {
         return value
     }
 
-    init(preferences: AppPreferences) {
+    init(preferences: AppPreferences, route: @escaping (Route) -> Void) {
         self.preferences = preferences
+        self.route = route
     }
 
     var body: some View {
@@ -48,10 +54,8 @@ struct SetupView: View {
                     }
                     Section("앱") {
                         Button {
+                            route(.guide)
                             dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                preferences.beginGuide()
-                            }
                         } label: {
                             Label("도움말 다시 보기", systemImage: "questionmark.circle")
                         }
@@ -141,10 +145,8 @@ struct SetupView: View {
 
     private func openGoalLevelOnboarding() {
         showsGoalLevelDialog = false
+        route(.levelSelection)
         dismiss()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            preferences.resetOnboarding()
-        }
     }
 
     private func openPrivacyPolicy() {

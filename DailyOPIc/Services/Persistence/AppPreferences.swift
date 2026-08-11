@@ -47,6 +47,9 @@ final class AppPreferences {
     var isInitialLevelSyncPending: Bool {
         didSet { defaults.set(isInitialLevelSyncPending, forKey: Key.initialLevelSyncPending) }
     }
+    /// 아래 두 값만 저장되지 않는 화면 표시 상태다. 각각 MainTabView 위에 덮이는
+    /// 난이도 재선택/도움말을 가리킨다(루트 교체가 아니다). 두 값이 동시에 켜지는
+    /// 경로는 없다.
     var isPresentingLevelSelection = false
     var isPresentingGuide = false
     var initialLevel: SelfAssessmentLevel? {
@@ -141,6 +144,5 @@ final class AppPreferences {
     func finishGuide(skipped: Bool) {
         guideState = skipped ? .skipped : .completed
         isPresentingGuide = false
-        if !hasCompletedOnboarding { isPresentingLevelSelection = true }
     }
 }

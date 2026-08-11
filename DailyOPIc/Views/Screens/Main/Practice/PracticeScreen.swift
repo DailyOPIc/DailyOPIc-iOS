@@ -6,6 +6,7 @@ struct PracticeScreen: View {
     @ObservedObject private var speech: SpeechRecognitionService
     @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsSetup = false
+    @State private var pendingSetupRoute: SetupView.Route?
     @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: PracticeViewModel, preferences: AppPreferences) {
@@ -19,7 +20,7 @@ struct PracticeScreen: View {
         practiceBody
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    GuideEntryButton(preferences: preferences)
+                    GuideEntryButton { preferences.beginGuide() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showsSetup = true } label: {
@@ -39,8 +40,8 @@ struct PracticeScreen: View {
                     .accessibilityLabel(viewModel.plan.isPaid ? "구독 관리" : "구독 업그레이드")
                 }
             }
-            .sheet(isPresented: $showsSetup) {
-                SetupView(preferences: preferences)
+            .sheet(isPresented: $showsSetup, onDismiss: applyPendingSetupRoute) {
+                SetupView(preferences: preferences) { pendingSetupRoute = $0 }
             }
             .sheet(isPresented: Binding(
                 get: { viewModel.showsPaywall },
@@ -86,6 +87,18 @@ struct PracticeScreen: View {
                 await viewModel.load()
                 await viewModel.refreshUsage()
             }
+    }
+
+    /// 설정 시트가 완전히 닫힌 뒤에 루트 플로우를 연다. 시트가 떠 있는 동안
+    /// fullScreenCover를 요청하면 표시 충돌이 나므로, 지연 대신 onDismiss로
+    /// 순서를 고정한다.
+    private func applyPendingSetupRoute() {
+        switch pendingSetupRoute {
+        case .guide: preferences.beginGuide()
+        case .levelSelection: preferences.resetOnboarding()
+        case nil: break
+        }
+        pendingSetupRoute = nil
     }
 
     private var practiceBody: some View {
