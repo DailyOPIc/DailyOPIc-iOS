@@ -268,21 +268,34 @@ struct MockExamScreen: View {
                     }
                 }
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
-                RecordingButton(isRecording: speech.isListening, isDisabled: false) {
-                    Task { await viewModel.toggleRecording() }
+                // 녹음을 멈추면 검토 상태로만 넘어간다. 제출해야 다음 문항으로 간다.
+                if let pending = viewModel.pendingAnswer {
+                    TranscriptReviewPanel(
+                        transcript: pending.transcript,
+                        submitTitle: "답변 제출",
+                        submitIcon: "paperplane.fill",
+                        isSubmitting: false,
+                        submit: { viewModel.submitPendingAnswer() },
+                        reRecord: { viewModel.discardPendingAnswer() }
+                    )
+                } else {
+                    RecordingButton(isRecording: speech.isListening, isDisabled: false) {
+                        Task { await viewModel.toggleRecording() }
+                    }
+                    Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
+                        .font(.title3.bold())
+                    Text("남은 시간 \(viewModel.remainingSeconds)초")
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.dangerInk : AppPalette.secondaryInk)
+                        .accessibilityLabel("남은 시간 \(viewModel.remainingSeconds)초")
+                    Text(speech.transcript.isEmpty ? "답변을 마치면 확인하고 제출해요." : speech.transcript)
+                        .font(AppTypography.body)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .multilineTextAlignment(.center)
+                    Text("제출한 문항은 다시 답할 수 없어요.")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(AppPalette.secondaryInk)
                 }
-                Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
-                    .font(.title3.bold())
-                Text("남은 시간 \(viewModel.remainingSeconds)초")
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.dangerInk : AppPalette.secondaryInk)
-                Text(speech.transcript.isEmpty ? "답변을 마치면 다음 문항으로 넘어가요." : speech.transcript)
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                    .multilineTextAlignment(.center)
-                Text("한 번 답한 문항은 다시 답할 수 없어요.")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(AppPalette.secondaryInk)
             }
             .padding(AppSpacing.lg)
         }

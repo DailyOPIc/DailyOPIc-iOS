@@ -38,6 +38,8 @@ final class MockExamViewModel {
     var surveyDraft: BackgroundSurvey
     var isApplyingAdjustment = false
     var remainingSeconds = 180
+    /// 녹음을 멈췄지만 아직 확정하지 않은 답변. 이 값이 있으면 검토 상태다.
+    var pendingAnswer: SpeechRecordingResult?
     var operationState: AsyncOperationState = .idle
     var operationKind: AsyncOperationKind = .dataLoading
     var usage: UsageStatus?
@@ -60,6 +62,7 @@ final class MockExamViewModel {
         preferences = environment.preferences
         persistence = environment.persistence
         surveyDraft = environment.preferences.mockSurvey ?? .defaultSurvey
+        speech.onInterruption = { [weak self] in self?.handleRecordingInterruption() }
     }
 
     var plan: PlanEntitlement { environment.currentPlan }
@@ -340,22 +343,63 @@ final class MockExamViewModel {
     func toggleRecording() async {
         errorMessage = nil
         if speech.isListening {
-            do {
-                timerTask?.cancel()
-                let result = try await speech.stop()
-                saveAnswer(result)
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            // 녹음 종료는 답변 확정이 아니다. 검토 상태로만 넘어가고, 문항은
+            // submitPendingAnswer에서만 넘어간다.
+            await finishRecording()
         } else {
             do {
                 promptPlayback.stop()
+                // 검토 중인 녹음을 두고 다시 녹음하면 그건 재녹음이다. 임시 파일을 정리한다.
+                AudioFileService.remove(pendingAnswer?.audioURL)
+                pendingAnswer = nil
                 try await speech.start()
                 startAnswerTimer()
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
+    }
+
+    /// 녹음을 멈추고 인식 결과를 확정한다. 답변 저장·문항 이동은 하지 않는다.
+    private func finishRecording(interruptedMessage: String? = nil) async {
+        guard speech.isListening else { return }
+        timerTask?.cancel()
+        do {
+            pendingAnswer = try await speech.stop()
+            errorMessage = interruptedMessage
+        } catch {
+            // 살릴 인식 결과가 없으면(무음 등) 솔직하게 다시 녹음하게 한다.
+            pendingAnswer = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 시스템 오디오 중단(전화 등). 여기까지 인식된 답변을 살려 검토 상태로 보낸다.
+    /// AVAudioEngine 세션은 이어붙일 수 없으므로 "이어서 녹음"은 제공하지 않는다.
+    private func handleRecordingInterruption() {
+        Task { @MainActor [weak self] in
+            await self?.finishRecording(
+                interruptedMessage: "통화 등으로 녹음이 중단됐어요. 여기까지 인식된 답변을 제출하거나 다시 녹음해 주세요."
+            )
+        }
+    }
+
+    /// 검토한 답변을 확정한다. 문항이 넘어가는 유일한 경로.
+    func submitPendingAnswer() {
+        guard let pendingAnswer else { return }
+        self.pendingAnswer = nil
+        errorMessage = nil
+        saveAnswer(pendingAnswer)
+    }
+
+    /// 다시 녹음. 확정 전이라 답변이 중복 저장되지 않고 문항도 넘어가지 않는다.
+    func discardPendingAnswer() {
+        AudioFileService.remove(pendingAnswer?.audioURL)
+        pendingAnswer = nil
+        // 인식 텍스트를 비워 이전 답변이 새 녹음 화면에 남지 않게 한다.
+        speech.cancel()
+        errorMessage = nil
+        remainingSeconds = 180
     }
 
     func playPrompt() {
@@ -373,7 +417,8 @@ final class MockExamViewModel {
                 self.remainingSeconds -= 1
             }
             guard let self, self.speech.isListening else { return }
-            await self.toggleRecording()
+            // 180초가 다 되면 녹음만 자동으로 멈춘다. 제출은 검토 후 사용자가 한다.
+            await self.finishRecording()
         }
     }
 
@@ -411,8 +456,6 @@ final class MockExamViewModel {
             currentIndex = min(currentIndex + 1, max(0, questionSet.questions.count - 1))
         }
     }
-
-    func previousQuestion() { }
 
     func evaluateAfterReward() async {
         // 조용히 return하면 "결과보기"가 죽은 버튼이 된다.
@@ -564,6 +607,9 @@ final class MockExamViewModel {
         speech.cancel()
         promptPlayback.stop()
         AudioFileService.removeAll(answers)
+        // 아직 확정하지 않은 녹음의 임시 파일도 같이 지운다.
+        AudioFileService.remove(pendingAnswer?.audioURL)
+        pendingAnswer = nil
         if let abandoned { AudioFileService.removeMockSession(sessionID: abandoned.sessionId) }
         try? persistence.clearDraft()
         questionSet = nil
@@ -595,6 +641,8 @@ final class MockExamViewModel {
         cancelPendingOperations()
         speech.cancel()
         promptPlayback.stop()
+        AudioFileService.remove(pendingAnswer?.audioURL)
+        pendingAnswer = nil
         questionSet = nil
         session = nil
         answers = []

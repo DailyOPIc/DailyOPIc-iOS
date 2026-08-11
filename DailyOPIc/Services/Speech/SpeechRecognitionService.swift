@@ -41,6 +41,10 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
     @Published private(set) var permissionState: PermissionState = .unknown
     @Published private(set) var interruptionReason: String?
 
+    /// 시스템 오디오 중단(전화 등)을 소유자에게 알린다. 여기서 녹음을 버리지 않고
+    /// 소유자가 stop()으로 지금까지 인식된 답변을 살릴 수 있게 하려는 것.
+    var onInterruption: (@MainActor () -> Void)?
+
     private let recognizer = SFSpeechRecognizer(locale: Locale(identifier: "en-US"))
     private let audioEngine = AVAudioEngine()
     private var recognitionRequest: SFSpeechAudioBufferRecognitionRequest?
@@ -228,13 +232,26 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
         )
     }
 
-    @objc private func handleInterruption(_ notification: Notification) {
-        guard isListening else { return }
-        interruptionReason = "통화 또는 다른 오디오로 녹음이 중단됐습니다. 같은 문항에서 다시 시작해 주세요."
-        recordingState = .interrupted
-        errorMessage = interruptionReason
-        cancel()
-        recordingState = .interrupted
+    @objc private nonisolated func handleInterruption(_ notification: Notification) {
+        // 중단 시작만 처리한다. .ended까지 같이 받으면 이미 정리된 녹음을 또 건드린다.
+        let rawType = notification.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt
+        guard let rawType,
+              AVAudioSession.InterruptionType(rawValue: rawType) == .began else { return }
+        // 알림은 임의 스레드로 온다. 상태 변경은 메인에서만.
+        Task { @MainActor [weak self] in
+            guard let self, self.isListening else { return }
+            self.interruptionReason = "통화 등으로 녹음이 중단됐어요."
+            self.errorMessage = self.interruptionReason
+            self.recordingState = .interrupted
+            // 오디오는 시스템이 이미 멈췄다. 여기서 파일을 지우면 사용자가 말한
+            // 내용이 조용히 사라지므로, 소유자가 stop()으로 살려내도록 넘긴다.
+            if let onInterruption = self.onInterruption {
+                onInterruption()
+            } else {
+                self.cancel()
+                self.recordingState = .interrupted
+            }
+        }
     }
 
     private func compressToM4A(_ source: URL) async throws -> URL {

@@ -197,32 +197,45 @@ struct PracticeScreen: View {
     @ViewBuilder
     private func recorder(for question: GeneratedQuestion) -> some View {
         VStack(spacing: AppSpacing.md) {
-            PromptPlayButton(
-                isSpeaking: promptPlayback.isSpeaking,
-                hasStarted: promptPlayback.hasStarted(question),
-                isDisabled: speech.isListening
-            ) {
-                viewModel.playPrompt()
-            }
-
-            RecordingButton(
-                isRecording: speech.isListening,
-                isDisabled: viewModel.phase == .analyzing
-            ) {
-                Task { await viewModel.toggleRecording() }
-            }
-            Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
-                .font(.title3.bold())
-            AnswerPanel(
-                finalText: speech.finalTranscript,
-                partialText: speech.partialTranscript,
-                isRecording: speech.isListening
-            )
-
-            if viewModel.pendingRecording != nil, viewModel.phase != .analyzing {
-                PrimaryButton(title: "분석 다시 시도", systemImage: "arrow.clockwise") {
-                    Task { await viewModel.retryEvaluation() }
+            // 녹음을 멈추면 검토 상태로만 넘어간다. 분석은 사용자가 눌러야 시작한다.
+            if let pending = viewModel.pendingRecording {
+                TranscriptReviewPanel(
+                    transcript: pending.transcript,
+                    submitTitle: viewModel.phase == .analyzing ? "분석 중" : "분석하기",
+                    submitIcon: "sparkles",
+                    isSubmitting: viewModel.phase == .analyzing,
+                    submit: { Task { await viewModel.analyzePendingRecording() } },
+                    reRecord: { viewModel.discardPendingRecording() }
+                )
+            } else {
+                PromptPlayButton(
+                    isSpeaking: promptPlayback.isSpeaking,
+                    hasStarted: promptPlayback.hasStarted(question),
+                    isDisabled: speech.isListening
+                ) {
+                    viewModel.playPrompt()
                 }
+
+                RecordingButton(
+                    isRecording: speech.isListening,
+                    isDisabled: viewModel.phase == .analyzing
+                ) {
+                    Task { await viewModel.toggleRecording() }
+                }
+                Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
+                    .font(.title3.bold())
+                if speech.isListening {
+                    Text("남은 시간 \(viewModel.remainingSeconds)초")
+                        .font(AppTypography.callout)
+                        .monospacedDigit()
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .accessibilityLabel("남은 답변 시간 \(viewModel.remainingSeconds)초")
+                }
+                AnswerPanel(
+                    finalText: speech.finalTranscript,
+                    partialText: speech.partialTranscript,
+                    isRecording: speech.isListening
+                )
             }
         }
         .padding(.vertical, AppSpacing.md)
