@@ -34,6 +34,11 @@ final class PracticeViewModel {
     var refreshProgressMessage: String?
     var operationState: AsyncOperationState = .idle
     var operationKind: AsyncOperationKind = .dataLoading
+    /// 현재 세트를 만들 때 사용한 자가진단 난이도. 설정에서 난이도를 바꾸면
+    /// "난이도를 바꾸면 지금 질문이 새로 만들어져요"라는 약속대로 세트를 다시
+    /// 받아야 한다. 예전에는 난이도 재선택이 루트 분기를 바꿔 ViewModel이 통째로
+    /// 사라지면서 우연히 처리됐지만, 이제 세션이 살아남으므로 명시적으로 비교한다.
+    private var loadedInitialLevel: SelfAssessmentLevel?
     private var loadTask: Task<Void, Never>?
     private var evaluationTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
@@ -120,6 +125,10 @@ final class PracticeViewModel {
     }
 
     func load() async {
+        if let loadedInitialLevel, loadedInitialLevel != initialLevel {
+            await reloadQuestions()
+            return
+        }
         guard questionSet == nil else { return }
         if let loadTask {
             await loadTask.value
@@ -153,6 +162,7 @@ final class PracticeViewModel {
             let set = try await setTask
             set.logDebugSummary(mode: "practice")
             questionSet = set
+            loadedInitialLevel = initialLevel
             phase = .idle
             operationState = .completed
             loadOperationID = UUID()
@@ -293,6 +303,7 @@ final class PracticeViewModel {
 
     func reloadQuestions() async {
         questionSet = nil
+        loadedInitialLevel = nil
         questionIndex = 0
         analyzedResults = [:]
         evaluation = nil
@@ -397,6 +408,7 @@ final class PracticeViewModel {
     private func applyRefreshedQuestionSet(_ updated: QuestionSet) {
         updated.logDebugSummary(mode: "practice")
         questionSet = updated
+        loadedInitialLevel = initialLevel
         questionIndex = 0
         analyzedResults = [:]
         showsRefreshDialog = false
