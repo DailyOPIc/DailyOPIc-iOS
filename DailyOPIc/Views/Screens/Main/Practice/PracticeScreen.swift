@@ -141,8 +141,8 @@ struct PracticeScreen: View {
 
                     navigationControls
                 }
-                BannerAdView()
-                    .frame(height: 50)
+                // 배너 없음: 말하기가 진행되는 화면이다. 광고는 통계·모의고사 인트로처럼
+                // 흐름을 끊지 않는 곳에만 둔다.
             }
             .padding(AppSpacing.lg)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.currentQuestion?.number)

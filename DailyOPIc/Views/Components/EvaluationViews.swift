@@ -6,16 +6,20 @@ struct LevelResultCard: View {
     let confidence: ConfidenceBand
     /// 결과가 완전하지 않다고 서버가 알려준 경우(resultStatus == "partial").
     var isPartial = false
+    /// 서버가 판정한 근거 충분도. 앱은 임계값을 계산하지 않고 받은 값만 그린다.
+    var quality: AnswerQuality?
     /// The grade is the hero element of this card, so it stays larger than any
     /// text style while still scaling with Dynamic Type via UIFontMetrics.
     @ScaledMetric(relativeTo: .largeTitle) private var gradeSize: CGFloat = 52
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("OPIc 예상 등급")
+            Text(showsGrade ? "OPIc 예상 등급" : "예상 등급을 낼 수 없었어요")
                 .font(.headline)
             HStack(alignment: .firstTextBaseline) {
-                Text(predicted.rawValue)
+                // 근거가 아예 없으면 등급을 말하지 않는다. 하한(IL)으로 채운 숫자를
+                // 보여주는 순간 그건 측정이 아니라 추측을 단언하는 것이 된다.
+                Text(showsGrade ? predicted.rawValue : "—")
                     .font(.system(size: gradeSize, weight: .bold, design: .rounded))
                     // 접근성 큰 글씨에서 등급 한 글자가 카드를 다 먹지 않도록.
                     .lineLimit(1)
@@ -30,10 +34,12 @@ struct LevelResultCard: View {
                     .font(AppTypography.footnote.weight(.semibold))
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Text("AI 예상 등급이라 실제 시험 결과와 다를 수 있어요.")
-                .font(AppTypography.footnote)
-                .opacity(0.85)
-                .fixedSize(horizontal: false, vertical: true)
+            if showsGrade {
+                Text("AI 예상 등급이라 실제 시험 결과와 다를 수 있어요.")
+                    .font(AppTypography.footnote)
+                    .opacity(0.85)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
         .foregroundStyle(AppPalette.actionOnPrimary)
         .padding(AppSpacing.lg)
@@ -45,7 +51,11 @@ struct LevelResultCard: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    private var showsGrade: Bool { quality?.showsGrade ?? true }
+
     private var caution: String? {
+        // 서버 판정이 가장 구체적이므로 우선한다.
+        if let message = quality?.cautionMessage { return message }
         if isPartial {
             return "결과 일부를 준비하지 못했어요. 예상 등급은 참고로만 봐주세요."
         }
@@ -53,8 +63,11 @@ struct LevelResultCard: View {
     }
 
     private var accessibilityText: String {
-        var text = "OPIc 예상 등급 \(predicted.rawValue), 목표 \(target.rawValue)."
+        var text = showsGrade
+            ? "OPIc 예상 등급 \(predicted.rawValue), 목표 \(target.rawValue)."
+            : "예상 등급을 낼 수 없었어요. 목표 \(target.rawValue)."
         if let caution { text += " \(caution)" }
+        guard showsGrade else { return text }
         return text + " AI 예상 등급이라 실제 시험 결과와 다를 수 있어요."
     }
 }
@@ -163,43 +176,6 @@ struct FeedbackSection: View {
     }
 }
 
-/// 모의고사 문항별 피드백. 서버는 이미 문항마다 피드백과 예시 답변을 주는데
-/// 화면에는 한 번도 그려지지 않고 있었다. 접어 두고 필요할 때 펼치게 한다.
-struct PerQuestionFeedbackView: View {
-    let items: [PerQuestionFeedback]
-
-    var body: some View {
-        if !items.isEmpty {
-            DisclosureGroup("문항별 피드백 \(items.count)개") {
-                VStack(alignment: .leading, spacing: AppSpacing.lg) {
-                    ForEach(items) { item in
-                        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                            Text("\(item.number)번 문항")
-                                .font(.subheadline.bold())
-                                .foregroundStyle(AppPalette.primary)
-                            Text(item.feedback)
-                                .font(AppTypography.body)
-                                .fixedSize(horizontal: false, vertical: true)
-                                .textSelection(.enabled)
-                            if !item.sampleAnswer.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
-                                FeedbackSection(
-                                    title: "예시 답변",
-                                    text: item.sampleAnswer,
-                                    tint: AppPalette.successSoft
-                                )
-                            }
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        if item.id != items.last?.id { Divider() }
-                    }
-                }
-                .padding(.top, AppSpacing.md)
-            }
-            .cardStyle()
-        }
-    }
-}
-
 extension View {
     func cardStyle(alignment: Alignment = .leading) -> some View {
         padding(AppSpacing.lg)
@@ -213,17 +189,16 @@ extension View {
     }
 }
 
-/// 결과 분석 화면의 플랜별 잠금 해제 사다리.
-/// 무료=예상등급+강점, 베이직=+개선점·루브릭, 플러스=+목표갭·교정·모범.
-/// `showsPerQuestion`(프로)은 어디에서도 쓰이지 않아 "프로면 문항별 피드백"이라는
-/// 사실이 아닌 약속만 남기고 있었으므로 삭제했다. 문항별 피드백은 잠금 없이 보여준다.
+/// 결과 화면의 잠금 경계는 **한 곳뿐**이다: 무료 ↔ 유료.
+/// 서버(`app/services/ai.py`)는 무료 플랜에만 교정 답안·모범 답안·목표 갭을
+/// 빼고 내려주고, 나머지(강점·개선점·5영역 루브릭)는 전 플랜에 똑같이 준다.
+/// 베이직/플러스/프로의 분석 내용은 완전히 동일하므로 화면에서도 구분하지 않는다.
+/// 모의고사 결과는 플랜과 무관하게 전체를 내려주므로 아예 잠그지 않는다.
 struct ResultUnlock {
     let plan: PlanEntitlement
 
-    var showsImprovements: Bool { plan >= .basic }
-    var showsRubrics: Bool { plan >= .basic }
-    var showsTargetGap: Bool { plan >= .plus }
-    var showsCorrectionAndSample: Bool { plan >= .plus }
+    /// 교정 답안 · 모범 답안 · 목표 등급까지의 갭.
+    var showsCoaching: Bool { plan.isPaid }
 }
 
 /// 유료 잠금 섹션. 탭하면 페이월을 연다.

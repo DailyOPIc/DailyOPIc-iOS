@@ -10,13 +10,11 @@ struct ProgressScreen: View {
     }
     let preferences: AppPreferences
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppEnvironment.self) private var environment
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
     private var practiceRecords: [PracticeHistoryRecord]
     @Query(sort: \MockHistoryRecord.createdAt, order: .reverse)
     private var mockRecords: [MockHistoryRecord]
     @State private var showsDeleteAll = false
-    @State private var showsPaywall = false
     @State private var period: Period = .seven
 
     private var cutoff: Date? {
@@ -53,8 +51,6 @@ struct ProgressScreen: View {
         }
     }
 
-    private var currentPlan: PlanEntitlement { environment.currentPlan }
-
     private var insights: StudyInsights {
         let entries: [(date: Date, level: OPIcLevel, scores: EvaluationScores?)] =
             visiblePractice.map { ($0.createdAt, $0.predictedLevel, $0.evaluation?.scores) }
@@ -82,11 +78,7 @@ struct ProgressScreen: View {
                 }
                 if !distribution.isEmpty { distributionView }
 
-                StudyInsightsSection(
-                    plan: currentPlan,
-                    insights: insights,
-                    onUpgrade: { showsPaywall = true }
-                )
+                StudyInsightsSection(insights: insights)
 
                 HStack {
                     Text("최근 기록").font(AppTypography.cardTitle)
@@ -104,9 +96,6 @@ struct ProgressScreen: View {
         }
         .confirmationDialog("모든 기록을 삭제할까요?", isPresented: $showsDeleteAll) {
             Button("전체 삭제", role: .destructive, action: deleteAll)
-        }
-        .sheet(isPresented: $showsPaywall) {
-            PaywallView()
         }
     }
 

@@ -28,11 +28,15 @@ struct PaywallView: View {
                 VStack(spacing: AppSpacing.lg) {
                     header
                     tierCards
-                    Text("예상 등급 추이 · 취약 유형 분석 · 주간 리포트는 모든 플랜에서 무료로 제공돼요.")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(Color(AppPalette.secondaryInk))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: AppSpacing.xs) {
+                        Text("예상 등급 추이 · 취약 유형 분석 · 주간 리포트는 모든 플랜에서 무료로 제공돼요.")
+                        // 유료 플랜끼리는 분석 내용이 같다. 안 그런 척하지 않는다.
+                        Text("베이직 · 플러스 · 프로의 결과 분석 내용은 같아요. 차이는 하루 이용 횟수와 기록 보관 기간이에요.")
+                    }
+                    .font(AppTypography.caption)
+                    .foregroundStyle(Color(AppPalette.secondaryInk))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
                     if store.packages.isEmpty {
                         unavailableNotice
                     }
@@ -68,7 +72,7 @@ struct PaywallView: View {
                 .font(AppTypography.title)
                 .foregroundStyle(Color(AppPalette.ink))
                 .multilineTextAlignment(.center)
-            Text("광고 없이 매일 연습하고, AI가 약점까지 잡아줍니다.")
+            Text("광고 없이 더 많이 연습하고, 교정 답안과 모범 답안까지 받아보세요.")
                 .font(AppTypography.callout)
                 .foregroundStyle(Color(AppPalette.secondaryInk))
                 .multilineTextAlignment(.center)
@@ -237,13 +241,17 @@ struct PaywallTier: Identifiable {
 
     var id: String { plan.rawValue }
 
+    /// 문구는 `DailyOPIc-BE/app/services/plans.py`의 실제 한도와
+    /// `app/services/ai.py`의 실제 분석 산출물에서만 가져온다.
+    /// 특히 분석 내용의 차이는 무료↔유료 한 곳뿐이라, 베이직 위로는
+    /// "더 깊은 분석"을 약속하지 않는다.
     static let all: [PaywallTier] = [
         PaywallTier(
             plan: .free,
             highlights: [
+                "결과: 예상 등급 + 강점 · 개선점 · 5영역 피드백",
                 "데일리 새 문제 세트 하루 1회 (+광고 보너스 1회)",
-                "모의고사 최초 1회 체험",
-                "결과: 예상 등급 + 강점",
+                "모의고사 체험 1회 (광고 시청)",
                 "학습 기록 최근 7일",
                 "광고 있음",
             ],
@@ -253,10 +261,10 @@ struct PaywallTier: Identifiable {
         PaywallTier(
             plan: .basic,
             highlights: [
+                "결과 전체 해제: 교정 답안 · 모범 답안 · 목표 등급까지",
                 "광고 완전 제거",
                 "데일리 새 문제 세트 하루 3회",
-                "모의고사 하루 1회",
-                "결과: + 개선점 · 5차원 루브릭 분석",
+                "모의고사 매일 1회 (광고 없이)",
                 "학습 기록 최근 30일",
             ],
             promoBadge: "오픈 기념 할인",
@@ -265,9 +273,9 @@ struct PaywallTier: Identifiable {
         PaywallTier(
             plan: .plus,
             highlights: [
+                "베이직의 결과 분석 그대로 + 더 많이 연습",
                 "데일리 새 문제 세트 하루 10회",
                 "모의고사 하루 3회",
-                "결과: + 교정답안 · 모범답안 · 목표 등급까지",
                 "학습 기록 최근 30일",
             ],
             promoBadge: nil,
@@ -276,10 +284,10 @@ struct PaywallTier: Identifiable {
         PaywallTier(
             plan: .pro,
             highlights: [
+                "가장 많이 연습하고 기록을 전부 보관",
                 "데일리 새 문제 세트 하루 20회",
                 "모의고사 하루 5회",
-                "결과: + 모의고사 항목별(문항별) 피드백",
-                "학습 기록 전체",
+                "학습 기록 전체 기간",
             ],
             promoBadge: nil,
             promoNote: nil
