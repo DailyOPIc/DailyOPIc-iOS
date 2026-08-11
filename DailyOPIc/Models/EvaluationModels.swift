@@ -57,7 +57,9 @@ enum AnswerQuality: String, Codable, Sendable {
         switch self {
         case .gradable: nil
         case .lowEvidence: "이 답변만으로는 근거가 충분하지 않아요. 예상 등급은 참고로만 봐주세요."
-        case .insufficient: "답변에서 영어 문장을 찾지 못했어요. 다시 녹음하면 분석해 드릴게요."
+        // 분석이 끝난 문항은 다시 녹음할 수 없다(결과 화면에 재녹음 경로가 없고,
+        // 모의고사는 문항이 지나간다). 없는 동작을 안내하지 않는다.
+        case .insufficient: "답변에서 영어 문장을 찾지 못했어요. 다음 답변은 영어로 조금 더 길게 말해 주세요."
         }
     }
 }
