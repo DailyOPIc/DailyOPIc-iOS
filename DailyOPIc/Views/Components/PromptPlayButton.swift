@@ -29,6 +29,7 @@ struct PromptPlayButton: View {
             .background(AppPalette.primarySoft, in: Capsule())
         }
         .buttonStyle(PressableButtonStyle())
+        .minimumTouchTarget()
         .disabled(isDisabled || isSpeaking)
         .opacity(isDisabled ? 0.5 : 1)
         .accessibilityLabel(hasStarted ? "질문 다시 듣기" : "질문 듣기")

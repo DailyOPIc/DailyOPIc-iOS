@@ -204,14 +204,31 @@ final class StoreService {
         highestPlan(from: [package.identifier, package.storeProduct.productIdentifier])
     }
 
+    /// 식별자 토큰 → 플랜. 백엔드 `app/services/plans.py`의 엔타이틀먼트 매핑과
+    /// 같은 값을 유지한다. 한쪽만 바뀌면 앱과 서버가 다른 플랜을 말하게 된다.
+    private static let planByToken: [String: PlanEntitlement] = [
+        "basic": .basic,
+        "plus": .plus,
+        "pro": .pro,
+        // 과거 명칭. 지금은 발급하지 않지만 만료 전 구독자가 남아 있을 수 있어
+        // 지우지 않는다(지우면 그 순간 무료로 강등된다). 새 상품에 쓰지 않는다.
+        "premium": .pro,
+        "exam_pass": .pro,
+    ]
+
+    /// 부분 문자열이 아니라 토큰으로 맞춘다. `contains`는 "promo_offer"를 프로로
+    /// 읽는 등 한 상품이 두 플랜으로 갈릴 수 있었다.
     private static func highestPlan(from identifiers: [String]) -> PlanEntitlement {
         var best: PlanEntitlement = .free
         for raw in identifiers {
             let lower = raw.lowercased()
-            for candidate in PlanEntitlement.allCases where candidate != .free {
-                if lower.contains(candidate.rawValue), candidate > best {
-                    best = candidate
-                }
+            // 엔타이틀먼트는 식별자 전체가 이름("exam_pass"), 상품 ID는 구분자로
+            // 이어 붙인 형태("com.dailyopic.pro.monthly")라 둘 다 본다.
+            let tokens = [lower] + lower
+                .split(whereSeparator: { !$0.isLetter && !$0.isNumber })
+                .map(String.init)
+            for token in tokens {
+                if let plan = planByToken[token], plan > best { best = plan }
             }
         }
         return best

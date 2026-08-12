@@ -2,7 +2,12 @@ import SwiftUI
 import UIKit
 
 struct SetupView: View {
+    /// 설정에서 요청하는 루트 화면. 시트가 스스로 열지 않고 요청만 남기는 이유는
+    /// 시트가 완전히 닫힌 뒤에 열어야 표시 충돌이 없기 때문이다.
+    enum Route { case guide, levelSelection }
+
     let preferences: AppPreferences
+    let route: (Route) -> Void
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
@@ -16,8 +21,9 @@ struct SetupView: View {
         return value
     }
 
-    init(preferences: AppPreferences) {
+    init(preferences: AppPreferences, route: @escaping (Route) -> Void) {
         self.preferences = preferences
+        self.route = route
     }
 
     var body: some View {
@@ -48,10 +54,8 @@ struct SetupView: View {
                     }
                     Section("앱") {
                         Button {
+                            route(.guide)
                             dismiss()
-                            DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-                                preferences.beginGuide()
-                            }
                         } label: {
                             Label("도움말 다시 보기", systemImage: "questionmark.circle")
                         }
@@ -141,10 +145,8 @@ struct SetupView: View {
 
     private func openGoalLevelOnboarding() {
         showsGoalLevelDialog = false
+        route(.levelSelection)
         dismiss()
-        DispatchQueue.main.asyncAfter(deadline: .now() + 0.2) {
-            preferences.resetOnboarding()
-        }
     }
 
     private func openPrivacyPolicy() {
@@ -205,7 +207,7 @@ private struct GoalLevelRoutingDialog: View {
                 .ignoresSafeArea()
                 .onTapGesture(perform: cancel)
 
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "target")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
@@ -232,16 +234,19 @@ private struct GoalLevelRoutingDialog: View {
                 Button("취소", action: cancel)
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .minimumTouchTarget()
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 340)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, cancel)
         }
         .transition(.opacity)
     }

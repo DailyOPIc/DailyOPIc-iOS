@@ -29,13 +29,22 @@ final class PracticeViewModel {
     var evaluatedTranscript = ""
     var errorMessage: String?
     var pendingRecording: SpeechRecordingResult?
+    /// 답변 최대 180초. 모의고사와 같은 제한을 연습에도 적용한다.
+    var remainingSeconds = PracticeViewModel.maxAnswerSeconds
+    static let maxAnswerSeconds = 180
     var showsRefreshDialog = false
     var isRefreshingQuestions = false
     var refreshProgressMessage: String?
     var operationState: AsyncOperationState = .idle
     var operationKind: AsyncOperationKind = .dataLoading
+    /// 현재 세트를 만들 때 사용한 자가진단 난이도. 설정에서 난이도를 바꾸면
+    /// "난이도를 바꾸면 지금 질문이 새로 만들어져요"라는 약속대로 세트를 다시
+    /// 받아야 한다. 예전에는 난이도 재선택이 루트 분기를 바꿔 ViewModel이 통째로
+    /// 사라지면서 우연히 처리됐지만, 이제 세션이 살아남으므로 명시적으로 비교한다.
+    private var loadedInitialLevel: SelfAssessmentLevel?
     private var loadTask: Task<Void, Never>?
     private var evaluationTask: Task<Void, Never>?
+    private var timerTask: Task<Void, Never>?
     private var refreshTask: Task<Void, Never>?
     private var loadOperationID = UUID()
     private var evaluationOperationID: UUID?
@@ -47,6 +56,7 @@ final class PracticeViewModel {
         ads = environment.ads
         preferences = environment.preferences
         persistence = environment.persistence
+        speech.onInterruption = { [weak self] in self?.handleRecordingInterruption() }
     }
 
     var plan: PlanEntitlement { environment.currentPlan }
@@ -112,6 +122,9 @@ final class PracticeViewModel {
     }
 
     private func clearTransientAnswerState() {
+        timerTask?.cancel()
+        timerTask = nil
+        remainingSeconds = Self.maxAnswerSeconds
         speech.cancel()
         promptPlayback.stop()
         AudioFileService.remove(pendingRecording?.audioURL)
@@ -120,6 +133,10 @@ final class PracticeViewModel {
     }
 
     func load() async {
+        if let loadedInitialLevel, loadedInitialLevel != initialLevel {
+            await reloadQuestions()
+            return
+        }
         guard questionSet == nil else { return }
         if let loadTask {
             await loadTask.value
@@ -153,6 +170,7 @@ final class PracticeViewModel {
             let set = try await setTask
             set.logDebugSummary(mode: "practice")
             questionSet = set
+            loadedInitialLevel = initialLevel
             phase = .idle
             operationState = .completed
             loadOperationID = UUID()
@@ -177,23 +195,66 @@ final class PracticeViewModel {
     func toggleRecording() async {
         errorMessage = nil
         if speech.isListening {
-            do {
-                pendingRecording = try await speech.stop()
-                try await evaluatePendingRecording()
-            } catch {
-                errorMessage = error.localizedDescription
-            }
+            // 녹음 종료는 제출이 아니다. 검토 상태(pendingRecording)로만 넘어가고,
+            // AI 분석은 사용자가 "분석하기"를 눌러야 시작한다.
+            await finishRecording()
         } else {
             promptPlayback.stop()
+            // 검토 중인 녹음을 두고 다시 녹음하면 그건 재녹음이다. 임시 파일을 정리한다.
+            AudioFileService.remove(pendingRecording?.audioURL)
+            pendingRecording = nil
             do {
                 try await speech.start()
+                startAnswerTimer()
             } catch {
                 errorMessage = error.localizedDescription
             }
         }
     }
 
-    func retryEvaluation() async {
+    /// 답변 180초 제한. 시간이 다 되면 녹음만 멈추고 검토 상태로 간다.
+    private func startAnswerTimer() {
+        timerTask?.cancel()
+        remainingSeconds = Self.maxAnswerSeconds
+        timerTask = Task { @MainActor [weak self] in
+            while let self, !Task.isCancelled, self.remainingSeconds > 0 {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { return }
+                self.remainingSeconds -= 1
+            }
+            guard let self, self.speech.isListening else { return }
+            // 시간이 다 돼도 제출은 하지 않는다. 검토 후 사용자가 분석을 누른다.
+            await self.finishRecording()
+        }
+    }
+
+    /// 녹음을 멈추고 인식 결과를 확정한다. 분석 요청은 하지 않는다.
+    private func finishRecording(interruptedMessage: String? = nil) async {
+        guard speech.isListening else { return }
+        timerTask?.cancel()
+        timerTask = nil
+        do {
+            pendingRecording = try await speech.stop()
+            errorMessage = interruptedMessage
+        } catch {
+            // 살릴 인식 결과가 없으면(무음 등) 솔직하게 다시 녹음하게 한다.
+            pendingRecording = nil
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    /// 시스템 오디오 중단(전화 등). 여기까지 인식된 답변을 살려 검토 상태로 보낸다.
+    /// AVAudioEngine 세션은 이어붙일 수 없으므로 "이어서 녹음"은 제공하지 않는다.
+    private func handleRecordingInterruption() {
+        Task { @MainActor [weak self] in
+            await self?.finishRecording(
+                interruptedMessage: "통화 등으로 녹음이 중단됐어요. 여기까지 인식된 답변을 분석하거나 다시 녹음해 주세요."
+            )
+        }
+    }
+
+    /// 검토한 답변을 AI 분석에 보낸다. "분석하기"와 "분석 다시 시도"가 같은 경로다.
+    func analyzePendingRecording() async {
         if let evaluationTask {
             await evaluationTask.value
             return
@@ -206,6 +267,17 @@ final class PracticeViewModel {
         evaluationTask = task
         await task.value
         evaluationTask = nil
+    }
+
+    /// 다시 녹음. 분석 요청도, 새 질문 요청도 하지 않으므로 토큰이 소모되지 않는다.
+    func discardPendingRecording() {
+        AudioFileService.remove(pendingRecording?.audioURL)
+        pendingRecording = nil
+        // 인식 텍스트를 비워 이전 답변이 새 녹음 화면에 남지 않게 한다.
+        speech.cancel()
+        errorMessage = nil
+        remainingSeconds = Self.maxAnswerSeconds
+        phase = .idle
     }
 
     private func evaluatePendingRecording() async throws {
@@ -293,6 +365,7 @@ final class PracticeViewModel {
 
     func reloadQuestions() async {
         questionSet = nil
+        loadedInitialLevel = nil
         questionIndex = 0
         analyzedResults = [:]
         evaluation = nil
@@ -397,6 +470,7 @@ final class PracticeViewModel {
     private func applyRefreshedQuestionSet(_ updated: QuestionSet) {
         updated.logDebugSummary(mode: "practice")
         questionSet = updated
+        loadedInitialLevel = initialLevel
         questionIndex = 0
         analyzedResults = [:]
         showsRefreshDialog = false

@@ -9,62 +9,44 @@ struct MockResultView: View {
     var isEmbedded = false
     var reset: () -> Void = {}
 
-    @Environment(AppEnvironment.self) private var environment
-    @State private var showsPaywall = false
-
     var body: some View {
-        Group {
-            if isEmbedded {
-                content
-            } else {
-                ScrollView { content.padding(AppSpacing.lg) }
-            }
+        if isEmbedded {
+            content
+        } else {
+            ScrollView { content.padding(AppSpacing.lg) }
         }
-        .sheet(isPresented: $showsPaywall) { PaywallView() }
     }
 
     private var content: some View {
-        let unlock = ResultUnlock(plan: environment.currentPlan)
-        return VStack(spacing: AppSpacing.md) {
-            Text("AI 분석 결과는 실제 시험 점수와 다를 수 있어요.")
-                .font(AppTypography.footnote.weight(.semibold))
-                .foregroundStyle(AppPalette.secondaryInk)
-                .multilineTextAlignment(.center)
-                .cardStyle(alignment: .center)
+        // 순서: 전체 등급 → 시험 총평 → 잘한 패턴 → 약한 패턴 → 다음에 집중할 것.
+        // 잠금 없음: 서버는 모의고사 평가를 플랜과 무관하게 전체로 내려준다
+        // (`ai.py: evaluate_mock`은 depth를 아예 쓰지 않는다). 실제로 받는 내용을
+        // 플랜을 이유로 가리면 그건 잠금이 아니라 거짓말이다.
+        VStack(spacing: AppSpacing.md) {
             LevelResultCard(
                 predicted: evaluation.predictedLevel,
                 target: targetLevel,
-                confidence: evaluation.confidence
+                confidence: evaluation.confidence,
+                isPartial: evaluation.isPartial,
+                quality: evaluation.answerQuality
             )
-            if evaluation.isPartial {
-                ErrorBanner(message: "일부 내용을 준비하지 못했어요. 핵심 결과만 보여드릴게요.")
-            }
-            FeedbackSection(title: "강점", bullets: evaluation.strengths, tint: AppPalette.successSoft)
 
-            if unlock.showsImprovements {
-                FeedbackSection(title: "종합 피드백", text: evaluation.overallFeedback)
-                FeedbackSection(title: "개선할 점", bullets: evaluation.improvements)
-            } else {
-                LockedFeedbackSection(title: "종합 피드백 · 개선할 점", requiredPlan: .basic) { showsPaywall = true }
+            FeedbackSection(title: "시험 총평", text: evaluation.overallFeedback)
+            FeedbackSection(title: "잘한 점", bullets: evaluation.strengths, tint: AppPalette.successSoft)
+            FeedbackSection(title: "개선할 점", bullets: evaluation.improvements)
+
+            if let rubrics = evaluation.rubrics, !rubrics.isEmpty {
+                RubricBandsView(rubrics: rubrics)
             }
 
-            if unlock.showsRubrics {
-                if let rubrics = evaluation.rubrics, !rubrics.isEmpty {
-                    RubricBandsView(rubrics: rubrics)
-                }
-            } else {
-                LockedFeedbackSection(title: "항목별 상세 분석", requiredPlan: .basic) { showsPaywall = true }
-            }
+            FeedbackSection(title: "목표 등급까지", text: evaluation.targetGap)
 
-            if unlock.showsTargetGap {
-                FeedbackSection(title: "목표 등급까지", text: evaluation.targetGap)
-            } else {
-                LockedFeedbackSection(title: "목표 등급까지", requiredPlan: .plus) { showsPaywall = true }
+            if !evaluation.disclaimer.isEmpty {
+                Text(evaluation.disclaimer)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
             }
-
-            Text(evaluation.disclaimer)
-                .font(AppTypography.caption)
-                .foregroundStyle(AppPalette.secondaryInk)
             if showsResetButton {
                 PrimaryButton(title: "완료", systemImage: "checkmark", action: reset)
             }

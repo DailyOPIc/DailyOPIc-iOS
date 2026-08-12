@@ -10,13 +10,11 @@ struct ProgressScreen: View {
     }
     let preferences: AppPreferences
     @Environment(\.modelContext) private var modelContext
-    @Environment(AppEnvironment.self) private var environment
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
     private var practiceRecords: [PracticeHistoryRecord]
     @Query(sort: \MockHistoryRecord.createdAt, order: .reverse)
     private var mockRecords: [MockHistoryRecord]
     @State private var showsDeleteAll = false
-    @State private var showsPaywall = false
     @State private var period: Period = .seven
 
     private var cutoff: Date? {
@@ -53,8 +51,6 @@ struct ProgressScreen: View {
         }
     }
 
-    private var currentPlan: PlanEntitlement { environment.currentPlan }
-
     private var insights: StudyInsights {
         let entries: [(date: Date, level: OPIcLevel, scores: EvaluationScores?)] =
             visiblePractice.map { ($0.createdAt, $0.predictedLevel, $0.evaluation?.scores) }
@@ -65,7 +61,7 @@ struct ProgressScreen: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     Text("통계").font(AppTypography.title)
                     Text("이 기기에 저장된 나의 연습 기록이에요.")
                         .font(AppTypography.callout)
@@ -82,11 +78,7 @@ struct ProgressScreen: View {
                 }
                 if !distribution.isEmpty { distributionView }
 
-                StudyInsightsSection(
-                    plan: currentPlan,
-                    insights: insights,
-                    onUpgrade: { showsPaywall = true }
-                )
+                StudyInsightsSection(insights: insights)
 
                 HStack {
                     Text("최근 기록").font(AppTypography.cardTitle)
@@ -104,9 +96,6 @@ struct ProgressScreen: View {
         }
         .confirmationDialog("모든 기록을 삭제할까요?", isPresented: $showsDeleteAll) {
             Button("전체 삭제", role: .destructive, action: deleteAll)
-        }
-        .sheet(isPresented: $showsPaywall) {
-            PaywallView()
         }
     }
 
@@ -130,7 +119,7 @@ struct ProgressScreen: View {
                 .foregroundStyle(AppPalette.secondaryInk)
             HStack(alignment: .firstTextBaseline, spacing: 2) {
                 Text(value)
-                    .font(.system(size: 30, weight: .bold, design: .rounded))
+                    .font(AppTypography.title)
                     .foregroundStyle(highlight ? AppPalette.primary : AppPalette.ink)
                     .contentTransition(.numericText())
                 if !unit.isEmpty {
@@ -143,7 +132,7 @@ struct ProgressScreen: View {
         .padding(AppSpacing.md)
         .frame(maxWidth: .infinity, minHeight: 96, alignment: .leading)
         .background(highlight ? AppPalette.primarySoft : AppPalette.surface)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 
     private var distributionView: some View {
@@ -186,7 +175,7 @@ struct ProgressScreen: View {
             )
             .frame(minHeight: 220)
         } else {
-            LazyVStack(spacing: 14) {
+            LazyVStack(spacing: AppSpacing.md) {
                 ForEach(rows) { row in
                     switch row.kind {
                     case let .practice(record):
@@ -247,7 +236,7 @@ private struct HistoryRow: View {
     let kind: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 Text(kind)
                     .font(.caption.bold())
@@ -256,8 +245,8 @@ private struct HistoryRow: View {
                 Text(level.rawValue)
                     .font(.subheadline.bold())
                     .foregroundStyle(AppPalette.primary)
-                    .padding(.horizontal, 13)
-                    .padding(.vertical, 6)
+                    .padding(.horizontal, AppSpacing.sm)
+                    .padding(.vertical, AppSpacing.xs)
                     .background(AppPalette.primarySoft)
                     .clipShape(Capsule())
             }

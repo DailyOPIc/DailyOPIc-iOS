@@ -1,0 +1,181 @@
+# iOS Validation
+#
+# ┌───────────────────────────────────────────────────────────────────────────┐
+# │ WHY `xcodebuild test` IS NOT RUN HERE (yet)                               │
+# │                                                                           │
+# │ DailyOPIcTests is a HOSTED unit test bundle: it is embedded at            │
+# │ DailyOPIc.app/PlugIns/DailyOPIcTests.xctest and injected into the app     │
+# │ process. Executing it therefore LAUNCHES DailyOPIc.app, which runs the    │
+# │ normal app startup path — FirebaseApp.configure(), App Check attestation, │
+# │ anonymous Auth sign-in, RevenueCat/AdMob SDK setup — against the REAL     │
+# │ production projects. DailyOPIc is a live service with real users, so CI   │
+# │ must not create anonymous user documents, consume daily quota, burn AI    │
+# │ calls, or generate ad/attestation traffic just to validate a pull         │
+# │ request. DailyOPIcUITests launches the app for the same reason.           │
+# │                                                                           │
+# │ This workflow therefore COMPILES the app and both test bundles and        │
+# │ verifies they are wired up for execution, but never runs them.            │
+# │                                                                           │
+# │ Enabling test execution requires external service isolation first, e.g.   │
+# │ a non-production backend/Firebase target for CI, or moving the pure       │
+# │ model/decoding tests out of the hosted bundle so they can run without     │
+# │ launching the app. Until one of those exists, keep this disabled.         │
+# │ Tracked in docs/IMPLEMENTATION_PLAN.md (P-1b / P5).                       │
+# └───────────────────────────────────────────────────────────────────────────┘
+
+name: iOS Validation
+
+on:
+  pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'graphify-out/**'
+  push:
+    branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'graphify-out/**'
+  workflow_dispatch:
+
+# Supersede an in-flight run when the same ref is pushed again.
+concurrency:
+  group: ios-validation-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Pinned so the compiler does not change underneath us when GitHub rotates
+  # its runner images. Bump both values together, in this block only.
+  # (Local development currently uses Xcode 26.2; matching it here requires the
+  # macos-26 runner image.)
+  XCODE_APP: /Applications/Xcode_16.4.app
+  # Generic destination: builds against the simulator SDK without requiring a
+  # specific simulator model to exist on the runner, and without booting one.
+  DESTINATION: generic/platform=iOS Simulator
+
+jobs:
+  build-for-testing:
+    name: Build for Testing (no test execution)
+    runs-on: macos-15
+    timeout-minutes: 45
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode and report toolchain
+        run: |
+          set -euo pipefail
+          if [ ! -d "$XCODE_APP" ]; then
+            echo "::error::Pinned Xcode not found at $XCODE_APP"
+            echo "Available Xcode installs on this runner:"
+            ls -d /Applications/Xcode*.app || true
+            echo "Update XCODE_APP in .github/workflows/ios-tests.yml to one of the above."
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_APP/Contents/Developer"
+          xcodebuild -version
+          swift --version
+
+      # Guard, not a build step: developer-local overrides must never reach CI.
+      # Config/*.local.xcconfig is gitignored (see Config/Local.xcconfig.template),
+      # so its presence here would mean something leaked into the repository.
+      - name: Verify no developer-local configuration is present
+        run: |
+          set -euo pipefail
+          leaked=$(find Config -name '*.local.xcconfig' 2>/dev/null || true)
+          if [ -n "$leaked" ]; then
+            echo "::error::Developer-local xcconfig committed to the repository:"
+            echo "$leaked"
+            exit 1
+          fi
+          echo "OK: no Config/*.local.xcconfig in the checkout."
+
+      - name: Resolve Swift package dependencies
+        run: |
+          set -euo pipefail
+          # Package.resolved is committed, so versions are pinned by the repo.
+          xcodebuild -resolvePackageDependencies \
+            -project DailyOPIc.xcodeproj \
+            -scheme DailyOPIc
+
+      # Reads build settings only. Does not compile, link, or launch anything.
+      - name: Verify build configuration
+        run: |
+          set -euo pipefail
+          settings=$(xcodebuild -showBuildSettings \
+            -project DailyOPIc.xcodeproj \
+            -scheme DailyOPIc \
+            -configuration Debug \
+            -destination "$DESTINATION" 2>/dev/null)
+
+          base_url=$(printf '%s\n' "$settings" \
+            | awk -F' = ' '$1 ~ /^ +DAILYOPIC_API_BASE_URL$/ {print $2; exit}')
+          # xcconfig escapes the URL scheme as https:/$()/ so that // is not
+          # treated as a comment; undo that to compare against the resolved value.
+          expected=$(awk -F' = ' '/^DAILYOPIC_API_BASE_URL/{gsub(/\$\(\)/,"",$2); print $2; exit}' Config/Debug.xcconfig)
+
+          echo "DAILYOPIC_API_BASE_URL (Debug) = $base_url"
+          if [ "$base_url" != "$expected" ]; then
+            echo "::error::Debug API base URL does not match the tracked Config/Debug.xcconfig value ($expected)."
+            echo "An unexpected override is in effect."
+            exit 1
+          fi
+          echo "OK: build configuration matches the tracked xcconfig."
+
+      - name: Build for testing
+        run: |
+          set -euo pipefail
+          xcodebuild build-for-testing \
+            -project DailyOPIc.xcodeproj \
+            -scheme DailyOPIc \
+            -destination "$DESTINATION" \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            -disableAutomaticPackageResolution \
+            CODE_SIGNING_ALLOWED=NO
+
+      # Static inspection of the generated .xctestrun. Nothing is executed.
+      - name: Verify test bundle discovery
+        run: |
+          set -euo pipefail
+          products="$RUNNER_TEMP/DerivedData/Build/Products"
+          xctestrun=$(find "$products" -maxdepth 1 -name '*.xctestrun' | head -1)
+          if [ -z "$xctestrun" ]; then
+            echo "::error::build-for-testing produced no .xctestrun in $products"
+            exit 1
+          fi
+          echo "xctestrun: $(basename "$xctestrun")"
+
+          plutil -convert json -o "$RUNNER_TEMP/xctestrun.json" "$xctestrun"
+          python3 - "$RUNNER_TEMP/xctestrun.json" <<'PY'
+          import json, sys
+
+          with open(sys.argv[1]) as handle:
+              data = json.load(handle)
+          expected = {"DailyOPIcTests", "DailyOPIcUITests"}
+
+          # Format v1 keys each target at the top level; v2 nests them under
+          # TestConfigurations. Handle both so a future test plan does not
+          # silently turn this check into a no-op.
+          targets = {}
+          for key, value in data.items():
+              if isinstance(value, dict) and "BlueprintName" in value:
+                  targets[value["BlueprintName"]] = value
+          for config in data.get("TestConfigurations", []):
+              for target in config.get("TestTargets", []):
+                  targets[target["BlueprintName"]] = target
+
+          for name in sorted(targets):
+              target = targets[name]
+              kind = "UI" if target.get("IsUITestBundle") else "unit"
+              host = (target.get("TestHostPath") or "").rsplit("/", 1)[-1]
+              print(f"  discovered: {name} ({kind}, host: {host})")
+
+          missing = expected - targets.keys()
+          if missing:
+              print(f"::error::Test bundles missing from the xctestrun: {sorted(missing)}")
+              sys.exit(1)
+
+          print(f"OK: {len(expected)} test bundles built and discoverable (not executed).")
+          PY

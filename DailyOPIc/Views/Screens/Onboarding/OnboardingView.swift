@@ -103,6 +103,7 @@ struct OnboardingView: View {
             }
             .font(.headline)
             .foregroundStyle(AppPalette.primary)
+            .minimumTouchTarget()
             Spacer()
         }
         .padding(AppSpacing.lg)
@@ -112,8 +113,21 @@ struct OnboardingView: View {
         ScrollView {
             VStack(spacing: AppSpacing.md) {
                 HStack {
+                    // 난이도 재선택은 메인 탭 위에 덮인 임시 화면이므로 빠져나갈
+                    // 길이 있어야 한다. 첫 실행 온보딩에는 돌아갈 곳이 없어 숨긴다.
+                    if preferences.isPresentingLevelSelection {
+                        Button("닫기") { returnToHome() }
+                            .font(.headline)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                            .minimumTouchTarget()
+                            .disabled(isSubmitting)
+                    }
                     Spacer()
-                    GuideEntryButton(preferences: preferences)
+                    // 도움말은 온보딩 안에서는 자기 단계로 연다. 재선택 화면이
+                    // 이미 덮여 있는 상태에서 또 다른 화면을 띄우지 않기 위해서다.
+                    GuideEntryButton {
+                        withAnimation(.easeInOut(duration: 0.25)) { step = .guide }
+                    }
                 }
                 Text(preferences.initialLevel == nil ? "시작 난이도를 골라주세요" : "난이도를 바꿔볼까요?")
                     .font(AppTypography.title)
@@ -186,11 +200,11 @@ struct OnboardingView: View {
                 selectedLevel = level
             }
         } label: {
-            HStack(alignment: .top, spacing: 14) {
+            HStack(alignment: .top, spacing: AppSpacing.md) {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title2)
                     .foregroundStyle(AppPalette.primary)
-                VStack(alignment: .leading, spacing: 6) {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     HStack {
                         Text(level.title).font(.title3.bold())
                         Spacer()
@@ -213,13 +227,13 @@ struct OnboardingView: View {
             .padding(AppSpacing.md)
             .background(isSelected ? AppPalette.primarySoft : AppPalette.surface)
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                     .stroke(
                         AppPalette.primary.opacity(isSelected ? 0.75 : 0.18),
                         lineWidth: isSelected ? 1.8 : 1
                     )
             }
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isSubmitting)
@@ -357,16 +371,16 @@ private struct ProgressBanner: View {
     let message: String
 
     var body: some View {
-        HStack(alignment: .center, spacing: 12) {
+        HStack(alignment: .center, spacing: AppSpacing.sm) {
             AppLoadingIndicator(dotSize: 8)
             Text(message)
                 .font(.footnote.weight(.semibold))
                 .foregroundStyle(AppPalette.primary)
                 .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(14)
+        .padding(AppSpacing.md)
         .background(AppPalette.primarySoft.opacity(0.72))
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
     }
 }
 
@@ -378,6 +392,11 @@ private struct TargetLevelConfirmationDialog: View {
     let confirm: () -> Void
     let cancel: () -> Void
 
+    /// 배경 탭과 이스케이프 제스처가 공유하는 단일 취소 경로. 제출 중에는 닫지 않는다.
+    private func dismiss() {
+        if !isSubmitting { cancel() }
+    }
+
     /// 유료 플랜은 광고 없이 하루 1회 무료 변경, 무료 플랜은 광고 시청 변경.
     private var paidChange: Bool { requiresReward && isPaidPlan }
     private var adChange: Bool { requiresReward && !isPaidPlan }
@@ -386,9 +405,7 @@ private struct TargetLevelConfirmationDialog: View {
         ZStack {
             Color.black.opacity(0.32)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    if !isSubmitting { cancel() }
-                }
+                .onTapGesture(perform: dismiss)
 
             VStack(spacing: AppSpacing.md) {
                 Image(systemName: adChange ? "play.rectangle.fill" : "checkmark.seal.fill")
@@ -417,17 +434,20 @@ private struct TargetLevelConfirmationDialog: View {
                 Button("다시 고르기") { cancel() }
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .minimumTouchTarget()
                     .disabled(isSubmitting)
             }
             .padding(AppSpacing.lg)
             .frame(maxWidth: 340)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
             .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, dismiss)
         }
         .transition(.opacity)
     }

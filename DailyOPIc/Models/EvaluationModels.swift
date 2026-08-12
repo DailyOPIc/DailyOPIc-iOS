@@ -3,11 +3,13 @@ import Foundation
 enum ConfidenceBand: String, Codable, Sendable {
     case low, medium, high
 
-    var label: String {
+    /// confidence는 서버가 계산한 값이 아니라 AI의 자기 보고다(docs/DESIGN_DECISIONS.md T4:
+    /// 평가 프롬프트에 confidence 판단 기준이 한 줄도 없다). 그래서 "신뢰도 높음"처럼
+    /// 확신을 광고하지 않는다. AI가 스스로 불확실하다고 한 경우만 사용자에게 알린다.
+    var cautionMessage: String? {
         switch self {
-        case .low: "낮음"
-        case .medium: "보통"
-        case .high: "높음"
+        case .low: "AI가 이 답변만으로는 판단이 어렵다고 했어요. 예상 등급은 참고로만 봐주세요."
+        case .medium, .high: nil
         }
     }
 }
@@ -35,6 +37,31 @@ struct AudioMetrics: Codable, Sendable {
     let speakingSeconds: Double
     let silenceRatio: Double
     let wordsPerMinute: Double
+    /// 서버가 실제로 오디오를 측정했는지(false) 전사 길이로 추정했는지(true).
+    /// 구버전 서버 응답에는 없으므로 옵셔널.
+    let isEstimated: Bool?
+}
+
+/// 등급을 얼마나 믿을 수 있는지에 대한 **서버 판정**. 판정 기준은 백엔드
+/// `app/services/answer_quality.py` 한 곳에만 있고, 앱은 렌더링만 한다.
+/// 클라이언트가 자체 임계값을 만들면 앱 버전마다 결과가 갈린다.
+enum AnswerQuality: String, Codable, Sendable {
+    case gradable
+    case lowEvidence = "low_evidence"
+    case insufficient
+
+    /// 등급을 숫자/글자로 단언해도 되는가.
+    var showsGrade: Bool { self != .insufficient }
+
+    var cautionMessage: String? {
+        switch self {
+        case .gradable: nil
+        case .lowEvidence: "이 답변만으로는 근거가 충분하지 않아요. 예상 등급은 참고로만 봐주세요."
+        // 분석이 끝난 문항은 다시 녹음할 수 없다(결과 화면에 재녹음 경로가 없고,
+        // 모의고사는 문항이 지나간다). 없는 동작을 안내하지 않는다.
+        case .insufficient: "답변에서 영어 문장을 찾지 못했어요. 다음 답변은 영어로 조금 더 길게 말해 주세요."
+        }
+    }
 }
 
 enum RubricBand: String, Codable, Sendable {
@@ -44,13 +71,40 @@ enum RubricBand: String, Codable, Sendable {
     case strong
     case advanced
 
+    /// 서버 밴드 5단계를 그대로 1:1로 옮긴 정성 표현. 숫자 점수(20/40/60/80/95)는
+    /// 밴드를 되돌린 값일 뿐이라 화면에 쓰지 않는다(docs/DESIGN_DECISIONS.md T4).
     var label: String {
         switch self {
-        case .foundation: "기초"
-        case .developing: "발전 중"
-        case .functional: "무난함"
-        case .strong: "우수함"
-        case .advanced: "탁월함"
+        case .foundation: "집중 필요"
+        case .developing: "개선 필요"
+        case .functional: "보통"
+        case .strong: "좋음"
+        case .advanced: "매우 좋음"
+        }
+    }
+
+    /// 밴드 순서(약함 → 강함). 5단계 표시와 정렬에 쓴다.
+    static let ordered: [RubricBand] = [.foundation, .developing, .functional, .strong, .advanced]
+
+    var step: Int { Self.ordered.firstIndex(of: self) ?? 0 }
+
+    /// 서버가 밴드를 되돌려 만든 0~100 점수(20/40/60/80/95)를 다시 밴드로 되돌린다.
+    /// 그 사이 값은 여러 회차를 평균 내며 생긴 것이라 "68점" 같은 정밀도는 가짜다.
+    static func nearest(toScore score: Int) -> RubricBand {
+        let table: [(band: RubricBand, score: Int)] = [
+            (.foundation, 20), (.developing, 40), (.functional, 60), (.strong, 80), (.advanced, 95),
+        ]
+        return table.min { abs($0.score - score) < abs($1.score - score) }?.band ?? .functional
+    }
+
+    /// 색만으로 등급을 구분하지 않도록 밴드마다 다른 기호를 함께 쓴다.
+    var icon: String {
+        switch self {
+        case .foundation: "exclamationmark.circle.fill"
+        case .developing: "arrow.up.circle.fill"
+        case .functional: "equal.circle.fill"
+        case .strong: "hand.thumbsup.fill"
+        case .advanced: "star.fill"
         }
     }
 }
@@ -99,6 +153,7 @@ struct PracticeEvaluation: Codable, Sendable {
     let rubrics: [RubricAssessment]?
     let warnings: [String]?
     let scoreScaleVersion: String?
+    let answerQuality: AnswerQuality?
 
     var isPartial: Bool { resultStatus == "partial" }
 }
@@ -119,6 +174,8 @@ struct MockEvaluation: Codable, Sendable {
     let improvements: [String]
     let targetGap: String
     let overallFeedback: String
+    /// 서버 프롬프트가 문항별 피드백을 금지하고 있어 항상 비어 있다.
+    /// 계약 호환을 위해 디코딩만 하고 화면에는 쓰지 않는다.
     let perQuestion: [PerQuestionFeedback]
     let disclaimer: String
     let modelVersion: String
@@ -127,6 +184,7 @@ struct MockEvaluation: Codable, Sendable {
     let rubrics: [RubricAssessment]?
     let warnings: [String]?
     let scoreScaleVersion: String?
+    let answerQuality: AnswerQuality?
 
     var isPartial: Bool { resultStatus == "partial" }
 }
@@ -270,15 +328,12 @@ struct Capabilities: Codable, Sendable {
         let mockSessionsPerDay: Int
         let mockRewardGates: Int
         // 플랜별 기능 게이트(신규 필드는 구 서버 호환을 위해 옵셔널).
+        // 등급 추이·취약 유형·주간 리포트는 전 플랜 무료라 게이트 자체가 없다.
         let practiceDaily: Int?
         let practiceAdBonus: Int?
         let historyDays: Int?
         let analysisDepth: String?
-        let gradeTrend: String?
-        let weaknessAnalysis: String?
         let reviewSet: Bool?
-        let weeklyReport: Bool?
-        let mockComparison: String?
         let adsEnabled: Bool?
     }
 

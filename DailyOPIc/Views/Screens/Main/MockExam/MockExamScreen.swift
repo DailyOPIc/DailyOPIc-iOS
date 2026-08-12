@@ -45,7 +45,7 @@ struct MockExamScreen: View {
             }
         }
         .toolbar {
-            if canResetExam {
+            if viewModel.canAbandon {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button("모의고사 포기") {
                         showsResetConfirmation = true
@@ -54,19 +54,21 @@ struct MockExamScreen: View {
             }
         }
         .overlay {
-            if viewModel.operationState.isRunning {
-                AILoadingOverlay(
-                    kind: viewModel.operationKind,
-                    blocksInteraction: true,
-                    canContinueInBackground: true
-                )
-            } else if showsResetConfirmation {
+            // 포기 확인은 로딩 오버레이보다 먼저 그린다. 뒤에 두면 진행 중인
+            // 작업이 끝날 때까지 포기 버튼이 아무 반응도 없는 것처럼 보인다.
+            if showsResetConfirmation {
                 ResetMockExamDialog(
                     cancel: { showsResetConfirmation = false },
                     confirm: {
                         showsResetConfirmation = false
                         viewModel.resetExam()
                     }
+                )
+            } else if viewModel.operationState.isRunning {
+                AILoadingOverlay(
+                    kind: viewModel.operationKind,
+                    blocksInteraction: true,
+                    canContinueInBackground: true
                 )
             } else if showsSavedSurveyDialog {
                 SavedSurveyDialog(
@@ -117,21 +119,16 @@ struct MockExamScreen: View {
         .padding(AppSpacing.lg)
         .frame(maxWidth: .infinity)
         .background(AppPalette.primarySoft.opacity(0.5))
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
-    }
-
-    private var canResetExam: Bool {
-        viewModel.phase != .completed
-            && (viewModel.questionSet != nil || !viewModel.answers.isEmpty)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 
     private var introduction: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 Image(systemName: "list.number")
                     .font(.system(size: 54, weight: .bold))
                     .foregroundStyle(AppPalette.primary)
-                    .padding(.top, 36)
+                    .padding(.top, AppSpacing.xl)
                 Text("실전처럼 15문항에 답해보세요")
                     .font(AppTypography.title)
                     .multilineTextAlignment(.center)
@@ -178,14 +175,14 @@ struct MockExamScreen: View {
                 }
                 BannerAdView().frame(height: 50)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 
     private var survey: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: 20) {
-                VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                VStack(alignment: .leading, spacing: AppSpacing.sm) {
                     Text("나에 대해 알려주세요")
                         .font(AppTypography.title)
                     Text("관심사를 바탕으로 질문을 만들어요. 상태와 거주 형태를 고르고, 관심 주제를 3개 이상 선택해 주세요.")
@@ -243,7 +240,7 @@ struct MockExamScreen: View {
                 )
                 Text("선택한 관심 주제 \(viewModel.surveyDraft.selectedTopicCount)개")
                     .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(viewModel.surveyDraft.isValid ? AppPalette.primary : AppPalette.danger)
+                    .foregroundStyle(viewModel.surveyDraft.isValid ? AppPalette.primary : AppPalette.dangerInk)
                 PrimaryButton(
                     title: "15문항 시작",
                     systemImage: "play.fill",
@@ -252,13 +249,13 @@ struct MockExamScreen: View {
                     Task { await viewModel.startNewExam(survey: viewModel.surveyDraft) }
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 
     private var answering: some View {
         ScrollView {
-            VStack(spacing: 22) {
+            VStack(spacing: AppSpacing.lg) {
                 MockProgressHeader(currentQuestion: viewModel.currentIndex + 1)
                 if let question = viewModel.currentQuestion {
                     QuestionCard(question: question, showsNumber: true, showsRubricFocus: false)
@@ -271,23 +268,36 @@ struct MockExamScreen: View {
                     }
                 }
                 if let message = viewModel.errorMessage { ErrorBanner(message: message) }
-                RecordingButton(isRecording: speech.isListening, isDisabled: false) {
-                    Task { await viewModel.toggleRecording() }
+                // 녹음을 멈추면 검토 상태로만 넘어간다. 제출해야 다음 문항으로 간다.
+                if let pending = viewModel.pendingAnswer {
+                    TranscriptReviewPanel(
+                        transcript: pending.transcript,
+                        submitTitle: "답변 제출",
+                        submitIcon: "paperplane.fill",
+                        isSubmitting: false,
+                        submit: { viewModel.submitPendingAnswer() },
+                        reRecord: { viewModel.discardPendingAnswer() }
+                    )
+                } else {
+                    RecordingButton(isRecording: speech.isListening, isDisabled: false) {
+                        Task { await viewModel.toggleRecording() }
+                    }
+                    Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
+                        .font(.title3.bold())
+                    Text("남은 시간 \(viewModel.remainingSeconds)초")
+                        .font(.headline.monospacedDigit())
+                        .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.dangerInk : AppPalette.secondaryInk)
+                        .accessibilityLabel("남은 시간 \(viewModel.remainingSeconds)초")
+                    Text(speech.transcript.isEmpty ? "답변을 마치면 확인하고 제출해요." : speech.transcript)
+                        .font(AppTypography.body)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .multilineTextAlignment(.center)
+                    Text("제출한 문항은 다시 답할 수 없어요.")
+                        .font(AppTypography.caption)
+                        .foregroundStyle(AppPalette.secondaryInk)
                 }
-                Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
-                    .font(.title3.bold())
-                Text("남은 시간 \(viewModel.remainingSeconds)초")
-                    .font(.headline.monospacedDigit())
-                    .foregroundStyle(viewModel.remainingSeconds <= 20 ? AppPalette.danger : AppPalette.secondaryInk)
-                Text(speech.transcript.isEmpty ? "답변을 마치면 다음 문항으로 넘어가요." : speech.transcript)
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                    .multilineTextAlignment(.center)
-                Text("한 번 답한 문항은 다시 답할 수 없어요.")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(AppPalette.secondaryInk)
             }
-            .padding(20)
+            .padding(AppSpacing.lg)
         }
         .interactiveDismissDisabled(speech.isListening)
     }
@@ -302,17 +312,17 @@ struct MockExamScreen: View {
             if let message = viewModel.errorMessage {
                 VStack {
                     ErrorBanner(message: message)
-                        .padding(.horizontal, 24)
+                        .padding(.horizontal, AppSpacing.lg)
                     Spacer()
                 }
-                .padding(.top, 24)
+                .padding(.top, AppSpacing.lg)
             }
         }
     }
 
     private var rewardGate: some View {
         ScrollView {
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 Image(systemName: "checkmark.seal.fill")
                     .font(.system(size: 64))
                     .foregroundStyle(AppPalette.primary)
@@ -343,9 +353,10 @@ struct MockExamScreen: View {
                     }
                 }
                 Button("모의고사 그만두기") { viewModel.resetExam() }
-                    .foregroundStyle(AppPalette.danger)
+                    .foregroundStyle(AppPalette.dangerInk)
+                    .minimumTouchTarget()
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
     }
 }
@@ -356,7 +367,7 @@ private struct SingleChoiceSection: View {
     @Binding var selection: String
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text(title)
                 .font(.headline)
             FlexibleChips(options: options, selection: selection) { option in
@@ -373,7 +384,7 @@ private struct MultiChoiceSection: View {
     @Binding var selection: [String]
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             HStack {
                 Text(title)
                     .font(.headline)
@@ -403,7 +414,7 @@ private struct MockProgressHeader: View {
     private let totalQuestions = 15
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 Text("\(currentQuestion) / \(totalQuestions)")
                     .font(.headline)
@@ -454,11 +465,11 @@ private struct SavedSurveyDialog: View {
             Color.black.opacity(0.34)
                 .ignoresSafeArea()
                 .onTapGesture(perform: cancel)
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "list.clipboard.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                VStack(spacing: 8) {
+                VStack(spacing: AppSpacing.sm) {
                     Text("저장된 설문으로 시작할까요?")
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
@@ -472,19 +483,23 @@ private struct SavedSurveyDialog: View {
                 Button("설문 수정", action: edit)
                     .font(.headline)
                     .foregroundStyle(AppPalette.primary)
+                    .minimumTouchTarget()
                 Button("취소", action: cancel)
                     .font(.headline)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .minimumTouchTarget()
             }
-            .padding(22)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 360)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, cancel)
         }
         .transition(.opacity)
     }
@@ -499,41 +514,45 @@ private struct ResetMockExamDialog: View {
             Color.black.opacity(0.34)
                 .ignoresSafeArea()
                 .onTapGesture(perform: cancel)
-            VStack(spacing: 18) {
-                VStack(spacing: 8) {
-                    Text("오늘 모의고사를 그만둘까요?")
+            VStack(spacing: AppSpacing.md) {
+                VStack(spacing: AppSpacing.sm) {
+                    Text("지금 진행한 모의고사를 그만둘까요?")
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
-                    Text("지금까지 녹음한 답변이 사라지고, 오늘 모의고사는 다시 시작할 수 없어요.")
+                    // 포기한 회차는 응시 한도를 소진하지 않는다. 다시 시작할 수 없다고
+                    // 안내하면 사실과 다르다.
+                    Text("지금까지 녹음한 답변은 사라져요. 새 모의고사는 다시 시작할 수 있어요.")
                         .font(AppTypography.body)
                         .foregroundStyle(AppPalette.secondaryInk)
                         .multilineTextAlignment(.center)
                         .fixedSize(horizontal: false, vertical: true)
                 }
-                HStack(spacing: 12) {
+                HStack(spacing: AppSpacing.sm) {
                     Button("계속하기", action: cancel)
                         .font(.headline)
                         .foregroundStyle(AppPalette.ink)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(Color(.secondarySystemBackground))
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                     Button("그만두기", role: .destructive) {
                         confirm()
                     }
                         .font(.headline)
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppPalette.actionOnDanger)
                         .frame(maxWidth: .infinity)
                         .frame(height: 48)
                         .background(AppPalette.danger)
-                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+                        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 }
             }
-            .padding(22)
+            .padding(AppSpacing.lg)
             .background(AppPalette.elevatedSurface)
-            .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .shadow(color: .black.opacity(0.18), radius: 18, y: 10)
-            .padding(.horizontal, 26)
+            .padding(.horizontal, AppSpacing.lg)
+            // 배경 탭·"계속하기"와 같은 취소 경로. 파괴적 동작(그만두기)은 이스케이프로 실행되지 않는다.
+            .accessibilityAction(.escape, cancel)
         }
     }
 }
@@ -551,7 +570,7 @@ private struct FlexibleChips<Selection: Equatable>: View {
                 } label: {
                     Text(option.label)
                         .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(isSelected(option) ? .white : AppPalette.primary)
+                        .foregroundStyle(isSelected(option) ? AppPalette.actionOnPrimary : AppPalette.primary)
                         .padding(.horizontal, 12)
                         .padding(.vertical, 8)
                         .background(isSelected(option) ? AppPalette.primary : AppPalette.primarySoft)
@@ -562,6 +581,8 @@ private struct FlexibleChips<Selection: Equatable>: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .minimumTouchTarget()
+                .accessibilityAddTraits(isSelected(option) ? .isSelected : [])
             }
         }
     }

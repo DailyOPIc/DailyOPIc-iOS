@@ -17,7 +17,7 @@ struct AnswerPanel: View {
                 Text(isRecording ? "영어로 답변해 주세요." : "녹음을 시작하면 답변이 여기에 표시돼요.")
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
-                LazyVStack(alignment: .leading, spacing: 8) {
+                LazyVStack(alignment: .leading, spacing: AppSpacing.sm) {
                     if !finalText.isEmpty { Text(finalText) }
                     if !partialText.isEmpty {
                         Text(partialText)

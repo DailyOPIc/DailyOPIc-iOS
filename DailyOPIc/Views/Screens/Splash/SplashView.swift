@@ -2,6 +2,9 @@ import SwiftUI
 
 struct SplashView: View {
     @State private var pulse = false
+    /// Wordmark sits above every text style, so it scales via UIFontMetrics
+    /// rather than snapping down to .largeTitle.
+    @ScaledMetric(relativeTo: .largeTitle) private var wordmarkSize: CGFloat = 40
 
     var body: some View {
         ZStack {
@@ -12,18 +15,18 @@ struct SplashView: View {
             )
             .ignoresSafeArea()
 
-            VStack(spacing: 24) {
+            VStack(spacing: AppSpacing.lg) {
                 ZStack {
                     Circle()
                         .fill(AppPalette.primary)
                         .frame(width: 92, height: 92)
                     Image(systemName: "mic.fill")
                         .font(.system(size: 38, weight: .semibold))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppPalette.actionOnPrimary)
                 }
                 .scaleEffect(pulse ? 1.04 : 0.96)
                 Text("DailyOPIc")
-                    .font(.system(size: 40, weight: .bold, design: .rounded))
+                    .font(.system(size: wordmarkSize, weight: .bold, design: .rounded))
                     .foregroundStyle(AppPalette.primary)
                 ProgressView()
                     .tint(AppPalette.primary)

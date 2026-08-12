@@ -19,6 +19,17 @@ final class AppEnvironment {
     var launchState: LaunchState = .launching
     var capabilities: Capabilities?
 
+    /// 진행 중인 학습 세션은 루트 뷰 계층보다 오래 살아야 한다(DESIGN.md §5.1 R2).
+    /// 가이드·목표등급 재선택은 AppRootView의 분기를 바꿔 MainTabView를 통째로
+    /// 걷어내므로, ViewModel을 MainTabView의 @State가 아니라 여기서 소유한다.
+    ///
+    /// lazy인 이유: 두 ViewModel은 SpeechRecognitionService(AVAudioEngine,
+    /// 오디오 세션 인터럽션 옵저버)와 PromptPlaybackService를 함께 만든다.
+    /// 지금처럼 탭에 처음 도달할 때 만들어야 온보딩만 하고 나가는 사용자에게
+    /// 불필요한 오디오 자원을 잡지 않는다. 생성 시점은 그대로 두고 수명만 늘린다.
+    @ObservationIgnored private(set) lazy var practiceViewModel = PracticeViewModel(environment: self)
+    @ObservationIgnored private(set) lazy var mockViewModel = MockExamViewModel(environment: self)
+
     /// 현재 유효 플랜.
     /// RevenueCat(StoreService)가 설정돼 있으면 Apple의 실제 활성 엔타이틀먼트를
     /// 그대로 따른다(업그레이드·다운그레이드·해지·만료가 즉시 반영). 미설정 시에만

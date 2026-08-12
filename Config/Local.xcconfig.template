@@ -1,0 +1,68 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// DailyOPIc — 개발자 로컬 오버라이드 템플릿
+//
+// 사용법:
+//   cp Config/Local.xcconfig.template Config/Debug.local.xcconfig
+//   필요한 줄만 주석 해제해서 값을 채운다.
+//
+// 동작:
+//   Config/Debug.xcconfig 끝에 `#include? "Debug.local.xcconfig"` 가 있다.
+//   파일이 없으면 조용히 무시되고, 있으면 여기 값이 Debug 빌드의 최종값이 된다.
+//   Release 빌드는 이 파일을 include 하지 않는다. 프로덕션 설정은 영향받지 않는다.
+//
+// 규칙:
+//   - Config/Debug.local.xcconfig 는 커밋하지 않는다 (.gitignore 가 이미 제외).
+//   - 이 템플릿에는 실제 키·토큰·시크릿을 넣지 않는다. 자리표시자만 둔다.
+//   - 이 템플릿은 커밋 대상이다. 값이 아니라 "무엇을 바꿀 수 있는지"만 담는다.
+// ─────────────────────────────────────────────────────────────────────────────
+
+
+// ── 백엔드 base URL ──────────────────────────────────────────────────────────
+//
+// ⚠️ DailyOPIc 는 실사용자가 있는 라이브 서비스다.
+//    Debug 기본값은 프로덕션 Cloud Run(dailyopic-api-…run.app)을 가리킨다.
+//    시뮬레이터로 기능을 반복 검증하면 프로덕션 익명 사용자 문서·일일 쿼터·
+//    AI 호출·리워드 카운트가 실제로 소모된다.
+//    → 개발 중에는 로컬 FastAPI 로 돌려두는 것을 기본으로 한다.
+//
+// xcconfig 는 // 를 주석으로 보므로 스킴 뒤에 $() 를 넣어 이스케이프한다.
+//   http:/$()/  → http://
+//   https:/$()/ → https://
+//
+// 시뮬레이터에서 Mac 로컬 서버로: localhost 또는 127.0.0.1
+// 실기기에서 Mac 로컬 서버로: Mac 의 LAN IP (아래 DEBUG_SERVER_HOST 와 맞출 것)
+//
+// DAILYOPIC_API_BASE_URL = http:/$()/localhost:8000
+
+
+// ── 로컬 서버 호스트/포트 ────────────────────────────────────────────────────
+//
+// AdMob 리워드 SSV 콜백은 공개 HTTPS 로 도달해야 한다. 리워드 광고까지
+// 로컬에서 끝까지 검증하려면 공개 HTTPS 터널 주소를 여기에 넣는다.
+//
+// DAILYOPIC_DEBUG_SERVER_HOST = 127.0.0.1
+// DAILYOPIC_DEBUG_SERVER_PORT = 8000
+
+
+// ── AdMob 테스트 광고 단위 ───────────────────────────────────────────────────
+//
+// Debug 기본값은 프로덕션 광고 단위다. 개발 중 노출·클릭은 계정 리스크가 되므로
+// Google 공식 테스트 단위로 덮어쓰는 것을 권장한다.
+// 참고: https:/$()/developers.google.com/admob/ios/test-ads
+//
+// GAD_BANNER_AD_UNIT_ID = ca-app-pub-3940256099942544/2934735716
+// GAD_REWARDED_AD_UNIT_ID = ca-app-pub-3940256099942544/1712485313
+//
+// 실기기 테스트 기기 ID (콘솔 로그의 GADMobileAds 출력에서 확인).
+// GAD_TEST_DEVICE_IDS =
+
+
+// ── 넣지 말 것 ───────────────────────────────────────────────────────────────
+//
+// 이 파일과 Debug.local.xcconfig 에 아래를 넣지 않는다:
+//   - OpenAI API 키 등 서버 전용 시크릿 (백엔드 .env 소관)
+//   - RevenueCat secret API key (public SDK key 만 앱에 들어간다)
+//   - Firebase App Check 디버그 토큰
+//       → 스킴 환경변수 FIRAAppCheckDebugToken 로 세션 한정 주입한다.
+//         xcconfig 에 넣으면 빌드 산출물에 남는다.
+//   - 서명 인증서·프로비저닝 프로파일 관련 값

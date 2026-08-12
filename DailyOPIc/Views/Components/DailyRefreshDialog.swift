@@ -10,19 +10,22 @@ struct DailyRefreshDialog: View {
 
     @State private var showsDifficulty = false
 
+    /// 배경 탭과 이스케이프 제스처가 공유하는 단일 취소 경로. 로딩 중에는 닫지 않는다.
+    private func dismiss() {
+        if !isLoading { cancel() }
+    }
+
     var body: some View {
         ZStack {
             Color.black.opacity(0.34)
                 .ignoresSafeArea()
-                .onTapGesture {
-                    if !isLoading { cancel() }
-                }
+                .onTapGesture(perform: dismiss)
 
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "sparkles.rectangle.stack.fill")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
-                VStack(spacing: 8) {
+                VStack(spacing: AppSpacing.sm) {
                     Text(showsDifficulty ? "난이도 재설정" : "새 문제 받기")
                         .font(.title3.bold())
                         .foregroundStyle(AppPalette.ink)
@@ -34,16 +37,16 @@ struct DailyRefreshDialog: View {
                 }
 
                 if let progressMessage {
-                    HStack(spacing: 10) {
+                    HStack(spacing: AppSpacing.sm) {
                         AppLoadingIndicator(dotSize: 7)
                         Text(progressMessage)
                             .font(.footnote.weight(.semibold))
                             .foregroundStyle(AppPalette.primary)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(12)
+                    .padding(AppSpacing.md)
                     .background(AppPalette.primarySoft.opacity(0.7))
-                    .clipShape(RoundedRectangle(cornerRadius: 12, style: .continuous))
+                    .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                 }
 
                 if showsDifficulty {
@@ -73,17 +76,20 @@ struct DailyRefreshDialog: View {
                 }
                 .font(.headline)
                 .foregroundStyle(AppPalette.secondaryInk)
+                .minimumTouchTarget()
                 .disabled(isLoading)
             }
-            .padding(22)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 360)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: 24, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: 24, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.35), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
+            // 배경 탭과 같은 취소 경로를 VoiceOver 이스케이프 제스처에도 열어준다.
+            .accessibilityAction(.escape, dismiss)
         }
         .transition(.opacity)
     }
@@ -95,11 +101,11 @@ struct DailyRefreshDialog: View {
         action: @escaping () -> Void
     ) -> some View {
         Button(action: action) {
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.sm) {
                 Image(systemName: icon)
                     .font(.headline)
                     .frame(width: 28)
-                VStack(alignment: .leading, spacing: 4) {
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     Text(title).font(.headline)
                     Text(subtitle)
                         .font(.footnote)
@@ -108,9 +114,9 @@ struct DailyRefreshDialog: View {
                 Spacer()
             }
             .foregroundStyle(AppPalette.ink)
-            .padding(14)
+            .padding(AppSpacing.md)
             .background(Color(.secondarySystemBackground))
-            .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         }
         .buttonStyle(.plain)
         .disabled(isLoading)

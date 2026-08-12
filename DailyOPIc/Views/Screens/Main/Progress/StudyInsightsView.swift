@@ -1,12 +1,10 @@
 import SwiftUI
 
-/// 통계 탭의 플랜별 스마트 인사이트 묶음.
-/// 예상 등급 추이 / 취약 유형 분석 / 주간 리포트 — 모두 로컬 기록으로 계산(신규 AI 없음).
-/// 플랜 미충족 항목은 잠금 카드로 표시하고 탭하면 페이월을 연다.
+/// 통계 탭의 스마트 인사이트 묶음.
+/// 예상 등급 추이 / 취약 유형 분석 / 주간 리포트 — 모두 로컬 기록으로 계산(신규 AI 없음)하고
+/// 전 플랜 무료다. 그래서 플랜도 잠금도 받지 않는다.
 struct StudyInsightsSection: View {
-    let plan: PlanEntitlement
     let insights: StudyInsights
-    let onUpgrade: () -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.lg) {
@@ -20,8 +18,7 @@ struct StudyInsightsSection: View {
 
     @ViewBuilder
     private var gradeTrendCard: some View {
-        // 전 플랜 공개: 전체 추이 표시.
-        InsightCard(title: "예상 등급 추이", locked: false) {
+        InsightCard(title: "예상 등급 추이") {
             if insights.trend.count < 2 {
                 Text("기록이 2개 이상 쌓이면 추이가 표시돼요.")
                     .font(AppTypography.footnote)
@@ -37,11 +34,11 @@ struct StudyInsightsSection: View {
 
     @ViewBuilder
     private var weaknessCard: some View {
-        // 전 플랜 공개: 5차원 전체를 약한 순으로 표시.
-        InsightCard(title: "취약 유형 분석", locked: false) {
-            if let averages = insights.dimensionAverages, !averages.isEmpty {
-                ForEach(averages.sorted { $0.score < $1.score }, id: \.name) { item in
-                    DimensionBar(name: item.name, score: item.score, highlight: false)
+        // 5영역을 약한 순으로. 점수가 아니라 밴드로 말한다.
+        InsightCard(title: "취약 유형 분석") {
+            if let dimensions = insights.dimensions, !dimensions.isEmpty {
+                ForEach(dimensions, id: \.name) { item in
+                    DimensionRow(name: item.name, band: item.band)
                 }
             } else {
                 Text("연습 기록이 쌓이면 영역별 분석이 표시돼요.")
@@ -51,12 +48,11 @@ struct StudyInsightsSection: View {
         }
     }
 
-    // MARK: 주간 리포트(Pro)
+    // MARK: 주간 리포트
 
     @ViewBuilder
     private var weeklyReportCard: some View {
-        // 전 플랜 공개.
-        InsightCard(title: "주간 리포트", locked: false) {
+        InsightCard(title: "주간 리포트") {
             if let report = insights.weeklyReport {
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
                     reportRow("이번 주 응시", "\(report.attempts)회")
@@ -86,58 +82,45 @@ struct StudyInsightsSection: View {
 
 private struct InsightCard<Content: View>: View {
     let title: String
-    var locked: Bool = false
-    var onUpgrade: (() -> Void)? = nil
     @ViewBuilder let content: Content
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            HStack {
-                Text(title).font(AppTypography.cardTitle).foregroundStyle(AppPalette.ink)
-                if locked {
-                    Image(systemName: "lock.fill")
-                        .font(.footnote)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                }
-                Spacer()
-                if locked {
-                    Button("업그레이드") { onUpgrade?() }
-                        .font(AppTypography.caption)
-                        .foregroundStyle(AppPalette.primary)
-                }
-            }
+            Text(title).font(AppTypography.cardTitle).foregroundStyle(AppPalette.ink)
             content
         }
         .cardStyle()
-        .contentShape(Rectangle())
-        .onTapGesture { if locked { onUpgrade?() } }
     }
 }
 
-private struct DimensionBar: View {
+/// 영역별 수준. 서버 밴드는 5단계뿐이라 5칸 표시 + 문구로 말한다.
+/// 예전의 0~100 막대는 밴드를 되돌린 값(20/40/60/80/95)의 평균이라
+/// "63점" 같은 정밀도가 근거 없이 만들어지고 있었다.
+private struct DimensionRow: View {
     let name: String
-    let score: Int
-    let highlight: Bool
+    let band: RubricBand
 
     var body: some View {
         HStack(spacing: AppSpacing.sm) {
             Text(name)
                 .font(.subheadline.weight(.medium))
                 .frame(width: 72, alignment: .leading)
-            GeometryReader { proxy in
-                ZStack(alignment: .leading) {
-                    Capsule().fill(Color(.tertiarySystemFill))
+            HStack(spacing: 3) {
+                ForEach(0..<RubricBand.ordered.count, id: \.self) { index in
                     Capsule()
-                        .fill(highlight ? AppPalette.danger : AppPalette.primary)
-                        .frame(width: max(8, proxy.size.width * CGFloat(Double(score) / 100.0)))
+                        .fill(index <= band.step ? AppPalette.primary : Color(.tertiarySystemFill))
+                        .frame(height: 8)
                 }
             }
-            .frame(height: 10)
-            Text("\(score)")
+            // 색만으로 구분하지 않도록 기호+문구를 함께 둔다.
+            Label(band.label, systemImage: band.icon)
                 .font(.caption.weight(.semibold))
                 .foregroundStyle(AppPalette.secondaryInk)
-                .frame(width: 30, alignment: .trailing)
+                // 글씨가 커지면 막대가 줄고 문구는 남는다.
+                .layoutPriority(1)
         }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(name) \(band.label)")
     }
 }
 

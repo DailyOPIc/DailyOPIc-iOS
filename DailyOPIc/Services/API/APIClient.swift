@@ -9,9 +9,12 @@ enum APIClientError: LocalizedError {
         switch self {
         case .invalidResponse:
             "서버 응답을 확인할 수 없습니다."
-        case let .rewardRequired(_, _, message),
-             let .server(_, _, message):
+        case let .rewardRequired(_, _, message):
             message
+        case let .server(_, code, message):
+            // 오디오 검증 실패는 서버가 영어 원문("audio file is too large")을
+            // 내려준다. 사용자에게는 다음에 뭘 하면 되는지만 보여준다.
+            code == "invalid_audio" ? "녹음 파일을 처리할 수 없어요. 다시 녹음해 주세요." : message
         }
     }
 
@@ -117,6 +120,11 @@ actor APIClient {
 
     func currentMockSession() async throws -> MockSession {
         try await send(path: "/v1/mock-exams/current", method: "GET", body: nil)
+    }
+
+    /// 진행 중인 회차를 서버에서도 닫는다. 이미 닫힌 회차에 다시 호출해도 안전하다.
+    func abandonMockSession(sessionId: String) async throws -> MockSession {
+        try await send(path: "/v1/mock-exams/\(sessionId)/abandon", method: "POST", body: nil)
     }
 
     func startMockSession(

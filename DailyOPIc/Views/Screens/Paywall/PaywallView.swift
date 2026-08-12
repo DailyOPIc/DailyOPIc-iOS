@@ -28,11 +28,15 @@ struct PaywallView: View {
                 VStack(spacing: AppSpacing.lg) {
                     header
                     tierCards
-                    Text("예상 등급 추이 · 취약 유형 분석 · 주간 리포트는 모든 플랜에서 무료로 제공돼요.")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(Color(AppPalette.secondaryInk))
-                        .multilineTextAlignment(.center)
-                        .frame(maxWidth: .infinity)
+                    VStack(spacing: AppSpacing.xs) {
+                        Text("예상 등급 추이 · 취약 유형 분석 · 주간 리포트는 모든 플랜에서 무료로 제공돼요.")
+                        // 유료 플랜끼리는 분석 내용이 같다. 안 그런 척하지 않는다.
+                        Text("베이직 · 플러스 · 프로의 결과 분석 내용은 같아요. 차이는 하루 이용 횟수와 기록 보관 기간이에요.")
+                    }
+                    .font(AppTypography.caption)
+                    .foregroundStyle(Color(AppPalette.secondaryInk))
+                    .multilineTextAlignment(.center)
+                    .frame(maxWidth: .infinity)
                     if store.packages.isEmpty {
                         unavailableNotice
                     }
@@ -68,7 +72,7 @@ struct PaywallView: View {
                 .font(AppTypography.title)
                 .foregroundStyle(Color(AppPalette.ink))
                 .multilineTextAlignment(.center)
-            Text("광고 없이 매일 연습하고, AI가 약점까지 잡아줍니다.")
+            Text("광고 없이 더 많이 연습하고, 교정 답안과 모범 답안까지 받아보세요.")
                 .font(AppTypography.callout)
                 .foregroundStyle(Color(AppPalette.secondaryInk))
                 .multilineTextAlignment(.center)
@@ -99,19 +103,29 @@ struct PaywallView: View {
                 let isCurrent = tier.plan == currentPlan
                 let purchasable = tier.plan != .free && !isCurrent && package != nil
 
-                PaywallTierCard(
+                let card = PaywallTierCard(
                     tier: tier,
                     isCurrent: isCurrent,
                     priceText: priceText(for: tier, package: package),
                     isPurchasing: purchasing != nil && purchasing == package?.id,
                     isPurchasable: purchasable
                 )
-                .contentShape(RoundedRectangle(cornerRadius: AppRadius.md))
-                .onTapGesture {
-                    guard purchasable, let package else { return }
-                    Task { await purchase(package) }
-                }
+                .contentShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
                 .opacity(purchasing != nil && purchasing != package?.id ? 0.5 : 1)
+
+                // 구매 가능한 카드만 Button으로 노출한다(A3). 무료/현재 플랜 카드는
+                // 어떤 상태에서도 동작하지 않는 안내 카드라, 비활성 버튼이 아니라
+                // 컨트롤이 아닌 것으로 두는 편이 VoiceOver에 정확하다.
+                if purchasable, let package {
+                    Button {
+                        Task { await purchase(package) }
+                    } label: {
+                        card
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    card
+                }
             }
         }
         .disabled(purchasing != nil)
@@ -139,6 +153,7 @@ struct PaywallView: View {
                 } label: {
                     if managing { ProgressView() } else { Text("구독 관리 · 해지").font(AppTypography.callout) }
                 }
+                .minimumTouchTarget()
                 .disabled(managing)
             }
 
@@ -152,13 +167,16 @@ struct PaywallView: View {
                         .font(AppTypography.callout)
                 }
             }
+            .minimumTouchTarget()
             .disabled(restoring)
 
             HStack(spacing: AppSpacing.md) {
                 if let privacy = AppConfiguration.privacyPolicyURL {
                     Button("개인정보 처리방침") { openURL(privacy) }
+                        .minimumTouchTarget()
                 }
                 Button("이용약관(EULA)") { openURL(AppConfiguration.termsOfUseURL) }
+                    .minimumTouchTarget()
             }
             .font(AppTypography.footnote)
             .foregroundStyle(Color(AppPalette.secondaryInk))
@@ -223,13 +241,17 @@ struct PaywallTier: Identifiable {
 
     var id: String { plan.rawValue }
 
+    /// 문구는 `DailyOPIc-BE/app/services/plans.py`의 실제 한도와
+    /// `app/services/ai.py`의 실제 분석 산출물에서만 가져온다.
+    /// 특히 분석 내용의 차이는 무료↔유료 한 곳뿐이라, 베이직 위로는
+    /// "더 깊은 분석"을 약속하지 않는다.
     static let all: [PaywallTier] = [
         PaywallTier(
             plan: .free,
             highlights: [
+                "결과: 예상 등급 + 강점 · 개선점 · 5영역 피드백",
                 "데일리 새 문제 세트 하루 1회 (+광고 보너스 1회)",
-                "모의고사 최초 1회 체험",
-                "결과: 예상 등급 + 강점",
+                "모의고사 체험 1회 (광고 시청)",
                 "학습 기록 최근 7일",
                 "광고 있음",
             ],
@@ -239,10 +261,10 @@ struct PaywallTier: Identifiable {
         PaywallTier(
             plan: .basic,
             highlights: [
+                "결과 전체 해제: 교정 답안 · 모범 답안 · 목표 등급까지",
                 "광고 완전 제거",
                 "데일리 새 문제 세트 하루 3회",
-                "모의고사 하루 1회",
-                "결과: + 개선점 · 5차원 루브릭 분석",
+                "모의고사 매일 1회 (광고 없이)",
                 "학습 기록 최근 30일",
             ],
             promoBadge: "오픈 기념 할인",
@@ -251,9 +273,9 @@ struct PaywallTier: Identifiable {
         PaywallTier(
             plan: .plus,
             highlights: [
+                "베이직의 결과 분석 그대로 + 더 많이 연습",
                 "데일리 새 문제 세트 하루 10회",
                 "모의고사 하루 3회",
-                "결과: + 교정답안 · 모범답안 · 목표 등급까지",
                 "학습 기록 최근 30일",
             ],
             promoBadge: nil,
@@ -262,10 +284,10 @@ struct PaywallTier: Identifiable {
         PaywallTier(
             plan: .pro,
             highlights: [
+                "가장 많이 연습하고 기록을 전부 보관",
                 "데일리 새 문제 세트 하루 20회",
                 "모의고사 하루 5회",
-                "결과: + 모의고사 항목별(문항별) 피드백",
-                "학습 기록 전체",
+                "학습 기록 전체 기간",
             ],
             promoBadge: nil,
             promoNote: nil
@@ -292,7 +314,7 @@ private struct PaywallTierCard: View {
                         .padding(.horizontal, AppSpacing.xs)
                         .padding(.vertical, 2)
                         .background(Color(AppPalette.primary))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(AppPalette.actionOnPrimary)
                         .clipShape(Capsule())
                 }
                 Spacer()
@@ -301,7 +323,7 @@ private struct PaywallTierCard: View {
                 } else {
                     Text(tier.plan == .free ? "무료" : "\(priceText)\(tier.plan == .free ? "" : "/월")")
                         .font(AppTypography.callout.weight(.bold))
-                        .foregroundStyle(Color(AppPalette.primaryMid))
+                        .foregroundStyle(Color(AppPalette.primary))
                 }
             }
             if let note = tier.promoNote {
@@ -321,13 +343,13 @@ private struct PaywallTierCard: View {
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(Color(AppPalette.elevatedSurface))
         .overlay(
-            RoundedRectangle(cornerRadius: AppRadius.md)
+            RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                 .stroke(
                     isCurrent ? Color(AppPalette.primary) : Color.clear,
                     lineWidth: 2
                 )
         )
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.md))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 
     @ViewBuilder
@@ -339,7 +361,7 @@ private struct PaywallTierCard: View {
         } else if isPurchasable {
             Text("탭하여 시작하기 →")
                 .font(AppTypography.caption.weight(.semibold))
-                .foregroundStyle(Color(AppPalette.primaryMid))
+                .foregroundStyle(Color(AppPalette.primary))
         }
     }
 }

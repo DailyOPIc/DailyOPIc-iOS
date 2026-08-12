@@ -6,6 +6,7 @@ struct PracticeScreen: View {
     @ObservedObject private var speech: SpeechRecognitionService
     @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsSetup = false
+    @State private var pendingSetupRoute: SetupView.Route?
     @Environment(\.scenePhase) private var scenePhase
 
     init(viewModel: PracticeViewModel, preferences: AppPreferences) {
@@ -19,7 +20,7 @@ struct PracticeScreen: View {
         practiceBody
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    GuideEntryButton(preferences: preferences)
+                    GuideEntryButton { preferences.beginGuide() }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showsSetup = true } label: {
@@ -39,8 +40,8 @@ struct PracticeScreen: View {
                     .accessibilityLabel(viewModel.plan.isPaid ? "구독 관리" : "구독 업그레이드")
                 }
             }
-            .sheet(isPresented: $showsSetup) {
-                SetupView(preferences: preferences)
+            .sheet(isPresented: $showsSetup, onDismiss: applyPendingSetupRoute) {
+                SetupView(preferences: preferences) { pendingSetupRoute = $0 }
             }
             .sheet(isPresented: Binding(
                 get: { viewModel.showsPaywall },
@@ -88,6 +89,18 @@ struct PracticeScreen: View {
             }
     }
 
+    /// 설정 시트가 완전히 닫힌 뒤에 루트 플로우를 연다. 시트가 떠 있는 동안
+    /// fullScreenCover를 요청하면 표시 충돌이 나므로, 지연 대신 onDismiss로
+    /// 순서를 고정한다.
+    private func applyPendingSetupRoute() {
+        switch pendingSetupRoute {
+        case .guide: preferences.beginGuide()
+        case .levelSelection: preferences.resetOnboarding()
+        case nil: break
+        }
+        pendingSetupRoute = nil
+    }
+
     private var practiceBody: some View {
         ScrollView {
             VStack(spacing: AppSpacing.lg) {
@@ -128,8 +141,8 @@ struct PracticeScreen: View {
 
                     navigationControls
                 }
-                BannerAdView()
-                    .frame(height: 50)
+                // 배너 없음: 말하기가 진행되는 화면이다. 광고는 통계·모의고사 인트로처럼
+                // 흐름을 끊지 않는 곳에만 둔다.
             }
             .padding(AppSpacing.lg)
             .animation(.spring(response: 0.4, dampingFraction: 0.85), value: viewModel.currentQuestion?.number)
@@ -141,7 +154,9 @@ struct PracticeScreen: View {
 
     private var questionProgressBar: some View {
         ScrollView(.horizontal, showsIndicators: false) {
-            HStack(spacing: AppSpacing.xs) {
+            // sm(8) is DESIGN.md §14.1's chip gap and §30.1's minimum gap
+            // between adjacent 44pt hit areas; xs(4) would leave them 4pt apart.
+            HStack(spacing: AppSpacing.sm) {
                 ForEach(0..<viewModel.questionCount, id: \.self) { index in
                     // 실제 문항 번호(데일리 Q2~Q15). index+1이 아니라 세트의 number 사용.
                     let number = viewModel.questionNumber(at: index) ?? (index + 1)
@@ -150,7 +165,7 @@ struct PracticeScreen: View {
                     Button {
                         viewModel.goToQuestion(index)
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: AppSpacing.xs) {
                             if done {
                                 Image(systemName: "checkmark.circle.fill")
                                     .font(.caption2)
@@ -160,7 +175,7 @@ struct PracticeScreen: View {
                         }
                         .padding(.horizontal, AppSpacing.sm)
                         .padding(.vertical, 6)
-                        .foregroundStyle(isCurrent ? .white : (done ? AppPalette.primary : AppPalette.secondaryInk))
+                        .foregroundStyle(isCurrent ? AppPalette.actionOnPrimary : (done ? AppPalette.primary : AppPalette.secondaryInk))
                         .background(
                             isCurrent ? AppPalette.primary
                                 : (done ? AppPalette.primarySoft : AppPalette.surface),
@@ -168,6 +183,9 @@ struct PracticeScreen: View {
                         )
                     }
                     .buttonStyle(PressableButtonStyle())
+                    .minimumTouchTarget()
+                    .accessibilityLabel("\(number)번 문항, \(done ? "분석 완료" : "아직 답하지 않음")")
+                    .accessibilityAddTraits(isCurrent ? .isSelected : [])
                 }
             }
             .padding(.vertical, 2)
@@ -179,32 +197,45 @@ struct PracticeScreen: View {
     @ViewBuilder
     private func recorder(for question: GeneratedQuestion) -> some View {
         VStack(spacing: AppSpacing.md) {
-            PromptPlayButton(
-                isSpeaking: promptPlayback.isSpeaking,
-                hasStarted: promptPlayback.hasStarted(question),
-                isDisabled: speech.isListening
-            ) {
-                viewModel.playPrompt()
-            }
-
-            RecordingButton(
-                isRecording: speech.isListening,
-                isDisabled: viewModel.phase == .analyzing
-            ) {
-                Task { await viewModel.toggleRecording() }
-            }
-            Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
-                .font(.title3.bold())
-            AnswerPanel(
-                finalText: speech.finalTranscript,
-                partialText: speech.partialTranscript,
-                isRecording: speech.isListening
-            )
-
-            if viewModel.pendingRecording != nil, viewModel.phase != .analyzing {
-                PrimaryButton(title: "분석 다시 시도", systemImage: "arrow.clockwise") {
-                    Task { await viewModel.retryEvaluation() }
+            // 녹음을 멈추면 검토 상태로만 넘어간다. 분석은 사용자가 눌러야 시작한다.
+            if let pending = viewModel.pendingRecording {
+                TranscriptReviewPanel(
+                    transcript: pending.transcript,
+                    submitTitle: viewModel.phase == .analyzing ? "분석 중" : "분석하기",
+                    submitIcon: "sparkles",
+                    isSubmitting: viewModel.phase == .analyzing,
+                    submit: { Task { await viewModel.analyzePendingRecording() } },
+                    reRecord: { viewModel.discardPendingRecording() }
+                )
+            } else {
+                PromptPlayButton(
+                    isSpeaking: promptPlayback.isSpeaking,
+                    hasStarted: promptPlayback.hasStarted(question),
+                    isDisabled: speech.isListening
+                ) {
+                    viewModel.playPrompt()
                 }
+
+                RecordingButton(
+                    isRecording: speech.isListening,
+                    isDisabled: viewModel.phase == .analyzing
+                ) {
+                    Task { await viewModel.toggleRecording() }
+                }
+                Text(speech.isListening ? "탭하면 답변 완료" : "탭하고 답변하기")
+                    .font(.title3.bold())
+                if speech.isListening {
+                    Text("남은 시간 \(viewModel.remainingSeconds)초")
+                        .font(AppTypography.callout)
+                        .monospacedDigit()
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .accessibilityLabel("남은 답변 시간 \(viewModel.remainingSeconds)초")
+                }
+                AnswerPanel(
+                    finalText: speech.finalTranscript,
+                    partialText: speech.partialTranscript,
+                    isRecording: speech.isListening
+                )
             }
         }
         .padding(.vertical, AppSpacing.md)

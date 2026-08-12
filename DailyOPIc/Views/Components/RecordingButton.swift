@@ -21,7 +21,7 @@ struct RecordingButton: View {
                 }
                 Image(systemName: isRecording ? "stop.fill" : "mic.fill")
                     .font(.system(size: 30, weight: .semibold))
-                    .foregroundStyle(.white)
+                    .foregroundStyle(isRecording ? AppPalette.actionOnDanger : AppPalette.actionOnPrimary)
                     .frame(width: 86, height: 86)
                     .background(isRecording ? AppPalette.danger : AppPalette.primary)
                     .clipShape(Circle())

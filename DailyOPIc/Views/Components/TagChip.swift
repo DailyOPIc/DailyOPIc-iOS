@@ -7,9 +7,9 @@ struct TagChip: View {
     var body: some View {
         Text(text.hasPrefix("#") ? text : "#\(text)")
             .font(.caption.weight(.semibold))
-            .foregroundStyle(filled ? Color.white : AppPalette.primary)
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
+            .foregroundStyle(filled ? AppPalette.actionOnPrimary : AppPalette.primary)
+            .padding(.horizontal, AppSpacing.sm)
+            .padding(.vertical, AppSpacing.xs)
             .background(filled ? AppPalette.primary : AppPalette.primarySoft)
             .clipShape(Capsule())
     }
@@ -21,10 +21,10 @@ struct FlowTags: View {
 
     var body: some View {
         ViewThatFits(in: .horizontal) {
-            HStack(spacing: 8) {
+            HStack(spacing: AppSpacing.sm) {
                 ForEach(values, id: \.self) { TagChip(text: $0, filled: filled) }
             }
-            VStack(alignment: .leading, spacing: 8) {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
                 ForEach(values, id: \.self) { TagChip(text: $0, filled: filled) }
             }
         }

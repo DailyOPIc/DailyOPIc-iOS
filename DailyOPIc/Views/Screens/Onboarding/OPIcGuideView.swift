@@ -118,7 +118,7 @@ private struct GuideTopicCard: View {
                 .font(.system(size: 30, weight: .semibold))
                 .foregroundStyle(AppPalette.primary)
                 .frame(width: 48)
-            VStack(alignment: .leading, spacing: 4) {
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
                 Text(topic.title)
                     .font(AppTypography.cardTitle)
                     .foregroundStyle(AppPalette.ink)
@@ -133,10 +133,10 @@ private struct GuideTopicCard: View {
         .padding(AppSpacing.lg)
         .background(AppPalette.elevatedSurface)
         .overlay {
-            RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous)
+            RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous)
                 .stroke(AppPalette.primary.opacity(0.22), lineWidth: 1)
         }
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.lg, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 }
 
@@ -177,7 +177,7 @@ private struct GuideReaderView: View {
                 .cardStyle(alignment: .center)
             Spacer()
 
-            HStack(spacing: 12) {
+            HStack(spacing: AppSpacing.sm) {
                 if page > 0 {
                     Button("이전") { move(to: page - 1) }
                         .buttonStyle(.bordered)

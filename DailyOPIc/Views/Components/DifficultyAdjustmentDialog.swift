@@ -9,7 +9,7 @@ struct DifficultyAdjustmentDialog: View {
             Color.black.opacity(0.32)
                 .ignoresSafeArea()
 
-            VStack(spacing: 18) {
+            VStack(spacing: AppSpacing.md) {
                 Image(systemName: "slider.horizontal.below.rectangle")
                     .font(.system(size: 38, weight: .semibold))
                     .foregroundStyle(AppPalette.primary)
@@ -22,17 +22,17 @@ struct DifficultyAdjustmentDialog: View {
                     .multilineTextAlignment(.center)
                     .fixedSize(horizontal: false, vertical: true)
 
-                VStack(spacing: 10) {
+                VStack(spacing: AppSpacing.sm) {
                     ForEach(DifficultyAdjustment.allCases) { adjustment in
                         Button {
                             select(adjustment)
                         } label: {
-                            HStack(spacing: 12) {
+                            HStack(spacing: AppSpacing.sm) {
                                 Image(systemName: iconName(for: adjustment))
                                     .font(.headline)
                                     .foregroundStyle(AppPalette.primary)
                                     .frame(width: 24)
-                                VStack(alignment: .leading, spacing: 3) {
+                                VStack(alignment: .leading, spacing: AppSpacing.xs) {
                                     Text(adjustment.title)
                                         .font(.headline)
                                         .foregroundStyle(AppPalette.ink)
@@ -42,9 +42,9 @@ struct DifficultyAdjustmentDialog: View {
                                 }
                                 Spacer()
                             }
-                            .padding(14)
+                            .padding(AppSpacing.md)
                             .background(AppPalette.elevatedSurface)
-                            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sm, style: .continuous))
+                            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
                         }
                         .buttonStyle(PressableButtonStyle())
                         .disabled(isLoading)
@@ -52,7 +52,7 @@ struct DifficultyAdjustmentDialog: View {
                 }
 
                 if isLoading {
-                    HStack(spacing: 10) {
+                    HStack(spacing: AppSpacing.sm) {
                         AppLoadingIndicator(dotSize: 7)
                         Text("남은 문제를 만들고 있어요")
                             .font(AppTypography.footnote)
@@ -60,15 +60,15 @@ struct DifficultyAdjustmentDialog: View {
                     }
                 }
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
             .frame(maxWidth: 360)
             .background(.regularMaterial)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous))
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous))
             .overlay {
-                RoundedRectangle(cornerRadius: AppRadius.xl, style: .continuous)
+                RoundedRectangle(cornerRadius: AppRadius.sheet, style: .continuous)
                     .stroke(Color.white.opacity(0.2), lineWidth: 1)
             }
-            .padding(24)
+            .padding(AppSpacing.lg)
         }
         .transition(.opacity)
     }

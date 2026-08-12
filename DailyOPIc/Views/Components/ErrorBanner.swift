@@ -5,7 +5,7 @@ struct ErrorBanner: View {
     var retry: (() -> Void)?
 
     var body: some View {
-        HStack(alignment: .top, spacing: 12) {
+        HStack(alignment: .top, spacing: AppSpacing.sm) {
             Image(systemName: "exclamationmark.triangle.fill")
                 .foregroundStyle(AppPalette.danger)
             Text(message)
@@ -14,10 +14,11 @@ struct ErrorBanner: View {
             if let retry {
                 Button("재시도", action: retry)
                     .font(.footnote.weight(.bold))
+                    .minimumTouchTarget()
             }
         }
-        .padding(14)
+        .padding(AppSpacing.md)
         .background(AppPalette.danger.opacity(0.08))
-        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.card, style: .continuous))
     }
 }
