@@ -254,22 +254,74 @@ final class SpeechRecognitionService: NSObject, ObservableObject, SFSpeechRecogn
         }
     }
 
-    private func compressToM4A(_ source: URL) async throws -> URL {
+    /// 말하기 평가에 쓰기 충분한 음성용 비트레이트. 서버는 이 파일에서 길이와
+    /// 묵음 비율만 재고, 전사는 이미 기기에서 끝난다.
+    private static let speechBitRate = 48_000
+    private static let transcodeQueue = DispatchQueue(label: "com.dailyopic.audio.transcode")
+
+    /// 녹음 원본(CAF, PCM)을 업로드용 m4a로 변환한다.
+    ///
+    /// 예전에는 AVAssetExportPresetAppleM4A를 썼는데, 이 프리셋은 비트레이트를
+    /// 지정할 수 없고 48kHz 마이크 입력에서 약 256kbps를 만들었다. 그래서 180초
+    /// 답변이 5.4MiB까지 커져 서버 업로드 상한에 걸렸다(2분 녹음이 거절된 원인).
+    /// 비트레이트를 직접 정하면 길이에 비례해 예측 가능하다: 180초 ≈ 1.1MiB.
+    nonisolated private func compressToM4A(_ source: URL) async throws -> URL {
         let destination = FileManager.default.temporaryDirectory
             .appendingPathComponent("dailyopic-\(UUID().uuidString)")
             .appendingPathExtension("m4a")
         let asset = AVURLAsset(url: source)
-        guard let exporter = AVAssetExportSession(
-            asset: asset,
-            presetName: AVAssetExportPresetAppleM4A
-        ) else {
+        guard let track = try await asset.loadTracks(withMediaType: .audio).first else {
             throw SpeechError.audioFailure
         }
-        exporter.outputURL = destination
-        exporter.outputFileType = .m4a
-        await exporter.export()
-        guard exporter.status == .completed else {
-            throw exporter.error ?? SpeechError.audioFailure
+        let format = try await track.load(.formatDescriptions).first
+            .flatMap { CMAudioFormatDescriptionGetStreamBasicDescription($0)?.pointee }
+
+        let reader = try AVAssetReader(asset: asset)
+        let output = AVAssetReaderTrackOutput(
+            track: track,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatLinearPCM,
+                AVLinearPCMBitDepthKey: 16,
+                AVLinearPCMIsFloatKey: false,
+                AVLinearPCMIsBigEndianKey: false,
+                AVLinearPCMIsNonInterleaved: false,
+            ]
+        )
+        reader.add(output)
+
+        let writer = try AVAssetWriter(outputURL: destination, fileType: .m4a)
+        let input = AVAssetWriterInput(
+            mediaType: .audio,
+            outputSettings: [
+                AVFormatIDKey: kAudioFormatMPEG4AAC,
+                // 원본 포맷을 그대로 따라간다. 리샘플링/다운믹스를 요구하면
+                // 기기에 따라 인코더가 실패한다.
+                AVSampleRateKey: format?.mSampleRate ?? 48_000,
+                AVNumberOfChannelsKey: format?.mChannelsPerFrame ?? 1,
+                AVEncoderBitRateKey: Self.speechBitRate,
+            ]
+        )
+        input.expectsMediaDataInRealTime = false
+        writer.add(input)
+
+        guard reader.startReading(), writer.startWriting() else {
+            throw SpeechError.audioFailure
+        }
+        writer.startSession(atSourceTime: .zero)
+        await withCheckedContinuation { continuation in
+            input.requestMediaDataWhenReady(on: Self.transcodeQueue) {
+                while input.isReadyForMoreMediaData {
+                    guard let buffer = output.copyNextSampleBuffer(), input.append(buffer) else {
+                        input.markAsFinished()
+                        continuation.resume()
+                        return
+                    }
+                }
+            }
+        }
+        await writer.finishWriting()
+        guard writer.status == .completed else {
+            throw writer.error ?? SpeechError.audioFailure
         }
         return destination
     }
