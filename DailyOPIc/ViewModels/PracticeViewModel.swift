@@ -439,7 +439,9 @@ final class PracticeViewModel {
             refreshOperationID = nil
         } catch is CancellationError {
             operationState = .idle
-        } catch let error as APIClientError where error.isPracticeQuotaExhausted {
+        } catch let error as APIClientError
+            where error.isPracticeQuotaExhausted || error.isRewardQuotaExhausted {
+            // 광고 보너스까지 소진. 지금 세트는 그대로 두고 상위 플랜 안내로 넘긴다.
             showsRefreshDialog = false
             showsPaywall = true
             operationState = .idle

@@ -208,7 +208,7 @@ struct UsageStatus: Codable, Sendable {
     }
 }
 
-enum RewardPurpose: String, Codable, Sendable {
+enum RewardPurpose: String, Codable, Sendable, CaseIterable {
     case practiceCredits = "practice_credits"
     case practiceRefresh = "practice_refresh"
     case mockStart = "mock_start"

@@ -168,13 +168,41 @@ actor APIClient {
         sessionHash: String? = nil,
         requestID: UUID
     ) async throws -> RewardIntent {
-        try await sendJSON(
-            path: "/v1/ad-rewards/intents",
-            method: "POST",
-            body: RewardIntentRequest(purpose: purpose, sessionHash: sessionHash),
-            requestID: requestID,
-            timeout: RequestTimeout.read
-        )
+        do {
+            return try await sendJSON(
+                path: "/v1/ad-rewards/intents",
+                method: "POST",
+                body: RewardIntentRequest(purpose: purpose, sessionHash: sessionHash),
+                requestID: requestID,
+                timeout: RequestTimeout.read
+            )
+        } catch let error as APIClientError where error.isRewardQuotaExhausted {
+            // 리워드 한도 초과는 용도마다 다음 행동이 다르다. 서버 message를 그대로
+            // 띄우면 구버전 서버에서는 영어 원문("daily reward quota exhausted")이
+            // 그대로 노출된다. 코드는 그대로 두고 문구만 갈아끼운다.
+            throw APIClientError.server(
+                status: 402,
+                code: error.code,
+                message: Self.rewardQuotaMessage(for: purpose)
+            )
+        }
+    }
+
+    static func rewardQuotaMessage(for purpose: RewardPurpose) -> String {
+        switch purpose {
+        case .practiceCredits:
+            "오늘 받을 수 있는 추가 학습 보상을 모두 사용했어요. 내일 다시 받을 수 있어요."
+        case .practiceRefresh:
+            "오늘 문제 새로고침 기회를 모두 사용했어요. 지금 세트는 계속 풀 수 있어요."
+        case .mockStart:
+            "오늘 모의고사 시작 기회를 모두 사용했어요. 내일 다시 시작할 수 있어요."
+        case .mockAdjustment:
+            "오늘 난이도 조정 기회를 모두 사용했어요. 조정 없이 계속 진행할 수 있어요."
+        case .mockResult:
+            "오늘 결과 확인 기회를 모두 사용했어요. 녹음한 답변은 저장해 두었으니 내일 다시 '결과 보기'를 눌러 주세요."
+        case .targetLevelChange:
+            "난이도 변경은 하루 한 번만 가능해요. 내일 다시 시도해 주세요."
+        }
     }
 
     func rewardStatus(nonce: String) async throws -> RewardIntent {

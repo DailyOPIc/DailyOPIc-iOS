@@ -329,6 +329,26 @@ struct DailyOPIcTests {
         #expect(error.statusCode == 402)
     }
 
+    @Test func rewardQuotaExhaustedNeverSurfacesRawServerEnglish() throws {
+        let data = """
+        {
+          "detail": {
+            "code": "reward_quota_exhausted",
+            "message": "daily reward quota exhausted"
+          }
+        }
+        """.data(using: .utf8)!
+        let error = APIClient.makeError(status: 402, data: data)
+
+        #expect(error.isRewardQuotaExhausted)
+        // 용도마다 다음 행동이 다르므로 문구도 달라야 한다.
+        let messages = RewardPurpose.allCases.map(APIClient.rewardQuotaMessage(for:))
+        #expect(Set(messages).count == RewardPurpose.allCases.count)
+        #expect(messages.allSatisfy { !$0.allSatisfy(\.isASCII) })
+        // 15문항을 다 답한 뒤 막히는 자리다. 답변이 남아 있다는 사실을 알려야 한다.
+        #expect(APIClient.rewardQuotaMessage(for: .mockResult).contains("답변"))
+    }
+
     @Test func apiClientClassifiesAIUnavailable() throws {
         let data = """
         {
