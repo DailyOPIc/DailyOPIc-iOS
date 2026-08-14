@@ -24,15 +24,9 @@ enum PlanEntitlement: String, Codable, Sendable, CaseIterable, Comparable {
         }
     }
 
-    /// 월 구독가(원). 무료는 0.
-    var monthlyPriceKRW: Int {
-        switch self {
-        case .free: 0
-        case .basic: 2_900
-        case .plus: 4_900
-        case .pro: 7_900
-        }
-    }
+    // 가격 상수는 두지 않는다. 표시 가격은 언제나
+    // `package.storeProduct.localizedPriceString`(StoreService)에서만 온다.
+    // 앱에 원화 상수를 함께 두면 스토어 가격이 바뀌는 순간 둘 중 하나가 거짓말이 된다.
 
     private var rank: Int {
         switch self {

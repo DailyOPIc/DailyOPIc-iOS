@@ -20,6 +20,13 @@ final class PracticeViewModel {
     private let environment: AppEnvironment
     /// 유료 플랜 한도 소진 등 결제 유도가 필요할 때 true.
     var showsPaywall = false
+    /// 페이월을 연 지점(분석 전용). `showsPaywall`을 직접 켜지 말고 `presentPaywall(from:)`을 쓴다.
+    private(set) var paywallSource: PaywallSource = .settings
+
+    func presentPaywall(from source: PaywallSource) {
+        paywallSource = source
+        showsPaywall = true
+    }
 
     var phase: Phase = .loading
     var questionSet: QuestionSet?
@@ -424,7 +431,7 @@ final class PracticeViewModel {
     private func handleRefreshQuotaExhausted(adjustment: DifficultyAdjustment) async {
         guard !environment.currentPlan.isPaid else {
             showsRefreshDialog = false
-            showsPaywall = true
+            presentPaywall(from: .tokenExhausted)
             operationState = .idle
             return
         }
@@ -443,7 +450,7 @@ final class PracticeViewModel {
             where error.isPracticeQuotaExhausted || error.isRewardQuotaExhausted {
             // 광고 보너스까지 소진. 지금 세트는 그대로 두고 상위 플랜 안내로 넘긴다.
             showsRefreshDialog = false
-            showsPaywall = true
+            presentPaywall(from: .tokenExhausted)
             operationState = .idle
         } catch {
             errorMessage = error.localizedDescription

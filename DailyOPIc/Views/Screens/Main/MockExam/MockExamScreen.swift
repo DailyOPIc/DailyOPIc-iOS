@@ -94,7 +94,7 @@ struct MockExamScreen: View {
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await viewModel.refreshUsage() } }
         }
-        .sheet(isPresented: $showsPaywall) { PaywallView() }
+        .sheet(isPresented: $showsPaywall) { PaywallView(source: .mockLimit) }
     }
 
     private var mockUpsell: some View {

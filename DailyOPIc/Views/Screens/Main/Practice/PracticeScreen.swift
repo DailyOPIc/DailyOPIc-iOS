@@ -29,7 +29,7 @@ struct PracticeScreen: View {
                     .accessibilityLabel("학습 설정")
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { viewModel.showsPaywall = true } label: {
+                    Button { viewModel.presentPaywall(from: .settings) } label: {
                         Image(systemName: viewModel.plan.isPaid ? "crown.fill" : "crown")
                             .foregroundStyle(
                                 viewModel.plan.isPaid
@@ -47,7 +47,7 @@ struct PracticeScreen: View {
                 get: { viewModel.showsPaywall },
                 set: { viewModel.showsPaywall = $0 }
             )) {
-                PaywallView()
+                PaywallView(source: viewModel.paywallSource)
             }
             .onChange(of: preferences.initialLevel) {
                 Task { await viewModel.reloadQuestions() }
