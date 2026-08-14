@@ -159,26 +159,50 @@
 서버 `app/services/plans.py`가 **단일 진실 소스**이고, 클라이언트는 `/v1/capabilities`의
 `plan` + `quotaPolicy`로 UI를 게이팅한다. 최종 판정은 항상 서버다.
 
+### 7.1 데일리 토큰 (제품 정의)
+
+**데일리 토큰 1개 = 새로운 Daily 문제 세트 1개.**
+
+- 토큰은 **세트를 받을 때** 1개 소모된다. 하루 첫 세트 생성과 리프레시(새 문제 받기 ·
+  난이도 조정)가 모두 여기에 해당한다. (`routes.py` `create_practice_set` /
+  `refresh_practice_set` → `reserve_practice`)
+- 한 번 시작한 세트 안에서는 **답변 기록 · 채점(평가) · 결과 열람에 토큰이 들지 않는다.**
+  세트 내 평가 횟수는 제한이 없다.
+- **모의고사는 데일리 토큰과 별개**다. 플랜별 모의고사 횟수로만 제한된다.
+- UI 문구는 항상 "데일리 토큰"이다. `quota` · `credit` · `practice_credit` ·
+  `reward intent` · `reserve_practice` 같은 구현 용어는 사용자에게 노출하지 않는다.
+  반대로 백엔드 식별자를 마케팅 용어로 개명하지도 않는다.
+
+### 7.2 플랜별 실제 강제 한도
+
 | | 무료(free) | 베이직(basic) | 플러스(plus) | 프로(pro) |
 |---|---|---|---|---|
-| 표시가(월) | 0 | ₩2,900 | ₩4,900 | ₩7,900 |
-| 데일리 세트/일 | 1 (+광고 보너스 1) | 3 | 10 | 20 |
-| 리프레시 리워드 상한 | 1 | 10 | 20 | 30 |
+| 현재 실판매가(월) | 0 | ₩2,900 | ₩4,900 | ₩7,900 |
+| 데일리 토큰/일 | 1 (+광고 보너스 1) | 3 | 10 | 20 |
 | 모의고사 | **평생 최초 1회 체험** | 1회/일 | 3회/일 | 5회/일 |
 | 모의고사 광고 게이트 | 있음(3회) | 없음 | 없음 | 없음 |
 | 광고 노출 | 있음 | 없음 | 없음 | 없음 |
-| 분석 depth | summary | basic | detailed | focus |
-| 서버 history_days | 7 | 30 | 30 | 전체 |
+| 분석 depth | `summary` | `full` | `full` | `full` |
+| 취약점 복습 세트 (`review_set`) | ✗ | ✗ | ✗ | 서버만 허용 (앱 진입점 없음) |
+| `history_days` (capabilities 값) | 7 | 30 | 30 | 전체 |
 
-- 가격은 클라이언트 표시용 상수(`PlanEntitlement.monthlyPriceKRW`)이며, 실제 결제 금액/현지화 가격은
-  RevenueCat 패키지에서 온다.
-- 시험 대비 패스는 `exam_pass` 엔타이틀먼트 → **pro 동급**으로 매핑된다.
-- **결과 화면 항목별 잠금**(`ResultUnlock`, `Views/Components/EvaluationViews.swift`):
-  - 무료: 예상 등급 + 강점
-  - basic 이상: + 개선점, 루브릭
-  - plus 이상: + 목표 갭, 교정 답안, 모범 답안
-  - pro: + 모의고사 문항별 피드백
-  서버도 depth가 summary/basic이면 교정/모범/targetGap을 **생성하지 않는다**(AI 비용 절감).
+- 가격은 **`package.storeProduct.localizedPriceString`(RevenueCat)에서만** 온다.
+  클라이언트에 원화 상수를 두지 않는다(`PlanEntitlement.monthlyPriceKRW`는 삭제됨).
+- 시험 대비 패스는 `exam_pass` 엔타이틀먼트 → **pro 동급**으로 매핑된다(신규 발급 없음).
+- **결과 화면 잠금은 무료↔유료 한 곳뿐**이다(`ResultUnlock.showsCoaching = plan.isPaid`).
+  교정 답안 · 모범 답안 · 목표 갭이 유료 전용이고, 유료 플랜끼리는 분석 내용이 같다.
+  서버도 depth가 `summary`면 이 셋을 **생성하지 않는다**(AI 비용 절감).
+
+### 7.3 강제되지 않는 항목 — 페이월에서 광고하지 않는다
+
+| 항목 | 상태 | 페이월 노출 |
+|---|---|---|
+| 학습 기록 보관 기간 (7일/30일/전체) | `historyDays`가 capabilities에 있으나 **서버에 기록 조회 API 자체가 없다**. 기록은 기기 로컬 SwiftData이며 `trimPracticeHistory`가 전 플랜 동일하게 최근 50건만 남긴다 | **제거됨** |
+| 취약점 복습 세트 | 서버 `/v1/question-sets/review`는 프로 전용으로 강제되지만, **앱이 이 엔드포인트를 호출하는 화면이 없다** | **제거됨** |
+| 리프레시 리워드 상한 (`refresh_ad_bonus`) | 리프레시는 이제 데일리 토큰을 소모하고 광고 리워드를 쓰지 않는다. 별도 혜택이 아니다 | 노출 안 함 |
+
+이 세 항목은 backlog다. 앱에서 실제로 도달 가능해지는 시점에 페이월 문구로 되살린다.
+`DailyOPIcTests/PaywallTests.swift`의 `copyNeverPromisesUnenforcedBenefits`가 회귀를 막는다.
 - **스마트 기능(예상 등급 추이 · 취약 유형 분석 · 주간 리포트)은 전 플랜 무료 공개**다.
   `StudyInsightsSection`의 세 카드 모두 `locked: false`이고, 페이월에도 그렇게 명시되어 있다.
   **리뉴얼에서 이걸 다시 잠그지 않는다.**
@@ -248,3 +272,152 @@
 2. 취약점 복습 세트(§8)를 이번 리뉴얼에서 노출할지 여부.
 3. 학습 기록이 기기 로컬 전용인 점을 UI에서 어디까지 명시할지(기기 변경 시 기록 유실).
 4. 난이도 변경 카피 수정 시 무료/유료 분기를 어디까지 문구로 드러낼지.
+
+---
+
+## 12. 페이월 V2 (Paywall V2) [구현됨 · G1]
+
+`Views/Screens/Paywall/PaywallView.swift` + `PaywallPlan.swift`.
+
+### 12.1 해결한 문제
+
+이전 페이월은 네 개의 큰 티어 카드를 세로로 늘어놓고 사용자가 직접 값을 비교해
+가치를 계산하게 하는 **사양서**였다. V2는 여섯 개 질문에 순서대로 답한다.
+
+1. 데일리 토큰이 뭔가 → 2. 몇 개 받나 → 3. 어떤 플랜이 나에게 맞나
+→ 4. 그 플랜의 의미 있는 혜택은 → 5. 얼마인가 → 6. 어떻게 구독하나
+
+### 12.2 정보 구조
+
+```
+헤더            데일리오픽 프리미엄 / "내 학습량에 맞는 플랜을 선택하세요." / 현재 플랜 배지
+데일리 토큰 설명  토큰 1개 = 새로운 Daily 문제 세트 1개
+                한 번 시작한 세트의 답변·채점에는 추가 토큰 없음 / 모의고사는 별개
+플랜 셀렉터      베이직 · 플러스 · 프로 (칩 3개 가로 배치, 하나만 선택)
+선택 플랜 상세    선택된 유료 플랜 하나만 이름 · 포지셔닝 · 현지화 가격 · 혜택 4줄
+무료 플랜        컴팩트 1블록, 구매 CTA 없음. 현재 플랜이면 "현재 이용 중" 표시
+모든 플랜 비교    DisclosureGroup(기본 접힘) — 토큰 · AI 분석 · 모의고사 · 광고 4행
+푸터            구독 관리(유료만) · 구매 복원(항상) · 개인정보 · EULA · 자동갱신 고지
+sticky CTA      safeAreaInset(.bottom) — "<플랜명> 시작하기"
+```
+
+- 선택 상태는 **색만으로 표시하지 않는다**: 체크 기호 + 2pt 테두리 + 굵기 변화 +
+  `.isSelected` accessibility trait.
+- 비교표는 4열 그리드가 아니라 항목별 세로 스택이다. 작은 iPhone 폭 + 큰 Dynamic Type에서
+  4열은 반드시 깨진다.
+- 미래에 개인화 추천 블록을 얹을 수 있도록 셀렉터/상세가 분리돼 있다. **지금은 계산하지 않는다.**
+
+### 12.3 포지셔닝 문구 (상시 · 기간 한정 아님)
+
+| 플랜 | 포지셔닝 |
+|---|---|
+| 무료 | 가볍게 시작해 보기 |
+| 베이직 | 매일 꾸준히 준비 |
+| 플러스 | 시험 전 집중 준비 |
+| 프로 | 가장 많이 연습하기 |
+
+프로의 "약점까지 관리"는 §7.3 대로 앱 진입점이 없어 **쓰지 않는다.**
+
+### 12.4 삭제한 문구
+
+- "오픈 기념 할인" 배지, "오픈 초기 특가 진행 중 — 지금 가장 저렴하게 시작하세요."
+  → RevenueCat에 오퍼·할인·무료 체험이 **하나도 설정돼 있지 않다.** 정가 판매다.
+- 학습 기록 보관 기간(7일/30일/전체) 4줄 → §7.3.
+- 클라이언트 가격 상수 `PlanEntitlement.monthlyPriceKRW` → 삭제.
+
+`PaywallTests.copyContainsNoFakePromotionOrUrgency`가 회귀를 막는다.
+
+### 12.5 페이월 진입점 (`PaywallSource`)
+
+| 소스 | rawValue | 진입 위치 |
+|---|---|---|
+| `.settings` | `settings` | `PracticeScreen` 툴바 왕관 버튼 |
+| `.tokenExhausted` | `token_exhausted` | `PracticeViewModel.handleRefreshQuotaExhausted` (유료 소진 · 광고 보너스까지 소진) |
+| `.resultLocked` | `result_locked` | `PracticeResultView` 잠금 섹션 |
+| `.mockLimit` | `mock_limit` | `MockExamScreen` 모의고사 한도 안내 |
+
+현재 앱의 페이월 진입점은 이 넷이 전부이며 **모두 커버된다.**
+`.calendarLocked`는 캘린더 출시 시 추가한다(지금 만들지 않는다).
+
+---
+
+## 13. 구매 퍼널 계측 (G0) [구현됨]
+
+**새 분석 벤더를 붙이지 않았다.** 이 앱에 연결된 Firebase 제품은 Core · Auth · AppCheck
+뿐이고 **FirebaseAnalytics는 링크돼 있지 않다.** 이미 쓰고 있는 구조화 OSLog
+(`Services/Analytics/AppTelemetry.swift`)에 이벤트를 추가했다. 매출 지표는 RevenueCat
+대시보드가 이미 갖고 있으므로 중복 구축하지 않는다.
+
+| 이벤트 | 파라미터 |
+|---|---|
+| `paywall_view` | `source` |
+| `plan_selected` | `plan`, `source` |
+| `purchase_started` | `plan`, `source` |
+| `purchase_success` | `plan`, `source` |
+| `purchase_failed` | `plan`, `source`, `error_category` |
+| `restore_started` | — |
+| `restore_success` | `plan` |
+| `restore_failed` | `error_category` |
+
+- `error_category`는 `PurchaseErrorCategory` 고정 집합(`cancelled` · `not_configured` ·
+  `no_active_subscription` · `unknown`)이다. 원본 오류 문자열은 스토어·네트워크 자유 텍스트라
+  스키마가 되지 않으므로 로그에 남기지 않는다.
+- **절대 로그하지 않는 것**: 전사(transcript) · 오디오 · 사용자 답변 · UID(전체/부분) ·
+  기타 개인정보. 파라미터는 전부 고정 enum이다.
+- 한계: OSLog는 원격 수집이 되지 않는다. 실제 퍼널 전환율이 필요해지면 별도 PR에서
+  수집 백엔드를 결정한다. 지금 반쪽짜리 수집기를 만들지 않는다.
+
+---
+
+## 14. 향후 가격 (문서화만 · 아직 적용 금지) [계획]
+
+캘린더 출시 이후 목표 가격:
+
+| 플랜 | 현재 실판매가 | 목표가 |
+|---|---|---|
+| 베이직 | ₩2,900 | **₩3,900** |
+| 플러스 | ₩4,900 | **₩6,900** |
+| 프로 | ₩7,900 | **₩9,900** |
+
+- **App Store Connect · RevenueCat 상품을 아직 바꾸지 않았다.**
+- 페이월은 **StoreKit/RevenueCat이 실제로 반환하는 현지화 가격만** 표시한다.
+  스토어가 아직 옛 가격을 반환하면 옛 가격이 보이는 게 맞다. 가짜 미래 가격을
+  하드코딩하지 않는다.
+- **기존 구독자 그랜드파더링이 선호 정책**이다(가격 인상 시 기존 구독자는 기존가 유지).
+  StoreKit 자동 갱신 구독의 가격 인상은 기존 구독자에게 동의 절차가 필요하므로,
+  마이그레이션은 별도 PR(G7)에서 설계한다.
+
+---
+
+## 15. 로드맵 · 이번 PR 범위 [계획]
+
+| 단계 | 내용 | 상태 |
+|---|---|---|
+| **G0** | 구매 퍼널 계측 | **이번 PR 완료** |
+| **G1** | 페이월 V2 | **이번 PR 완료** |
+| G2 | 캘린더 기반(Calendar Foundation) | 다음 PR · **이번 PR에서 착수 금지** |
+| G3 | 적응형 캘린더 플래너 | 이후 |
+| G4 | 캘린더 플랜 게이팅 | 이후 |
+| G5 | 알림 | 이후 |
+| G6 | 네이티브 App Store 평점 요청 | 이후 |
+| G7 | 가격 마이그레이션(§14) | 이후 |
+| G8 | 캘린더 인텔리전스 V2 | 이후 |
+
+### 15.1 향후 캘린더 플랜 게이팅 (계획일 뿐 · 구현 없음)
+
+| 플랜 | 캘린더 |
+|---|---|
+| 무료 | 기본 캘린더 |
+| 베이직 | 개인화 일정 · 결석일 재계획 |
+| 플러스 | 적응형 플랜 · 모의고사 스케줄링 · 시험일 역산 계획 |
+| 프로 | 취약점 플래너 · 취약점 복습 스케줄링 · 주간 학습 인텔리전스 |
+
+**이 표는 로드맵 문서 전용이다.** 페이월에 캘린더를 혜택으로 노출하지 않으며,
+`PaywallTests.copyNeverPromisesUnenforcedBenefits`가 "캘린더"·"일정" 문구를 차단한다.
+
+### 15.2 이번 PR에서 명시적으로 제외한 것
+
+캘린더 탭 · 캘린더 온보딩 · 캘린더 영속화 · 예측 엔진 · 학습 시간 계산 ·
+결석일 재조정 · 학습량 재분배 · 적응형 플랜 · 취약점 플래너 · 캘린더 플랜 잠금 ·
+푸시 알림 · App Store 평점 요청 · 신규 StoreKit 가격 · RevenueCat 상품 변경 ·
+App Store Connect 변경 · 그랜드파더링 마이그레이션 · 주간 AI 리포트.
