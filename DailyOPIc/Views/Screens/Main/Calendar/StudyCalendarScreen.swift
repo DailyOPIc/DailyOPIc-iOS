@@ -1,0 +1,369 @@
+import SwiftUI
+import SwiftData
+
+/// 캘린더 탭. 설정 전에는 온보딩, 설정 후에는 대시보드.
+struct StudyCalendarScreen: View {
+    let viewModel: StudyCalendarViewModel
+    let preferences: AppPreferences
+    /// Daily 탭으로 이동. 캘린더는 학습 화면을 따로 갖지 않는다.
+    let onStartDaily: () -> Void
+
+    @Query(sort: \StudySetCompletionRecord.completedAt, order: .reverse)
+    private var completionRecords: [StudySetCompletionRecord]
+    @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
+    private var practiceRecords: [PracticeHistoryRecord]
+    @State private var isEditingPlan = false
+
+    private var completions: [Date: Int] {
+        StudyCalendarEngine.completionCounts(
+            completedAt: completionRecords.map(\.completedAt),
+            calendar: viewModel.settings?.calendar ?? .current
+        )
+    }
+
+    /// 최근 분석 결과의 예상 등급. 오래된 기록은 현재 실력으로 보지 않는다.
+    private var recentLevel: OPIcLevel? {
+        guard let latest = practiceRecords.first else { return nil }
+        let age = Calendar.current.dateComponents(
+            [.day],
+            from: latest.createdAt,
+            to: .now
+        ).day ?? 0
+        guard age <= StudyPlanEstimatorConfig.recentLevelMaxAgeDays else { return nil }
+        return latest.predictedLevel
+    }
+
+    var body: some View {
+        Group {
+            switch viewModel.loadState {
+            case .idle, .loading:
+                loadingView
+            case let .failed(message):
+                failureView(message)
+            case .loaded:
+                if let snapshot = viewModel.snapshot(
+                    completions: completions,
+                    recentLevel: recentLevel
+                ) {
+                    StudyCalendarDashboard(
+                        snapshot: snapshot,
+                        settings: viewModel.settings ?? .draft,
+                        targetLevel: viewModel.targetLevel,
+                        planName: viewModel.plan.displayName,
+                        isShowingCachedSettings: viewModel.isShowingCachedSettings,
+                        completions: completions,
+                        onStartDaily: onStartDaily,
+                        onEditPlan: { isEditingPlan = true }
+                    )
+                } else {
+                    StudyPlanSetupView(
+                        viewModel: viewModel,
+                        onFinished: {},
+                        onChangeTargetLevel: { preferences.isPresentingLevelSelection = true }
+                    )
+                }
+            }
+        }
+        .navigationTitle("캘린더")
+        .task { await viewModel.loadIfNeeded() }
+        .sheet(isPresented: $isEditingPlan) {
+            StudyPlanEditView(viewModel: viewModel) {
+                isEditingPlan = false
+                preferences.isPresentingLevelSelection = true
+            }
+        }
+    }
+
+    private var loadingView: some View {
+        VStack(spacing: AppSpacing.md) {
+            AppLoadingIndicator()
+            Text("학습 계획을 불러오고 있어요.")
+                .font(AppTypography.body)
+                .foregroundStyle(AppPalette.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+
+    /// 캘린더 요청이 실패해도 다른 탭은 그대로 쓸 수 있다. 여기서만 재시도를 보여준다.
+    private func failureView(_ message: String) -> some View {
+        VStack(spacing: AppSpacing.md) {
+            Image(systemName: "calendar.badge.exclamationmark")
+                .font(.system(size: 40))
+                .foregroundStyle(AppPalette.secondaryInk)
+            Text("학습 계획을 불러오지 못했어요")
+                .font(AppTypography.sectionTitle)
+            Text(message)
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+                .multilineTextAlignment(.center)
+            Button("다시 시도") { Task { await viewModel.load() } }
+                .font(AppTypography.callout)
+                .minimumTouchTarget()
+        }
+        .padding(AppSpacing.lg)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+    }
+}
+
+struct StudyCalendarDashboard: View {
+    let snapshot: StudyCalendarSnapshot
+    let settings: StudyPlanSettings
+    let targetLevel: OPIcLevel
+    let planName: String
+    let isShowingCachedSettings: Bool
+    let completions: [Date: Int]
+    let onStartDaily: () -> Void
+    let onEditPlan: () -> Void
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                if isShowingCachedSettings {
+                    Text("오프라인이라 저장된 학습 계획을 보여주고 있어요.")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+                goalCard
+                weekStrip
+                todayCard
+                weekSummaryCard
+                StudyMonthView(
+                    settings: settings,
+                    targetSets: snapshot.forecast.effectiveDailyTarget,
+                    completions: completions
+                )
+            }
+            .padding(AppSpacing.lg)
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button("학습 설정 수정", systemImage: "slider.horizontal.3", action: onEditPlan)
+                    .accessibilityLabel("학습 설정 수정")
+            }
+        }
+    }
+
+    // MARK: 목표 요약
+
+    private var goalCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("\(targetLevel.rawValue) 학습 플랜")
+                .font(AppTypography.cardTitle)
+            Text("권장 계획 완료까지 약 \(snapshot.forecast.estimatedStudyDays)일")
+                .font(AppTypography.body)
+            if let completion = snapshot.forecast.estimatedCompletionDate {
+                Text("\(completion.formatted(.dateTime.month().day())) 완료 예상")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            if let remaining = snapshot.examDaysRemaining {
+                // 시험일과 권장 계획 완료일은 다른 값이다. 나란히 두되 섞지 않는다.
+                Text(examDDayText(remaining))
+                    .font(AppTypography.caption)
+                    .padding(.horizontal, AppSpacing.sm)
+                    .padding(.vertical, AppSpacing.xs)
+                    .background(AppPalette.primarySoft)
+                    .clipShape(Capsule())
+            }
+            if snapshot.forecastLandsAfterExam {
+                Text("현재 설정으로는 권장 학습 계획이 시험일 이후에 끝날 수 있어요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.dangerInk)
+            }
+            Text(StudyPlanForecast.disclaimer)
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+        }
+        .cardStyle()
+    }
+
+    private func examDDayText(_ remaining: Int) -> String {
+        if remaining > 0 { return "시험 D-\(remaining)" }
+        return remaining == 0 ? "시험 당일" : "시험일 지남"
+    }
+
+    // MARK: 주간 스트립
+
+    private var weekStrip: some View {
+        HStack(spacing: AppSpacing.xs) {
+            ForEach(snapshot.weekDays) { day in
+                StudyDayCell(day: day, isToday: day.date == snapshot.today.date)
+            }
+        }
+    }
+
+    // MARK: 오늘
+
+    private var todayCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("오늘의 학습")
+                .font(AppTypography.sectionTitle)
+            if snapshot.today.state == .rest {
+                Text("오늘은 휴식일이에요. 원하면 그냥 연습해도 좋아요.")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            } else {
+                Text("Daily 연습 \(snapshot.today.completedSets) / \(snapshot.today.targetSets) 완료")
+                    .font(AppTypography.body)
+                if snapshot.forecast.isCappedByPlan {
+                    Text("오늘 권장 \(snapshot.forecast.effectiveDailyTarget)세트 · 현재 \(planName) 플랜 최대 \(snapshot.forecast.dailyCapacity)토큰")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+            }
+            if snapshot.today.state == .completed {
+                Label("오늘 계획 완료", systemImage: "checkmark.circle.fill")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.primary)
+            } else {
+                PrimaryButton(title: "Daily 연습 시작", systemImage: "mic.fill", action: onStartDaily)
+            }
+        }
+        .cardStyle()
+    }
+
+    // MARK: 주간 요약
+
+    private var weekSummaryCard: some View {
+        HStack {
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text("이번 주")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                Text("\(snapshot.weekCompletedDays) / \(snapshot.weekScheduledDays)일 완료")
+                    .font(AppTypography.sectionTitle)
+            }
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: AppSpacing.xs) {
+                Text("연속 학습")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                Text("🔥 \(snapshot.streak)일")
+                    .font(AppTypography.sectionTitle)
+                    .accessibilityLabel("연속 학습 \(snapshot.streak)일")
+            }
+        }
+        .cardStyle()
+    }
+}
+
+/// 하루 한 칸. 색만으로 상태를 구분하지 않도록 기호를 함께 그린다.
+struct StudyDayCell: View {
+    let day: StudyDay
+    var isToday = false
+
+    private var calendar: Calendar { .current }
+
+    var body: some View {
+        VStack(spacing: AppSpacing.xs) {
+            Text(StudyWeekday.from(date: day.date, calendar: calendar).shortLabel)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppPalette.secondaryInk)
+            Image(systemName: day.state.symbolName)
+                .font(.system(size: 16))
+                .foregroundStyle(tint)
+            Text("\(calendar.component(.day, from: day.date))")
+                .font(AppTypography.footnote)
+        }
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, AppSpacing.sm)
+        .background(isToday ? AppPalette.primarySoft : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(
+            "\(day.date.formatted(.dateTime.month().day())) "
+            + "\(StudyWeekday.from(date: day.date, calendar: calendar).accessibilityLabel), "
+            + day.state.title
+            + (day.isScheduled ? ", \(day.completedSets) / \(day.targetSets) 세트" : "")
+        )
+    }
+
+    private var tint: Color {
+        switch day.state {
+        case .completed: AppPalette.primary
+        case .partial: AppPalette.primaryMid
+        case .missed: AppPalette.danger
+        case .planned, .rest: AppPalette.secondaryInk
+        }
+    }
+}
+
+/// 월간 보기. 오늘 할 일보다 아래에 두는 보조 화면이라 기본 SwiftUI 격자로 충분하다.
+struct StudyMonthView: View {
+    let settings: StudyPlanSettings
+    let targetSets: Int
+    let completions: [Date: Int]
+
+    @State private var monthOffset = 0
+
+    private var calendar: Calendar { settings.calendar }
+
+    private var monthStart: Date {
+        let today = calendar.startOfDay(for: .now)
+        let components = calendar.dateComponents([.year, .month], from: today)
+        let firstOfThisMonth = calendar.date(from: components) ?? today
+        return calendar.date(byAdding: .month, value: monthOffset, to: firstOfThisMonth)
+            ?? firstOfThisMonth
+    }
+
+    private var days: [StudyDay] {
+        StudyCalendarEngine.days(
+            from: monthStart,
+            count: calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30,
+            today: .now,
+            settings: settings,
+            targetSets: targetSets,
+            completions: completions
+        )
+    }
+
+    /// 1일 앞에 비워 둘 칸 수(월요일 시작).
+    private var leadingBlanks: Int {
+        StudyWeekday.from(date: monthStart, calendar: calendar).rawValue - 1
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            HStack {
+                Text(monthStart.formatted(.dateTime.year().month()))
+                    .font(AppTypography.sectionTitle)
+                Spacer(minLength: 0)
+                Button("이전 달", systemImage: "chevron.left") { monthOffset -= 1 }
+                    .labelStyle(.iconOnly)
+                    .minimumTouchTarget()
+                Button("다음 달", systemImage: "chevron.right") { monthOffset += 1 }
+                    .labelStyle(.iconOnly)
+                    .minimumTouchTarget()
+            }
+            LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7), spacing: AppSpacing.sm) {
+                ForEach(StudyWeekday.allCases) { weekday in
+                    Text(weekday.shortLabel)
+                        .font(AppTypography.caption)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .accessibilityHidden(true)
+                }
+                ForEach(0..<leadingBlanks, id: \.self) { _ in
+                    Color.clear.frame(height: 1)
+                }
+                ForEach(days) { day in
+                    StudyDayCell(day: day, isToday: calendar.isDateInToday(day.date))
+                }
+            }
+            legend
+        }
+        .cardStyle()
+    }
+
+    private var legend: some View {
+        // 색약 사용자를 위해 기호와 문구를 함께 설명한다.
+        HStack(spacing: AppSpacing.md) {
+            ForEach(StudyDayState.allCases, id: \.rawValue) { state in
+                Label(state.title, systemImage: state.symbolName)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .fixedSize(horizontal: false, vertical: true)
+    }
+}

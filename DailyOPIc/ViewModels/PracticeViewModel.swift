@@ -316,6 +316,10 @@ final class PracticeViewModel {
                 transcript: pendingRecording.transcript,
                 evaluation: result
             )
+            // 캘린더 완료 집계. 세트를 받은 것이 아니라 분석이 성공한 순간에 센다.
+            // 세트당 한 번만 기록되므로 재분석·결과 재진입은 중복되지 않는다.
+            // 기록 실패가 학습 흐름을 막아선 안 되므로 오류는 삼킨다.
+            _ = try? persistence.recordStudySetCompletion(setId: questionSet.setId)
             AudioFileService.remove(pendingRecording.audioURL)
             self.pendingRecording = nil
             usage = try? await api.usage()

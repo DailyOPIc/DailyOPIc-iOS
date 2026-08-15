@@ -22,6 +22,7 @@ final class AppPreferences {
         static let guideState = "native_guide_state"
         static let guidePage = "native_guide_page"
         static let initialLevelSyncPending = "native_initial_level_sync_pending"
+        static let studyPlan = "native_study_plan"
     }
 
     private let defaults: UserDefaults
@@ -65,6 +66,18 @@ final class AppPreferences {
             }
         }
     }
+    /// 서버에 저장된 학습 계획의 로컬 사본. 진실은 서버지만, 캘린더가 네트워크
+    /// 실패 하나로 빈 화면이 되지 않도록 마지막으로 성공한 설정을 들고 있는다.
+    var studyPlanSettings: StudyPlanSettings? {
+        didSet {
+            if let studyPlanSettings,
+               let data = try? JSONCoding.encoder.encode(studyPlanSettings) {
+                defaults.set(data, forKey: Key.studyPlan)
+            } else {
+                defaults.removeObject(forKey: Key.studyPlan)
+            }
+        }
+    }
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -105,6 +118,11 @@ final class AppPreferences {
             backgroundProfile = profile
         } else {
             backgroundProfile = BackgroundProfile()
+        }
+        if let data = defaults.data(forKey: Key.studyPlan) {
+            studyPlanSettings = try? JSONCoding.decoder.decode(StudyPlanSettings.self, from: data)
+        } else {
+            studyPlanSettings = nil
         }
         if let data = defaults.data(forKey: Key.mockSurvey),
            let survey = try? JSONCoding.decoder.decode(BackgroundSurvey.self, from: data) {

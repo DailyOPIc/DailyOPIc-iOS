@@ -89,6 +89,33 @@ final class PersistenceService {
         try context.save()
     }
 
+    /// 캘린더 완료 기록. 같은 세트는 몇 번 분석하든 한 번만 센다.
+    /// - Returns: 이번 호출로 새로 기록됐으면 true.
+    @discardableResult
+    func recordStudySetCompletion(setId: String, at date: Date = .now) throws -> Bool {
+        guard let context, !setId.isEmpty else { return false }
+        var descriptor = FetchDescriptor<StudySetCompletionRecord>(
+            predicate: #Predicate { $0.setId == setId }
+        )
+        descriptor.fetchLimit = 1
+        if try context.fetch(descriptor).first != nil { return false }
+        context.insert(StudySetCompletionRecord(setId: setId, completedAt: date))
+        try trimStudyCompletions(context: context, now: date)
+        try context.save()
+        return true
+    }
+
+    /// 1년치만 남긴다. 캘린더는 그보다 과거를 보여주지 않는다.
+    private func trimStudyCompletions(context: ModelContext, now: Date) throws {
+        guard let cutoff = Calendar.current.date(byAdding: .day, value: -366, to: now) else {
+            return
+        }
+        try context.delete(
+            model: StudySetCompletionRecord.self,
+            where: #Predicate { $0.completedAt < cutoff }
+        )
+    }
+
     private func trimPracticeHistory(context: ModelContext) throws {
         let descriptor = FetchDescriptor<PracticeHistoryRecord>(
             sortBy: [SortDescriptor(\.createdAt, order: .reverse)]

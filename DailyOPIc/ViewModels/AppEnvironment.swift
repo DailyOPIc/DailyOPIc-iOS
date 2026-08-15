@@ -29,6 +29,9 @@ final class AppEnvironment {
     /// 불필요한 오디오 자원을 잡지 않는다. 생성 시점은 그대로 두고 수명만 늘린다.
     @ObservationIgnored private(set) lazy var practiceViewModel = PracticeViewModel(environment: self)
     @ObservationIgnored private(set) lazy var mockViewModel = MockExamViewModel(environment: self)
+    /// 캘린더도 탭을 떠나도 살아 있어야 서버 설정을 매번 다시 받지 않는다.
+    /// 오디오 자원을 잡지 않으므로 생성 비용은 사실상 없다.
+    @ObservationIgnored private(set) lazy var studyCalendarViewModel = StudyCalendarViewModel(environment: self)
 
     /// 현재 유효 플랜.
     /// RevenueCat(StoreService)가 설정돼 있으면 Apple의 실제 활성 엔타이틀먼트를
