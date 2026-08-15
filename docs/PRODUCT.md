@@ -69,9 +69,10 @@
 
 - iOS SwiftUI 단일 앱. 진입: `DailyOPIcApp` → `AppRootView`.
   런치 상태에 따라 `SplashView` / `AuthRecoveryView` / 온보딩 / 메인. (`Views/AppRootView.swift`)
-- **탭 3개** (`Views/Screens/Main/MainTabView.swift`):
+- **탭 4개** (`Views/Screens/Main/MainTabView.swift`):
   - `데일리` (mic.fill) — 일일 연습
   - `모의고사` (list.number) — 15문항 모의고사
+  - `캘린더` (calendar) — 학습 계획/오늘 할 일 (§16)
   - `통계` (chart.bar.fill) — 학습 기록/인사이트
 - 설정은 탭이 아니라 데일리 화면 툴바의 시트(`SetupView`)로 진입.
   같은 툴바에 가이드 진입(`GuideEntryButton`)과 왕관(구독/페이월) 버튼이 있다.
@@ -79,7 +80,8 @@
   ③ **자가 진단 난이도(SelfAssessmentLevel 1~6) 선택**. 각 단계 카드에 예상 등급 범위와 답변 예시 문장 노출.
 - 인증: **Firebase 익명 인증**(`signInAnonymously`) + App Check(App Attest / Debug provider).
   로그인/로그아웃 UI 없음. 고객 지원용으로 `SetupView`에 사용자 식별 ID 복사 기능 제공.
-- 학습 기록 저장: **SwiftData 로컬 저장**(`PracticeHistoryRecord`, `MockHistoryRecord`, `MockDraftRecord`).
+- 학습 기록 저장: **SwiftData 로컬 저장**(`PracticeHistoryRecord`, `MockHistoryRecord`, `MockDraftRecord`,
+  `StudySetCompletionRecord`).
   통계 탭 문구도 "이 기기에 저장된 나의 연습 기록이에요" — **기기 간 동기화 없음**.
 - 서버: FastAPI(`DailyOPIc-BE`), 상태는 Firestore, AI는 OpenAI(`openai_model` 설정값),
   결제 상태는 RevenueCat 웹훅 → `userProfiles.entitlement`.
@@ -393,10 +395,10 @@ sticky CTA      safeAreaInset(.bottom) — "<플랜명> 시작하기"
 
 | 단계 | 내용 | 상태 |
 |---|---|---|
-| **G0** | 구매 퍼널 계측 | **이번 PR 완료** |
-| **G1** | 페이월 V2 | **이번 PR 완료** |
-| G2 | 캘린더 기반(Calendar Foundation) | 다음 PR · **이번 PR에서 착수 금지** |
-| G3 | 적응형 캘린더 플래너 | 이후 |
+| G0 | 구매 퍼널 계측 | 완료 |
+| G1 | 페이월 V2 | 완료 |
+| **G2** | 캘린더 기반(Calendar Foundation) | **이번 PR 완료**(§16) |
+| G3 | 적응형 캘린더 플래너 | 다음 PR · **이번 PR에서 착수 금지** |
 | G4 | 캘린더 플랜 게이팅 | 이후 |
 | G5 | 알림 | 이후 |
 | G6 | 네이티브 App Store 평점 요청 | 이후 |
@@ -415,9 +417,127 @@ sticky CTA      safeAreaInset(.bottom) — "<플랜명> 시작하기"
 **이 표는 로드맵 문서 전용이다.** 페이월에 캘린더를 혜택으로 노출하지 않으며,
 `PaywallTests.copyNeverPromisesUnenforcedBenefits`가 "캘린더"·"일정" 문구를 차단한다.
 
-### 15.2 이번 PR에서 명시적으로 제외한 것
+### 15.2 이번 PR(G2)에서 명시적으로 제외한 것
 
-캘린더 탭 · 캘린더 온보딩 · 캘린더 영속화 · 예측 엔진 · 학습 시간 계산 ·
-결석일 재조정 · 학습량 재분배 · 적응형 플랜 · 취약점 플래너 · 캘린더 플랜 잠금 ·
-푸시 알림 · App Store 평점 요청 · 신규 StoreKit 가격 · RevenueCat 상품 변경 ·
-App Store Connect 변경 · 그랜드파더링 마이그레이션 · 주간 AI 리포트.
+놓친 학습 자동 재배치 · 예상 완료일 자동 연장/단축 · 시험일 기준 학습량 압축(G3) ·
+캘린더 플랜 잠금 · 캘린더 페이월 유도(G4) · 로컬/푸시 알림 · 알림 권한 요청 ·
+알림 스케줄러(G5) · App Store 평점 요청(G6) · 신규 StoreKit 가격 · RevenueCat 상품 변경 ·
+App Store Connect 변경(G7) · AI 적응형 플래너 · 취약점 기반 스케줄링 · 주간 AI 리포트(G8).
+
+---
+
+## 16. 학습 캘린더 (Calendar Foundation) [구현됨 · G2]
+
+DailyOPIc는 답변 채점 앱이 아니라 **목표 등급/시험일까지 매일 무엇을 할지 관리하는
+AI OPIc 학습 플래너**다. G2는 그 플래너의 토대다.
+
+### 16.1 범위
+
+- 캘린더 탭 신설(기존 탭 재설계 없음), 미설정 시 온보딩 / 설정 후 대시보드.
+- 학습 계획 설정의 서버 영속화, 오늘 할 일 · 주간 · 월간 표시, 자동 완료 집계, 스트릭.
+- **자동 재계획(G3), 플랜별 잠금(G4), 알림(G5), AI 플래너(G8)는 포함하지 않는다.**
+
+### 16.2 온보딩 5단계
+
+| 단계 | 질문 | 저장 위치 |
+|---|---|---|
+| 1 | 목표 등급이 어떻게 되세요? | **기존 목표 등급 그대로**(§16.4) |
+| 2 | 시험일이 정해졌나요? (선택 · 과거 불가) | `studyPlan.examDate` |
+| 3 | 언제 공부할 수 있나요? (최소 1일) | `studyPlan.studyWeekdays` |
+| 4 | 하루에 얼마나 공부하고 싶나요? | `studyPlan.intensity` |
+| 5 | 언제 공부할까요? (로컬 시각) | `studyPlan.preferredStudyTime` |
+
+5단계에서 **알림 권한을 요청하지 않고 알림을 예약하지도 않는다.** 시각만 저장하며
+화면에 "알림 기능은 학습 계획 설정 이후 사용할 수 있어요."라고 적는다(G5가 이 값을 쓴다).
+
+### 16.3 저장 위치 (단일 진실)
+
+- 서버: `GET/PUT /v1/users/me/study-plan` → Firestore `userProfiles/{uid}.studyPlan`.
+  기존 사용자 문서에 `studyPlan`이 없으면 **오류가 아니라 `configured=false`**다.
+  파괴적 마이그레이션 없음, 컬렉션 전수 스캔 없음.
+- 로컬: `AppPreferences.studyPlanSettings`는 **서버 값의 사본**일 뿐이다. 네트워크가
+  끊겼을 때 캘린더가 빈 화면이 되지 않게만 쓴다.
+- 저장하지 않는 것: 전사(transcript) · 녹음 · AI 응답 본문 · 파생값(예상 완료일 등) ·
+  구독 플랜(엔타이틀먼트에서 실시간으로 온다).
+
+### 16.4 목표 등급은 복제하지 않는다
+
+목표 등급의 진실은 이미 `AppPreferences.targetLevel` + 서버 `userProfiles.targetLevel`
+(`PUT /v1/users/me/target-level`)이다. 캘린더는 이 값을 **읽기만** 하고, 변경은 기존
+난이도 재선택 화면(`OnboardingView`, 하루 1회 · 광고/유료 자동 검증 규칙 포함)으로 보낸다.
+`StudyPlanRequest`에 `targetLevel` 필드는 없다(`StudyCalendarTests`가 이를 강제).
+
+### 16.5 예측 휴리스틱 (검증된 학습 곡선이 아니다)
+
+상수는 전부 `StudyPlanEstimatorConfig` 한 곳에 있다.
+
+| 상수 | 값 | 의미 |
+|---|---|---|
+| `baseTotalSets` | 20 | 목표에 이미 도달했을 때도 권장하는 유지 학습량(세트) |
+| `setsPerLevelStep` | 12 | 목표까지 등급 한 단계당 추가 세트 |
+| `assumedLevelStepsWhenUnknown` | 2 | 최근 등급을 모를 때 가정하는 단계 차 |
+| `recentLevelMaxAgeDays` | 60 | 이보다 오래된 분석 결과는 현재 실력으로 보지 않음 |
+| `minimumTotalSets` / `maximumTotalSets` | 12 / 120 | 권장 총량 클램프 |
+| `maximumForecastDays` | 365 | 완료일 탐색 상한(넘으면 날짜 없음) |
+
+계산: `권장 총 세트 = clamp(20 + 12 × max(0, 목표.rank − 현재.rank))` →
+`하루 목표 = min(강도 세트, 플랜 Daily 토큰 한도)` →
+`예상 학습일수 = ceil(총 세트 ÷ 하루 목표)` →
+`예상 완료일 = 선택한 공부 요일만 세어 그 일수째 되는 날`.
+OpenAI를 호출하지 않으며 등급 예측 모델도 아니다.
+
+> **예측의 의미: "권장 학습 계획을 끝내는 데 걸리는 예상 기간"이지, 해당 날짜에
+> OPIc 등급을 취득한다는 뜻이 아니다.** 화면에도 "실제 OPIc 등급 달성을 보장하지
+> 않아요"를 항상 함께 노출한다.
+
+### 16.6 하루 학습량과 플랜
+
+- 강도 → 희망 세트: 가볍게 1 · 꾸준히 2 · 집중 3.
+- **실효 목표 = min(희망 세트, 현재 플랜의 하루 Daily 토큰 한도)**
+  (무료 1 · 베이직 3 · 플러스 10 · 프로 20 — 진실은 서버 `quotaPolicy.practiceDaily`).
+- **프로의 20토큰은 한도지 숙제가 아니다.** 한도가 희망 세트를 늘리는 일은 없다.
+- 무료 + 집중처럼 한도에 걸리면 "오늘 권장 1세트 · 현재 무료 플랜 최대 1토큰"이라고
+  설명만 한다. **여기서 페이월을 열지 않는다(G4).**
+
+### 16.7 하루 상태
+
+| 상태 | 표기 | 규칙 |
+|---|---|---|
+| 휴식 | `moon.zzz` | 선택하지 않은 요일 |
+| 예정 | `circle.dotted` | 학습일 · 오늘 이후(또는 오늘) · 완료 0 |
+| 일부 완료 | `circle.lefthalf.filled` | 1세트 이상 · 목표 미만 |
+| 완료 | `checkmark.circle.fill` | 목표 이상 |
+| 놓침 | `exclamationmark.circle` | 지난 학습일 · 완료 0 |
+
+색만으로 구분하지 않고 항상 기호 + 문구를 함께 쓴다. 놓친 날은 **표시만** 하고
+이후 일정을 자동으로 밀지 않는다(G3).
+
+### 16.8 완료 정의와 중복 방지
+
+- **세트를 받는 것(토큰 소모)은 완료가 아니다.** 그 세트에서 **AI 분석이 처음
+  성공했을 때** 완료 1세트로 센다(`PracticeViewModel.evaluatePendingRecording()`의
+  성공 경로).
+- 저장은 `StudySetCompletionRecord(setId, completedAt)`, `setId`가 **유일 키**다.
+  재분석 · 결과 재진입 · 화면 재등장 · 네트워크 재시도가 중복으로 세지 않는다.
+- 토큰 소모 · 평가 로직 · Daily 세트 획득 동작은 **변경하지 않았다.**
+- `PracticeHistoryRecord`(문항 단위 · 최근 50개만 보관)로는 세트 단위 일별 완료를
+  복원할 수 없어 별도 원장을 뒀다. 서버 `dailyUsage`는 토큰 예약을 세므로 "세트를
+  열기만 한 날"까지 완료로 잡히기 때문에 쓰지 않는다.
+
+### 16.9 스트릭
+
+연속으로 **완료**한 학습일 수. 계획된 휴식일은 끊지 않고, 목표에 못 미친 지난
+학습일은 끊는다. 아직 끝나지 않은 오늘은 끊지 않으며 미래 날짜는 세지 않는다.
+스트릭 프리즈 · 복구 아이템 · 공유 · 업적은 만들지 않는다.
+
+### 16.10 시험일
+
+로컬 달력 기준 "시험 D-n". 예상 완료일이 시험일 이후면 중립적으로 한 줄 알린다:
+"현재 설정으로는 권장 학습 계획이 시험일 이후에 끝날 수 있어요." 제공하는 행동은
+학습 설정 수정 · 시험일 수정뿐이며, **업셀 · 학습량 자동 증가 · 날짜 자동 변경 ·
+페이월 트리거는 없다.** 시험일과 권장 계획 완료일은 서로 다른 값으로 표시한다.
+
+### 16.11 설정 수정
+
+시험일 · 공부 요일 · 강도 · 학습 시간을 한 화면에서 고친다(목표 등급은 §16.4 경로).
+저장하면 예측만 다시 계산되고 **이미 쌓인 완료 기록은 그대로 남는다.**
