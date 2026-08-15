@@ -14,6 +14,8 @@ struct StudyCalendarScreen: View {
     private var practiceRecords: [PracticeHistoryRecord]
     @Query private var dayPlanRecords: [StudyDayPlanRecord]
     @State private var isEditingPlan = false
+    /// 잠긴 기능을 **직접 눌렀을 때만** Paywall이 열린다. 캘린더 진입이나 일정 부족으로는 열지 않는다.
+    @State private var paywallFeature: CalendarLockedFeature?
 
     /// 그날 배정됐던 학습량. 지난 날짜는 이 값으로만 판정하고 현재 설정으로 다시 계산하지 않는다.
     private var historicalTargets: [String: Int] {
@@ -59,8 +61,16 @@ struct StudyCalendarScreen: View {
                         planName: viewModel.plan.displayName,
                         isShowingCachedSettings: viewModel.isShowingCachedSettings,
                         completions: completions,
+                        lockedFeatures: viewModel.lockedFeatures,
                         onStartDaily: onStartDaily,
-                        onEditPlan: { isEditingPlan = true }
+                        onEditPlan: { isEditingPlan = true },
+                        onLockedFeature: { feature in
+                            AppTelemetry.calendarFeatureLockedTap(
+                                feature: feature,
+                                plan: viewModel.plan
+                            )
+                            paywallFeature = feature
+                        }
                     )
                     // 오늘까지의 배정 학습량을 고정해 둔다. 내일 설정을 바꿔도 오늘의 기록은
                     // 그대로 남는다.
@@ -82,6 +92,7 @@ struct StudyCalendarScreen: View {
                 preferences.isPresentingLevelSelection = true
             }
         }
+        .sheet(item: $paywallFeature) { _ in PaywallView(source: .calendarLocked) }
     }
 
     private var loadingView: some View {
@@ -122,8 +133,11 @@ struct StudyCalendarDashboard: View {
     let planName: String
     let isShowingCachedSettings: Bool
     let completions: [Date: Int]
+    /// 아직 잠긴 자동화 기능. 비어 있으면 잠금 영역 자체를 그리지 않는다.
+    var lockedFeatures: [CalendarLockedFeature] = []
     let onStartDaily: () -> Void
     let onEditPlan: () -> Void
+    var onLockedFeature: (CalendarLockedFeature) -> Void = { _ in }
 
     var body: some View {
         ScrollView {
@@ -137,6 +151,7 @@ struct StudyCalendarDashboard: View {
                 weekStrip
                 todayCard
                 weekSummaryCard
+                lockedFeatureCard
                 StudyMonthView(
                     settings: settings,
                     schedule: snapshot.schedule,
@@ -213,6 +228,16 @@ struct StudyCalendarDashboard: View {
                     .font(AppTypography.callout)
                     .minimumTouchTarget()
             }
+        case .onTrack where plan.finishesAfterExam:
+            // 시험일 역산이 잠겨 있어도 위험은 그대로 알린다. 대신 여기서 결제를 권하지 않는다.
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text("현재 일정대로면 시험 전에 권장 학습량을 모두 마치기 어려워요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.dangerInk)
+                Button("학습 설정 수정", action: onEditPlan)
+                    .font(AppTypography.callout)
+                    .minimumTouchTarget()
+            }
         case .onTrack, .completed:
             EmptyView()
         }
@@ -262,7 +287,13 @@ struct StudyCalendarDashboard: View {
                 }
             }
             if snapshot.extraToday > 0 {
-                Text("오늘 계획보다 \(snapshot.extraToday)세트 더 학습했어요. 남은 일정에 반영했어요.")
+                // 자동 재조정이 없는 플랜에는 "남은 일정에 반영했어요"라고 말하지 않는다.
+                // 추가 학습이 남은 학습량을 줄이는 것은 두 플랜 모두 사실이다.
+                Text(
+                    plan.policy.canAutoReplan
+                    ? "오늘 계획보다 \(snapshot.extraToday)세트 더 학습했어요. 남은 일정에 반영했어요."
+                    : "오늘 계획보다 \(snapshot.extraToday)세트 더 학습했어요."
+                )
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
             }
@@ -303,6 +334,47 @@ struct StudyCalendarDashboard: View {
             }
         }
         .cardStyle()
+    }
+
+    // MARK: 잠긴 자동화 기능
+
+    /// 한 칸에 모아 둔다. 월간 보기와 오늘 할 일을 잠금 배지로 어지럽히지 않는다.
+    /// 여기를 **직접 누를 때만** Paywall이 열린다.
+    @ViewBuilder
+    private var lockedFeatureCard: some View {
+        if !lockedFeatures.isEmpty {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("학습 플랜 기능")
+                    .font(AppTypography.sectionTitle)
+                ForEach(lockedFeatures, id: \.rawValue) { feature in
+                    Button { onLockedFeature(feature) } label: {
+                        HStack(alignment: .top, spacing: AppSpacing.sm) {
+                            Image(systemName: "lock.fill")
+                                .font(AppTypography.callout)
+                                .foregroundStyle(AppPalette.secondaryInk)
+                            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                                Text(feature.title)
+                                    .font(AppTypography.callout)
+                                Text(feature.detail)
+                                    .font(AppTypography.footnote)
+                                    .foregroundStyle(AppPalette.secondaryInk)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                            Text(feature.requirementText)
+                                .font(AppTypography.caption)
+                                .foregroundStyle(AppPalette.secondaryInk)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget()
+                    .accessibilityLabel(feature.accessibilityLabel)
+                    .accessibilityHint(feature.detail)
+                }
+            }
+            .cardStyle()
+        }
     }
 }
 

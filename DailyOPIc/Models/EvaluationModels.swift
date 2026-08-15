@@ -335,6 +335,11 @@ struct Capabilities: Codable, Sendable {
         let analysisDepth: String?
         let reviewSet: Bool?
         let adsEnabled: Bool?
+        // 캘린더 자동화 깊이(G4). 캘린더 자체는 전 플랜 개방이라 클라이언트가
+        // `calendarEnabled`로 화면을 잠그지 않는다 → 읽지 않는 값을 디코드하지 않는다.
+        let calendarAutoReplan: Bool?
+        let calendarEvaluationAdaptive: Bool?
+        let calendarExamBackplan: Bool?
     }
 
     let minimumSupportedAppVersion: String

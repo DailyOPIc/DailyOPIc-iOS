@@ -1,0 +1,95 @@
+import Foundation
+
+/// 캘린더 자동화 3종을 쓸 수 있는지 여부. 캘린더 자체는 어떤 플랜에서도 잠기지 않는다.
+///
+/// 플랜 이름 비교(`plan == .plus`)를 planner와 화면 여기저기에 흩지 않기 위해,
+/// "이 사용자가 무엇을 할 수 있는가"는 이 타입 한 곳에서만 결정한다.
+struct CalendarFeaturePolicy: Equatable, Sendable {
+    /// 놓친/추가 학습을 앞으로의 일정에 반영해 하루 배정량을 다시 계산한다.
+    let canAutoReplan: Bool
+    /// 최근 평가 등급을 권장 총 학습량에 반영한다.
+    let canUseRecentEvaluation: Bool
+    /// 시험일까지 남은 학습일에 남은 학습량을 다시 나눈다.
+    let canBackplanToExam: Bool
+
+    static let free = CalendarFeaturePolicy(
+        canAutoReplan: false, canUseRecentEvaluation: false, canBackplanToExam: false
+    )
+    static let everything = CalendarFeaturePolicy(
+        canAutoReplan: true, canUseRecentEvaluation: true, canBackplanToExam: true
+    )
+
+    /// 진실은 서버 capabilities다. 다만 방금 결제한 직후에는 로컬 엔타이틀먼트가 서버
+    /// 스냅샷보다 앞서 가므로, 서버가 **같은 플랜**을 말할 때만 서버 값을 쓴다.
+    /// 그 외(스냅샷 없음·오래된 서버·플랜 불일치)에는 플랜 폴백 표를 쓴다.
+    static func resolve(capabilities: Capabilities?, plan: PlanEntitlement) -> CalendarFeaturePolicy {
+        guard let quota = capabilities?.quotaPolicy,
+              PlanEntitlement(from: capabilities?.plan) == plan,
+              let autoReplan = quota.calendarAutoReplan
+        else { return fallback(for: plan) }
+        return CalendarFeaturePolicy(
+            canAutoReplan: autoReplan,
+            canUseRecentEvaluation: quota.calendarEvaluationAdaptive ?? false,
+            canBackplanToExam: quota.calendarExamBackplan ?? false
+        )
+    }
+
+    /// 서버 값을 못 쓸 때의 **유일한** 폴백 표. 여기 말고 다른 곳에서 플랜을 보고
+    /// 기능을 정하지 않는다.
+    static func fallback(for plan: PlanEntitlement) -> CalendarFeaturePolicy {
+        switch plan {
+        case .free: .free
+        case .basic: CalendarFeaturePolicy(
+            canAutoReplan: true, canUseRecentEvaluation: false, canBackplanToExam: false
+        )
+        case .plus, .pro: .everything
+        }
+    }
+}
+
+/// 잠긴 캘린더 기능. 화면 문구·접근성 라벨·분석 이벤트·필요 플랜이 전부 여기서 나온다.
+/// 구현이 있는 기능만 넣는다(취약점 기반 일정은 G8이라 없다).
+enum CalendarLockedFeature: String, CaseIterable, Identifiable, Sendable {
+    case autoReplan = "auto_replan"
+    case evaluationAdaptive = "evaluation_adaptive"
+    case examBackplan = "exam_backplan"
+
+    var id: String { rawValue }
+
+    var title: String {
+        switch self {
+        case .autoReplan: "자동 일정 재조정"
+        case .evaluationAdaptive: "최근 평가를 반영한 학습 계획"
+        case .examBackplan: "시험일까지 역산한 일정"
+        }
+    }
+
+    var detail: String {
+        switch self {
+        case .autoReplan: "놓친 학습과 추가 학습을 앞으로의 일정에 다시 나눠요."
+        case .evaluationAdaptive: "최근 분석 등급으로 권장 학습량을 다시 계산해요."
+        case .examBackplan: "시험 전까지 남은 학습일에 학습량을 다시 나눠요."
+        }
+    }
+
+    var requiredPlan: PlanEntitlement {
+        switch self {
+        case .autoReplan: .basic
+        case .evaluationAdaptive, .examBackplan: .plus
+        }
+    }
+
+    /// "베이직부터" / "플러스부터".
+    var requirementText: String { "\(requiredPlan.displayName)부터" }
+
+    /// 자물쇠 아이콘과 색에만 기대지 않기 위한 VoiceOver 라벨.
+    var accessibilityLabel: String { "\(title), 잠김, \(requirementText) 이용 가능" }
+
+    func isLocked(under policy: CalendarFeaturePolicy) -> Bool {
+        switch self {
+        case .autoReplan: !policy.canAutoReplan
+        case .evaluationAdaptive: !policy.canUseRecentEvaluation
+        case .examBackplan: !policy.canBackplanToExam
+        }
+    }
+}

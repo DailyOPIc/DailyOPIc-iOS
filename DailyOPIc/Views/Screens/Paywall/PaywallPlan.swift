@@ -7,6 +7,8 @@ enum PaywallSource: String, Sendable {
     case tokenExhausted = "token_exhausted"
     case resultLocked = "result_locked"
     case mockLimit = "mock_limit"
+    /// 캘린더의 잠긴 자동화 기능을 직접 눌러서 들어온 경우.
+    case calendarLocked = "calendar_locked"
 }
 
 /// 페이월 한 플랜의 표시 문구.
@@ -21,6 +23,8 @@ enum PaywallSource: String, Sendable {
 ///   50건만 남는다. 7일/30일/전체는 강제되지 않는다.
 /// - **취약점 복습 세트**: 서버 `/v1/question-sets/review`는 프로 전용으로 막혀
 ///   있지만 앱이 이 엔드포인트를 호출하는 화면이 아직 없다.
+/// - **취약점 기반 학습 일정**: 구현이 없다(G8). 캘린더 문구는 실제로 동작하는
+///   자동 재조정 · 평가 반영 · 시험일 역산 세 가지만 말한다.
 struct PaywallPlanCopy: Identifiable, Sendable {
     let plan: PlanEntitlement
     /// 이 플랜이 누구에게 맞는지 한 줄. 상시 포지셔닝이며 기간 한정 문구가 아니다.
@@ -36,6 +40,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
             "매일 데일리 토큰 1개 (광고 시청으로 1개 더)",
             "예상 등급 · 강점 · 개선점 · 5영역 피드백",
             "모의고사 1회 체험 (광고 시청)",
+            "학습 캘린더 · 진행률 · 연속 학습",
             "광고 포함",
         ]
     )
@@ -49,6 +54,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "매일 데일리 토큰 3개",
                 "결과 전체 해제 — 교정 답안 · 모범 답안 · 목표 등급까지",
                 "모의고사 매일 1회",
+                "놓친 학습을 반영한 자동 일정 재조정",
                 "광고 없음",
             ]
         ),
@@ -59,6 +65,8 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "매일 데일리 토큰 10개",
                 "베이직의 결과 분석 그대로",
                 "모의고사 하루 3회",
+                "최근 평가를 반영한 학습 계획",
+                "시험일까지 역산한 일정 조정",
                 "광고 없음",
             ]
         ),
@@ -69,6 +77,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "매일 데일리 토큰 20개",
                 "플러스의 결과 분석 그대로",
                 "모의고사 하루 5회",
+                "플러스의 학습 일정 기능 그대로",
                 "광고 없음",
             ]
         ),
@@ -92,6 +101,11 @@ struct PaywallComparisonRow: Identifiable, Sendable {
         PaywallComparisonRow(title: "데일리 토큰", values: ["1 (+광고 1)", "3", "10", "20"]),
         PaywallComparisonRow(title: "AI 결과 분석", values: ["요약", "전체", "전체", "전체"]),
         PaywallComparisonRow(title: "모의고사", values: ["1회 체험", "매일 1회", "하루 3회", "하루 5회"]),
+        // 캘린더 자체는 전 플랜이 쓴다. 다른 것은 자동화 깊이뿐이다.
+        PaywallComparisonRow(
+            title: "학습 일정 자동화",
+            values: ["기본 캘린더", "자동 재조정", "평가 반영 · 시험일 역산", "평가 반영 · 시험일 역산"]
+        ),
         PaywallComparisonRow(title: "광고", values: ["있음", "없음", "없음", "없음"]),
     ]
 

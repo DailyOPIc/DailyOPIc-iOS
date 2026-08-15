@@ -301,6 +301,7 @@ struct StudyCalendarSnapshot: Sendable {
         dailyCapacity: Int,
         completions: [Date: Int],
         historicalTargets: [String: Int] = [:],
+        policy: CalendarFeaturePolicy = .everything,
         today: Date = .now
     ) -> StudyCalendarSnapshot {
         let calendar = settings.calendar
@@ -311,6 +312,7 @@ struct StudyCalendarSnapshot: Sendable {
             recentLevel: recentLevel,
             dailyCapacity: dailyCapacity,
             completions: completions,
+            policy: policy,
             today: startOfToday
         )
         let schedule = StudySchedule(

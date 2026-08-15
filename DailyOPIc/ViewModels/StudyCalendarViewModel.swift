@@ -49,6 +49,19 @@ final class StudyCalendarViewModel {
 
     var plan: PlanEntitlement { environment.currentPlan }
 
+    /// 캘린더 자동화 권한. 화면과 planner는 플랜을 직접 보지 않고 이 값만 본다.
+    var featurePolicy: CalendarFeaturePolicy {
+        CalendarFeaturePolicy.resolve(
+            capabilities: environment.capabilities,
+            plan: environment.currentPlan
+        )
+    }
+
+    /// 이 플랜에서 아직 잠겨 있는 캘린더 기능(화면 노출 순서 그대로).
+    var lockedFeatures: [CalendarLockedFeature] {
+        CalendarLockedFeature.allCases.filter { $0.isLocked(under: featurePolicy) }
+    }
+
     var hasFailed: Bool {
         if case .failed = loadState { return true }
         return false
@@ -137,7 +150,8 @@ final class StudyCalendarViewModel {
             recentLevel: recentLevel,
             dailyCapacity: dailyCapacity,
             completions: completions,
-            historicalTargets: historicalTargets
+            historicalTargets: historicalTargets,
+            policy: featurePolicy
         )
     }
 }

@@ -53,6 +53,11 @@ enum AppTelemetry {
         logger.info("purchase_failed plan=\(plan.rawValue, privacy: .public) source=\(source.rawValue, privacy: .public) error_category=\(category.rawValue, privacy: .public)")
     }
 
+    /// 잠긴 캘린더 기능을 **직접 누른** 순간만 남긴다. 화면이 그려질 때마다 남기지 않는다.
+    static func calendarFeatureLockedTap(feature: CalendarLockedFeature, plan: PlanEntitlement) {
+        logger.info("calendar_feature_locked_tap feature=\(feature.rawValue, privacy: .public) current_plan=\(plan.rawValue, privacy: .public)")
+    }
+
     static func restoreStarted() {
         logger.info("restore_started")
     }

@@ -42,8 +42,18 @@ struct AdaptiveStudyPlan: Sendable {
     let maximumSetsPossibleBeforeExam: Int?
     /// 시험 전에 모자라는 학습량. `insufficientTime`이 아니면 nil.
     let shortfallSets: Int?
+    /// 이 계획을 만들 때 적용된 캘린더 자동화 권한.
+    let policy: CalendarFeaturePolicy
 
     var isCappedByPlan: Bool { baseDailyTarget < desiredDailySets }
+
+    /// 지금 일정대로면 시험 전에 권장 학습량을 끝내지 못한다.
+    /// 시험일 역산이 잠긴 플랜에서도 이 경고는 그대로 보여준다(숨기면 거짓말이 된다).
+    var finishesAfterExam: Bool {
+        guard let examDate else { return false }
+        guard let completion = estimatedCompletionDate else { return mode == .insufficientTime }
+        return completion >= examDate
+    }
 
     /// 남은 학습일 수(오늘 포함). 대시보드의 "약 n일" 표기에 쓴다.
     var estimatedStudyDays: Int { upcomingDays.count }
@@ -62,12 +72,18 @@ enum AdaptiveStudyPlanner {
         recentLevel: OPIcLevel?,
         dailyCapacity: Int,
         completions: [Date: Int],
+        policy: CalendarFeaturePolicy = .everything,
         today: Date = .now
     ) -> AdaptiveStudyPlan {
         let calendar = settings.calendar
         let startOfToday = calendar.startOfDay(for: today)
 
-        let total = StudyPlanEstimator.recommendedTotalSets(target: targetLevel, recent: recentLevel)
+        // 최근 평가 반영이 잠겨 있으면 등급을 아예 모르는 것으로 계산한다(결정론적 폴백).
+        let effectiveRecent = policy.canUseRecentEvaluation ? recentLevel : nil
+        let total = StudyPlanEstimator.recommendedTotalSets(
+            target: targetLevel,
+            recent: effectiveRecent
+        )
         let completed = eligibleCompletedSets(
             settings: settings,
             completions: completions,
@@ -103,7 +119,8 @@ enum AdaptiveStudyPlanner {
                 estimatedCompletionDate: days.last?.date,
                 examDate: exam,
                 maximumSetsPossibleBeforeExam: maximumBeforeExam,
-                shortfallSets: shortfall
+                shortfallSets: shortfall,
+                policy: policy
             )
         }
 
@@ -112,13 +129,17 @@ enum AdaptiveStudyPlanner {
 
         // 1) 평소 속도로 짠 일정. 놓친 날의 몫을 다음 날에 몰아주지 않고,
         //    남은 학습량이 그만큼 뒤로 밀릴 뿐이다.
-        let normalDays = distribute(
-            remaining,
-            over: studyDates(from: startOfToday, settings: settings),
-            perDay: base
-        )
+        //    자동 재조정이 잠긴 플랜은 남은 학습량과 무관하게 하루 배정량이 늘 고정이다.
+        let dates = studyDates(from: startOfToday, settings: settings)
+        let normalDays = policy.canAutoReplan
+            ? distribute(remaining, over: dates, perDay: base)
+            : fixedQuota(remaining, over: dates, perDay: base)
 
         guard let exam else { return result(mode: .onTrack, days: normalDays) }
+
+        // 시험일 역산은 잠길 수 있다. 그래도 시험일과 D-day, "시험 전에 못 끝낸다"는
+        // 사실(`finishesAfterExam`)은 그대로 준다. 다시 나누는 일만 하지 않는다.
+        guard policy.canBackplanToExam else { return result(mode: .onTrack, days: normalDays) }
 
         // 2) 시험일이 있으면 마지막 학습일은 시험 전날까지다. 시험 당일에 숙제를 내지 않는다.
         guard let lastAllowed = calendar.date(byAdding: .day, value: -1, to: exam),
@@ -219,6 +240,14 @@ enum AdaptiveStudyPlanner {
             day = next
         }
         return dates
+    }
+
+    /// 자동 재조정이 없는 플랜의 일정. 학습일마다 정해진 하루 학습량 그대로 배정한다.
+    /// 남은 학습량이 줄면 일정이 짧아질 뿐, 하루 배정량은 진행 상황에 따라 달라지지 않는다.
+    static func fixedQuota(_ sets: Int, over dates: [Date], perDay: Int) -> [StudyDayPlan] {
+        guard perDay > 0, sets > 0 else { return [] }
+        let days = (sets + perDay - 1) / perDay
+        return dates.prefix(days).map { StudyDayPlan(date: $0, targetSets: perDay) }
     }
 
     /// 하루 `perDay`씩 채우다 남은 학습량이 떨어지면 멈춘다(마지막 날은 남은 만큼만).

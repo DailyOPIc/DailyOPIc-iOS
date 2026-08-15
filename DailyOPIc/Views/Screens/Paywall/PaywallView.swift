@@ -83,7 +83,12 @@ struct PaywallView: View {
 
     private var header: some View {
         VStack(spacing: AppSpacing.xs) {
-            Text("내 학습량에 맞는 플랜을 선택하세요.")
+            // 어디서 들어왔는지만 한 줄로 되짚는다. "당신에게 OO이 최적" 같은 추천은 하지 않는다.
+            Text(
+                source == .calendarLocked
+                ? "학습 일정 자동화는 유료 플랜에 포함돼 있어요."
+                : "내 학습량에 맞는 플랜을 선택하세요."
+            )
                 .font(AppTypography.callout)
                 .foregroundStyle(AppPalette.secondaryInk)
                 .multilineTextAlignment(.center)

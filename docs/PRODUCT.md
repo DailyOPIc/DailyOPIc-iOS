@@ -187,6 +187,8 @@
 | 분석 depth | `summary` | `full` | `full` | `full` |
 | 취약점 복습 세트 (`review_set`) | ✗ | ✗ | ✗ | 서버만 허용 (앱 진입점 없음) |
 | `history_days` (capabilities 값) | 7 | 30 | 30 | 전체 |
+| 학습 캘린더 | 있음 | 있음 | 있음 | 있음 |
+| 캘린더 자동화 (§18) | ✗ | 자동 재조정 | 자동 재조정 · 평가 반영 · 시험일 역산 | 플러스와 동일 |
 
 - 가격은 **`package.storeProduct.localizedPriceString`(RevenueCat)에서만** 온다.
   클라이언트에 원화 상수를 두지 않는다(`PlanEntitlement.monthlyPriceKRW`는 삭제됨).
@@ -337,9 +339,9 @@ sticky CTA      safeAreaInset(.bottom) — "<플랜명> 시작하기"
 | `.tokenExhausted` | `token_exhausted` | `PracticeViewModel.handleRefreshQuotaExhausted` (유료 소진 · 광고 보너스까지 소진) |
 | `.resultLocked` | `result_locked` | `PracticeResultView` 잠금 섹션 |
 | `.mockLimit` | `mock_limit` | `MockExamScreen` 모의고사 한도 안내 |
+| `.calendarLocked` | `calendar_locked` | 캘린더 "학습 플랜 기능" 카드에서 **잠긴 기능을 직접 눌렀을 때만**(G4 · §18.5) |
 
-현재 앱의 페이월 진입점은 이 넷이 전부이며 **모두 커버된다.**
-`.calendarLocked`는 캘린더 출시 시 추가한다(지금 만들지 않는다).
+현재 앱의 페이월 진입점은 이 다섯이 전부이며 **모두 커버된다.**
 
 ---
 
@@ -398,30 +400,32 @@ sticky CTA      safeAreaInset(.bottom) — "<플랜명> 시작하기"
 | G0 | 구매 퍼널 계측 | 완료 |
 | G1 | 페이월 V2 | 완료 |
 | G2 | 캘린더 기반(Calendar Foundation) | 완료(§16) |
-| **G3** | 적응형 캘린더 플래너 | **이번 PR 완료**(§17) |
-| G4 | 캘린더 플랜 게이팅 | **다음 PR** · 이번 PR에서 착수 금지 |
+| G3 | 적응형 캘린더 플래너 | 완료(§17) |
+| **G4** | 캘린더 플랜 게이팅 | **이번 PR 완료**(§18) |
 | G5 | 알림 | 이후 |
 | G6 | 네이티브 App Store 평점 요청 | 이후 |
 | G7 | 가격 마이그레이션(§14) | 이후 |
 | G8 | 캘린더 인텔리전스 V2 | 이후 |
 
-### 15.1 향후 캘린더 플랜 게이팅 (계획일 뿐 · 구현 없음)
+### 15.1 캘린더 플랜 게이팅
 
-| 플랜 | 캘린더 |
+구현된 것은 **§18**에 있다. 아래는 **아직 구현이 없는 G8 계획**이며 페이월·앱 어디에도
+노출하지 않는다.
+
+| G8 계획 (구현 없음) | 내용 |
 |---|---|
-| 무료 | 기본 캘린더 |
-| 베이직 | 개인화 일정 · 결석일 재계획 |
-| 플러스 | 적응형 플랜 · 모의고사 스케줄링 · 시험일 역산 계획 |
-| 프로 | 취약점 플래너 · 취약점 복습 스케줄링 · 주간 학습 인텔리전스 |
+| 취약점 기반 플래너 | 약한 문항 유형을 일정에 자동 편성 |
+| 복습 세트 스케줄링 | 과거 답변 재연습을 날짜에 배치 |
+| 주간 AI 리포트 | 주 단위 학습 인텔리전스 |
 
-**이 표는 로드맵 문서 전용이다.** 페이월에 캘린더를 혜택으로 노출하지 않으며,
-`PaywallTests.copyNeverPromisesUnenforcedBenefits`가 "캘린더"·"일정" 문구를 차단한다.
+`calendarWeaknessPlanner` 같은 capability는 **서버에 존재하지 않는다.**
+`PaywallTests.copyNeverClaimsWeaknessBasedScheduling`이 카피 회귀를 막는다.
 
-### 15.2 이번 PR(G3)에서 명시적으로 제외한 것
+### 15.2 이번 PR(G4)에서 명시적으로 제외한 것
 
-캘린더 플랜 잠금 · 캘린더 페이월 유도 · 플랜별 캘린더 제한(G4) · 로컬/푸시 알림 · 알림 권한 요청 ·
-알림 스케줄러(G5) · App Store 평점 요청(G6) · 신규 StoreKit 가격 · RevenueCat 상품 변경 ·
-App Store Connect 변경(G7) · AI 적응형 플래너 · 취약점 기반 스케줄링 · 주간 AI 리포트(G8).
+로컬/푸시 알림 · 알림 권한 요청 · 알림 스케줄러(G5) · App Store 평점 요청(G6) ·
+신규 StoreKit 가격 · RevenueCat 상품 변경 · App Store Connect 변경(G7) ·
+AI 적응형 플래너 · 취약점 기반 스케줄링 · 복습 세트 스케줄링 · 주간 AI 리포트(G8).
 
 ---
 
@@ -674,3 +678,85 @@ G2는 "권장 학습량 ÷ 하루 목표"를 매일 처음부터 다시 계산�
 - "현재 설정으로는 시험 전 권장 학습량을 모두 완료하기 어려워요."
 
 실패 · 뒤처짐 · 게으름 같은 수치심 문구는 쓰지 않는다.
+
+---
+
+## 18. 캘린더 플랜 게이팅 [구현됨 · G4]
+
+캘린더는 **전 플랜이 쓴다.** 유료가 사는 것은 접근권이 아니라 **자동화의 깊이**다.
+무료 사용자의 계산을 일부러 틀리게 만들지 않는다 — 무료 캘린더도 수학적으로 참이다.
+
+### 18.1 플랜별 실제 동작
+
+| | 무료 | 베이직 | 플러스 | 프로 |
+|---|---|---|---|---|
+| 캘린더 · 오늘 진행 · 완료 상태 · 스트릭 · 완료 예상일 | ✅ | ✅ | ✅ | ✅ |
+| 자동 일정 재조정 (`calendarAutoReplan`) | ✗ | ✅ | ✅ | ✅ |
+| 최근 평가를 반영한 학습 계획 (`calendarEvaluationAdaptive`) | ✗ | ✗ | ✅ | ✅ |
+| 시험일까지 역산한 일정 (`calendarExamBackplan`) | ✗ | ✗ | ✅ | ✅ |
+
+프로는 **플러스와 캘린더 기능이 같다.** G4에서 프로 전용 일정 기능을 새로 만들지 않았다.
+
+### 18.2 각 권한이 실제로 바꾸는 계산
+
+| 권한 | 켜짐 | 꺼짐 |
+|---|---|---|
+| 자동 재조정 | 남은 학습량을 남은 학습일에 재분배(`balanced`) | 하루 배정량 고정(`fixedQuota`) · 남은 세트/스트릭/날짜 상태는 그대로 참이고 일정 길이만 줄어든다 |
+| 평가 반영 | 최근 평가 등급으로 권장 총량 산출 | `recentLevel = nil` 고정 → 목표 등급 기준의 결정적 기본값 |
+| 시험일 역산 | 시험일까지 압축(`compressed`) · 불가하면 `insufficientTime` | 압축하지 않는다. **D-day와 "시험 전에 다 못 끝낸다" 경고는 그대로 보여준다**(`finishesAfterExam`) |
+
+무료에서 잠긴 자동화를 **프리미엄 문구로 가장하지 않는다.** 자동 재조정이 꺼져 있으면
+"남은 일정에 반영했어요"라고 말하지 않고 "오늘 계획보다 N세트 더 학습했어요"까지만 쓴다.
+
+### 18.3 권한의 진실은 서버다
+
+`GET /v1/capabilities`의 `quotaPolicy`에 4개 필드가 추가됐다(추가만 · 하위 호환).
+
+```json
+"quotaPolicy": {
+  "calendarEnabled": true,
+  "calendarAutoReplan": false,
+  "calendarEvaluationAdaptive": false,
+  "calendarExamBackplan": false
+}
+```
+
+- `calendarEnabled`는 **항상 true**다. 클라이언트는 이 값으로 화면을 잠그지 않으므로
+  디코딩하지도 않는다(읽지 않는 값을 모델에 넣지 않는다).
+- `calendarWeaknessPlanner`는 **존재하지 않는다.** 취약점 기반 일정은 구현이 없다(§15.1).
+
+### 18.4 클라이언트 폴백은 한 곳에만 있다
+
+`CalendarFeaturePolicy.resolve(capabilities:plan:)`.
+
+- 서버 스냅샷의 플랜이 **현재 플랜과 같을 때만** 서버 값을 쓴다.
+- 그 외(오래된 서버 · 필드 없음 · capabilities 없음 · 방금 업그레이드해서 스냅샷이 낡음)는
+  전부 `fallback(for: plan)` 표 하나로 간다. 방금 업그레이드한 사용자가 낡은 스냅샷 때문에
+  잠기지 않는다.
+- 화면과 플래너는 플랜을 직접 보지 않는다. `canAutoReplan` / `canUseRecentEvaluation` /
+  `canBackplanToExam` 셋만 본다. `AdaptiveStudyPlanner` 안에 플랜 분기를 흩뿌리지 않았다.
+
+### 18.5 잠긴 기능 UX
+
+- 월간 보기를 어지럽히지 않는다. 주간 요약과 달력 사이의 **"학습 플랜 기능" 카드 한 곳**에만
+  모아 둔다. 잠긴 게 없으면 카드 자체가 사라진다.
+- **캘린더에 들어왔다는 이유로 페이월을 열지 않는다.** 로드 · 완료 예상 부족 · 학습 누락 ·
+  시험일 임박 어느 것도 자동으로 페이월을 열지 않는다. 잠긴 행을 **직접 눌렀을 때만** 연다
+  (`PaywallSource.calendarLocked`).
+- 계측은 `AppTelemetry.calendarFeatureLockedTap`. 파라미터는 고정 enum
+  `feature`(`auto_replan` · `evaluation_adaptive` · `exam_backplan`)와 `current_plan`뿐이다.
+  전사·답변·UID·자유 텍스트는 남기지 않는다.
+- VoiceOver는 "자동 일정 재조정, 잠김, 베이직부터 이용 가능"처럼 한 문장으로 읽는다.
+
+### 18.6 플랜이 바뀌어도 과거는 다시 쓰이지 않는다
+
+배정량 고정(`StudyDayPlanRecord`)은 `baseDailyTarget`만 쓰고 자동화 권한을 보지 않는다.
+따라서 업그레이드·다운그레이드는 **미래 계획만** 바꾼다. 과거 배정량 · 완료 기록 · 스트릭 ·
+학습 설정은 그대로다. 다운그레이드가 캘린더를 초기화하거나 설정을 지우지 않는다.
+
+### 18.7 페이월 카피
+
+G1에서 걸어 둔 "캘린더"·"일정" 전면 금지는 **해제**하고, 대신 각 플랜이 **실제 구현된
+캘린더 기능만** 광고하는지 검사한다(`PaywallTests.calendarCopyMatchesEachPlanCapabilities`).
+비교표에 "학습 일정 자동화" 행이 추가됐다: 기본 캘린더 / 자동 재조정 / 평가 반영 · 시험일 역산 /
+평가 반영 · 시험일 역산. 프로에 없는 캘린더 기능을 붙이지 않는다.
