@@ -83,6 +83,27 @@ final class StudySetCompletionRecord {
     }
 }
 
+/// 그날 실제로 배정됐던 학습량. 지난 날의 상태(완료/일부 완료/놓침)를 나중 설정으로
+/// 다시 계산하지 않기 위해 필요하다. 강도를 꾸준히→집중으로 바꿔도 어제의 "1 / 1 완료"가
+/// "1 / 3 일부 완료"로 바뀌면 안 된다.
+///
+/// 키는 학습 계획 타임존 기준 "yyyy-MM-dd"다. Date로 잡으면 기기 타임존이 바뀔 때
+/// 같은 날이 두 칸으로 갈라진다. 문자열이라 정렬·비교도 사전순 그대로 통한다.
+/// 휴식일은 아예 기록하지 않는다(레코드 없음 = 그날 배정된 학습 없음).
+/// 완료 수는 여기 복제하지 않는다 — 그건 `StudySetCompletionRecord`의 몫이다.
+@Model
+final class StudyDayPlanRecord {
+    @Attribute(.unique) var localDate: String
+    var targetSets: Int
+    var createdAt: Date
+
+    init(localDate: String, targetSets: Int, createdAt: Date = .now) {
+        self.localDate = localDate
+        self.targetSets = targetSets
+        self.createdAt = createdAt
+    }
+}
+
 @Model
 final class MockDraftRecord {
     @Attribute(.unique) var id: UUID

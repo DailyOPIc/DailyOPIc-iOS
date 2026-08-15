@@ -15,6 +15,7 @@ final class StudyCalendarViewModel {
     private let environment: AppEnvironment
     private let api: APIClient
     private let preferences: AppPreferences
+    private let persistence: PersistenceService
 
     var loadState: LoadState = .idle
     /// 진실은 서버지만, 마지막으로 성공한 설정을 로컬에 둬서 네트워크가 끊겨도
@@ -29,6 +30,7 @@ final class StudyCalendarViewModel {
         self.environment = environment
         api = environment.api
         preferences = environment.preferences
+        persistence = environment.persistence
         settings = environment.preferences.studyPlanSettings
     }
 
@@ -80,6 +82,9 @@ final class StudyCalendarViewModel {
         isSaving = true
         saveErrorMessage = nil
         defer { isSaving = false }
+        // 설정을 바꾸기 전에 지금 설정 기준의 과거를 봉인한다.
+        // 이걸 빼먹으면 캘린더를 열지 않은 날들이 나중에 "새 설정"으로 되살아난다.
+        if let current = settings { sealHistory(using: current) }
         do {
             let response = try await api.updateStudyPlan(draft, requestID: UUID())
             settings = response.studyPlan ?? draft
@@ -93,14 +98,46 @@ final class StudyCalendarViewModel {
         }
     }
 
-    func snapshot(completions: [Date: Int], recentLevel: OPIcLevel?) -> StudyCalendarSnapshot? {
+    /// 오늘까지의 배정 학습량을 고정한다. 지난 날짜는 이미 기록이 있으면 건드리지 않는다.
+    /// 실패해도 캘린더는 계속 보여준다(다음 실행에서 다시 시도).
+    func freezeSchedule(_ snapshot: StudyCalendarSnapshot, today: Date = .now) {
+        guard let settings else { return }
+        try? persistence.freezeStudyDayPlans(
+            snapshot.targetsToFreeze(settings: settings, today: today),
+            today: LocalCalendarDate.text(from: today, timeZone: settings.timeZone)
+        )
+    }
+
+    /// 지금 설정 기준으로 계획 시작일~오늘의 배정 학습량을 고정한다.
+    /// 완료 기록이 필요 없다(배정량은 완료와 무관하다) → 캘린더 화면 없이도 호출할 수 있다.
+    func sealHistory(using settings: StudyPlanSettings, today: Date = .now) {
+        let base = StudyPlanEstimator.effectiveDailyTarget(
+            intensity: settings.intensity,
+            dailyCapacity: dailyCapacity
+        )
+        try? persistence.freezeStudyDayPlans(
+            AdaptiveStudyPlanner.historicalTargets(
+                settings: settings,
+                baseDailyTarget: base,
+                today: today
+            ),
+            today: LocalCalendarDate.text(from: today, timeZone: settings.timeZone)
+        )
+    }
+
+    func snapshot(
+        completions: [Date: Int],
+        recentLevel: OPIcLevel?,
+        historicalTargets: [String: Int]
+    ) -> StudyCalendarSnapshot? {
         guard let settings else { return nil }
         return StudyCalendarSnapshot.make(
             settings: settings,
             targetLevel: targetLevel,
             recentLevel: recentLevel,
             dailyCapacity: dailyCapacity,
-            completions: completions
+            completions: completions,
+            historicalTargets: historicalTargets
         )
     }
 }

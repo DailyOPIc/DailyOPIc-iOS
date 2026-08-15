@@ -12,7 +12,13 @@ struct StudyCalendarScreen: View {
     private var completionRecords: [StudySetCompletionRecord]
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
     private var practiceRecords: [PracticeHistoryRecord]
+    @Query private var dayPlanRecords: [StudyDayPlanRecord]
     @State private var isEditingPlan = false
+
+    /// 그날 배정됐던 학습량. 지난 날짜는 이 값으로만 판정하고 현재 설정으로 다시 계산하지 않는다.
+    private var historicalTargets: [String: Int] {
+        dayPlanRecords.reduce(into: [:]) { $0[$1.localDate] = $1.targetSets }
+    }
 
     private var completions: [Date: Int] {
         StudyCalendarEngine.completionCounts(
@@ -43,7 +49,8 @@ struct StudyCalendarScreen: View {
             case .loaded:
                 if let snapshot = viewModel.snapshot(
                     completions: completions,
-                    recentLevel: recentLevel
+                    recentLevel: recentLevel,
+                    historicalTargets: historicalTargets
                 ) {
                     StudyCalendarDashboard(
                         snapshot: snapshot,
@@ -55,6 +62,9 @@ struct StudyCalendarScreen: View {
                         onStartDaily: onStartDaily,
                         onEditPlan: { isEditingPlan = true }
                     )
+                    // 오늘까지의 배정 학습량을 고정해 둔다. 내일 설정을 바꿔도 오늘의 기록은
+                    // 그대로 남는다.
+                    .onAppear { viewModel.freezeSchedule(snapshot) }
                 } else {
                     StudyPlanSetupView(
                         viewModel: viewModel,
@@ -129,7 +139,7 @@ struct StudyCalendarDashboard: View {
                 weekSummaryCard
                 StudyMonthView(
                     settings: settings,
-                    targetSets: snapshot.forecast.effectiveDailyTarget,
+                    schedule: snapshot.schedule,
                     completions: completions
                 )
             }
@@ -145,16 +155,23 @@ struct StudyCalendarDashboard: View {
 
     // MARK: 목표 요약
 
+    private var plan: AdaptiveStudyPlan { snapshot.plan }
+
     private var goalCard: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("\(targetLevel.rawValue) 학습 플랜")
                 .font(AppTypography.cardTitle)
-            Text("권장 계획 완료까지 약 \(snapshot.forecast.estimatedStudyDays)일")
-                .font(AppTypography.body)
-            if let completion = snapshot.forecast.estimatedCompletionDate {
-                Text("\(completion.formatted(.dateTime.month().day())) 완료 예상")
+            if plan.mode == .completed {
+                Text("권장 학습 계획을 완료했어요.")
                     .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
+            } else {
+                Text("남은 권장 학습 \(plan.remainingSets)세트")
+                    .font(AppTypography.body)
+                if let completion = plan.estimatedCompletionDate {
+                    Text("\(completion.formatted(.dateTime.month().day())) 완료 예상 · 약 \(plan.estimatedStudyDays)일")
+                        .font(AppTypography.body)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
             }
             if let remaining = snapshot.examDaysRemaining {
                 // 시험일과 권장 계획 완료일은 다른 값이다. 나란히 두되 섞지 않는다.
@@ -165,16 +182,40 @@ struct StudyCalendarDashboard: View {
                     .background(AppPalette.primarySoft)
                     .clipShape(Capsule())
             }
-            if snapshot.forecastLandsAfterExam {
-                Text("현재 설정으로는 권장 학습 계획이 시험일 이후에 끝날 수 있어요.")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.dangerInk)
-            }
-            Text(StudyPlanForecast.disclaimer)
+            plannerStateMessage
+            Text(StudyPlanEstimator.disclaimer)
                 .font(AppTypography.footnote)
                 .foregroundStyle(AppPalette.secondaryInk)
         }
         .cardStyle()
+    }
+
+    /// 계획 상태 안내. 부족한 상태를 감추지 않되 자책하게 만드는 표현은 쓰지 않는다.
+    @ViewBuilder
+    private var plannerStateMessage: some View {
+        switch plan.mode {
+        case .compressed:
+            Text("시험일까지 남은 기간을 반영해 학습량을 조정했어요.")
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+        case .insufficientTime:
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text("현재 설정으로는 시험 전 권장 학습량을 모두 완료하기 어려워요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.dangerInk)
+                if let possible = plan.maximumSetsPossibleBeforeExam {
+                    Text("남은 권장 학습 \(plan.remainingSets)세트 · 현재 일정에서 시험 전 최대 \(possible)세트 가능")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+                // G3가 제안하는 행동은 설정 수정뿐이다. 플랜 업그레이드를 권하지 않는다(G4).
+                Button("학습 설정 수정", action: onEditPlan)
+                    .font(AppTypography.callout)
+                    .minimumTouchTarget()
+            }
+        case .onTrack, .completed:
+            EmptyView()
+        }
     }
 
     private func examDDayText(_ remaining: Int) -> String {
@@ -187,7 +228,11 @@ struct StudyCalendarDashboard: View {
     private var weekStrip: some View {
         HStack(spacing: AppSpacing.xs) {
             ForEach(snapshot.weekDays) { day in
-                StudyDayCell(day: day, isToday: day.date == snapshot.today.date)
+                StudyDayCell(
+                    day: day,
+                    calendar: settings.calendar,
+                    isToday: day.date == snapshot.today.date
+                )
             }
         }
     }
@@ -198,20 +243,34 @@ struct StudyCalendarDashboard: View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("오늘의 학습")
                 .font(AppTypography.sectionTitle)
-            if snapshot.today.state == .rest {
+            if plan.mode == .completed {
+                Text("권장 학습 계획을 완료했어요. 원하면 계속 연습해도 좋아요.")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            } else if snapshot.today.state == .rest {
                 Text("오늘은 휴식일이에요. 원하면 그냥 연습해도 좋아요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
+                // 오늘 배정량은 압축 모드에서 달라진다. 고정된 기본 학습량이 아니다.
                 Text("Daily 연습 \(snapshot.today.completedSets) / \(snapshot.today.targetSets) 완료")
                     .font(AppTypography.body)
-                if snapshot.forecast.isCappedByPlan {
-                    Text("오늘 권장 \(snapshot.forecast.effectiveDailyTarget)세트 · 현재 \(planName) 플랜 최대 \(snapshot.forecast.dailyCapacity)토큰")
+                if plan.isCappedByPlan {
+                    Text("오늘 권장 \(snapshot.today.targetSets)세트 · 현재 \(planName) 플랜 최대 \(plan.dailyCapacity)토큰")
                         .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
             }
-            if snapshot.today.state == .completed {
+            if snapshot.extraToday > 0 {
+                Text("오늘 계획보다 \(snapshot.extraToday)세트 더 학습했어요. 남은 일정에 반영했어요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            if plan.mode == .completed {
+                Label("권장 학습 계획 완료", systemImage: "checkmark.seal.fill")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.primary)
+            } else if snapshot.today.state == .completed {
                 Label("오늘 계획 완료", systemImage: "checkmark.circle.fill")
                     .font(AppTypography.callout)
                     .foregroundStyle(AppPalette.primary)
@@ -250,9 +309,9 @@ struct StudyCalendarDashboard: View {
 /// 하루 한 칸. 색만으로 상태를 구분하지 않도록 기호를 함께 그린다.
 struct StudyDayCell: View {
     let day: StudyDay
+    /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 요일·날짜가 하루 어긋날 수 있다.
+    let calendar: Calendar
     var isToday = false
-
-    private var calendar: Calendar { .current }
 
     var body: some View {
         VStack(spacing: AppSpacing.xs) {
@@ -291,7 +350,7 @@ struct StudyDayCell: View {
 /// 월간 보기. 오늘 할 일보다 아래에 두는 보조 화면이라 기본 SwiftUI 격자로 충분하다.
 struct StudyMonthView: View {
     let settings: StudyPlanSettings
-    let targetSets: Int
+    let schedule: StudySchedule
     let completions: [Date: Int]
 
     @State private var monthOffset = 0
@@ -312,7 +371,7 @@ struct StudyMonthView: View {
             count: calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30,
             today: .now,
             settings: settings,
-            targetSets: targetSets,
+            schedule: schedule,
             completions: completions
         )
     }
@@ -346,7 +405,11 @@ struct StudyMonthView: View {
                     Color.clear.frame(height: 1)
                 }
                 ForEach(days) { day in
-                    StudyDayCell(day: day, isToday: calendar.isDateInToday(day.date))
+                    StudyDayCell(
+                        day: day,
+                        calendar: calendar,
+                        isToday: calendar.isDateInToday(day.date)
+                    )
                 }
             }
             legend

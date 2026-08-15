@@ -345,7 +345,7 @@ struct StudyPlanEditView: View {
                     )
                     StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
                     // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
-                    Text("설정을 바꾸면 앞으로의 계획과 예상 기간만 다시 계산돼요. 지금까지의 학습 기록은 그대로 남아요.")
+                    Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")
                         .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
                     if let message = viewModel.saveErrorMessage {

@@ -25,7 +25,8 @@ struct DailyOPIcApp: App {
             PracticeHistoryRecord.self,
             MockHistoryRecord.self,
             MockDraftRecord.self,
-            StudySetCompletionRecord.self
+            StudySetCompletionRecord.self,
+            StudyDayPlanRecord.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
