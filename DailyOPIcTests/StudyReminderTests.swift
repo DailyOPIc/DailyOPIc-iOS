@@ -448,6 +448,70 @@ struct StudyReminderTests {
 
     // MARK: 플랜 변경
 
+    /// 27. 무료도 쓸모 있는 알림을 받는다. 알림은 유료 잠금이 아니다.
+    @Test func freeReceivesUsefulReminders() {
+        let requests = reminders(recentLevel: nil, policy: .free)
+
+        #expect(!requests.isEmpty)
+        #expect(localDates(requests).contains("2026-08-14"))
+        #expect(requests.first?.body.contains("세트") == true)
+        #expect(requests.allSatisfy { !$0.body.contains("잠") && !$0.body.contains("플랜") })
+    }
+
+    /// 28. 자동 재조정(베이직+)이 켜지면 앞으로의 배정량이 달라지고 알림도 따라간다.
+    @Test func autoReplanChangesReminderTargets() {
+        // 44세트 · 하루 3세트 → 마지막 날에 2세트만 남는다. 자동 재조정이 없으면 늘 3세트다.
+        func lastBody(_ policy: CalendarFeaturePolicy) -> String? {
+            reminders(
+                settings: settings(intensity: .focused),
+                recentLevel: nil,
+                dailyCapacity: 3,
+                policy: policy
+            ).last?.body
+        }
+
+        #expect(lastBody(.free) == "오늘 Daily 연습 3세트가 예정되어 있어요.")
+        #expect(lastBody(.fallback(for: .basic)) == "오늘 Daily 연습 2세트가 예정되어 있어요.")
+    }
+
+    /// 29. 시험일 역산(플러스·프로)이 켜지면 시험 전 배정량이 달라지고 알림도 따라간다.
+    @Test func examBackplanChangesReminderTargets() {
+        func requests(_ policy: CalendarFeaturePolicy) -> [StudyReminderRequest] {
+            reminders(
+                // 평소 속도(하루 1세트)로는 시험 전에 못 끝낸다 → 역산이 켜지면 배정량이 올라간다.
+                settings: settings(intensity: .light, examDate: "2026-09-04"),
+                recentLevel: nil,
+                dailyCapacity: 3,
+                policy: policy
+            )
+        }
+
+        let backplanned = requests(.fallback(for: .plus))
+        #expect(backplanned.map(\.body) != requests(.fallback(for: .basic)).map(\.body))
+        #expect(requests(.fallback(for: .pro)).map(\.body) == backplanned.map(\.body))
+        // 어느 플랜에서도 시험 당일에는 숙제 알림을 만들지 않는다.
+        #expect(!localDates(backplanned).contains("2026-09-04"))
+        #expect(!localDates(requests(.fallback(for: .basic))).contains("2026-09-04"))
+    }
+
+    /// 30. 플랜이 바뀌어도 지난 기록은 그대로다. 알림은 오늘 이후만 만든다.
+    @Test func planChangeDoesNotAlterHistoricalRecords() {
+        let settings = settings()
+        // 지난 날의 배정량은 자동화 권한을 보지 않는다(§18.6).
+        let historical = AdaptiveStudyPlanner.historicalTargets(
+            settings: settings,
+            baseDailyTarget: 2,
+            today: now
+        )
+
+        #expect(!historical.isEmpty)
+        #expect(historical["2026-08-13"] == 2)
+        for policy in [CalendarFeaturePolicy.free, .fallback(for: .basic), .everything] {
+            let dates = localDates(reminders(settings: settings, policy: policy))
+            #expect(dates.allSatisfy { $0 >= "2026-08-14" })
+        }
+    }
+
     /// 플랜이 바뀌어도 알림은 그대로 온다(유료 잠금이 아니다).
     /// 자동화 권한만큼 앞으로의 일정이 달라지고, 지난 기록은 건드리지 않는다.
     @Test func planChangeReconcilesFutureOnlyAndNeverLocksReminders() {
