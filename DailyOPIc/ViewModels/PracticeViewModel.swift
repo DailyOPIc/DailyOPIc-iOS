@@ -320,6 +320,8 @@ final class PracticeViewModel {
             // 세트당 한 번만 기록되므로 재분석·결과 재진입은 중복되지 않는다.
             // 기록 실패가 학습 흐름을 막아선 안 되므로 오류는 삼킨다.
             _ = try? persistence.recordStudySetCompletion(setId: questionSet.setId)
+            // 오늘 계획을 다 채웠으면 남은 알림을 걷어낸다. 알림 정리가 실패해도 학습은 성공이다.
+            Task { await environment.studyCalendarViewModel.reconcileStudyReminders() }
             AudioFileService.remove(pendingRecording.audioURL)
             self.pendingRecording = nil
             usage = try? await api.usage()

@@ -16,6 +16,8 @@ final class AppEnvironment {
     let api: APIClient
     let ads: AdService
     let store: StoreService
+    /// 학습 알림. 권한은 사용자가 캘린더에서 직접 켤 때만 요청한다(여기서는 아무것도 하지 않는다).
+    let studyReminders: StudyReminderService
     var launchState: LaunchState = .launching
     var capabilities: Capabilities?
 
@@ -52,8 +54,10 @@ final class AppEnvironment {
     init() {
         let authentication = AuthenticationService()
         self.authentication = authentication
-        preferences = AppPreferences()
+        let preferences = AppPreferences()
+        self.preferences = preferences
         persistence = PersistenceService()
+        studyReminders = StudyReminderService(preferences: preferences)
         let apiBaseURL = AppConfiguration.apiBaseURL
         api = APIClient(baseURL: apiBaseURL, authentication: authentication)
         ads = AdService()

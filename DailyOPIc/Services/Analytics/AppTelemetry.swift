@@ -1,5 +1,6 @@
 import Foundation
 import OSLog
+import UserNotifications
 
 enum AppTelemetry {
     private static let logger = Logger(
@@ -56,6 +57,24 @@ enum AppTelemetry {
     /// 잠긴 캘린더 기능을 **직접 누른** 순간만 남긴다. 화면이 그려질 때마다 남기지 않는다.
     static func calendarFeatureLockedTap(feature: CalendarLockedFeature, plan: PlanEntitlement) {
         logger.info("calendar_feature_locked_tap feature=\(feature.rawValue, privacy: .public) current_plan=\(plan.rawValue, privacy: .public)")
+    }
+
+    // MARK: - 학습 알림
+    //
+    // 켜기/끄기 같은 **사용자 결정**만 남긴다. 예약된 알림 하나하나·날짜·문구는
+    // 남기지 않는다(카디널리티만 늘고 알 수 있는 것은 없다). 로컬 예약만으로는
+    // 실제 전달·열람을 알 수 없으므로 전달률 지표로 쓰지 않는다.
+
+    static func studyReminderEnableTapped() {
+        logger.info("study_reminder_enable_tapped")
+    }
+
+    static func studyReminderPermissionResult(_ status: UNAuthorizationStatus) {
+        logger.info("study_reminder_permission_result result=\(status.telemetryValue, privacy: .public)")
+    }
+
+    static func studyReminderDisabled() {
+        logger.info("study_reminder_disabled")
     }
 
     static func restoreStarted() {

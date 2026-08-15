@@ -23,6 +23,7 @@ final class AppPreferences {
         static let guidePage = "native_guide_page"
         static let initialLevelSyncPending = "native_initial_level_sync_pending"
         static let studyPlan = "native_study_plan"
+        static let studyReminders = "native_study_reminders_enabled"
     }
 
     private let defaults: UserDefaults
@@ -78,6 +79,11 @@ final class AppPreferences {
             }
         }
     }
+    /// 이 기기에서 학습 알림을 받고 싶은지에 대한 **사용자 의도**.
+    /// 실제 발송 권한은 언제나 OS이고, 서버로 보내지 않는다(기기별 설정이다).
+    var studyRemindersEnabled: Bool {
+        didSet { defaults.set(studyRemindersEnabled, forKey: Key.studyReminders) }
+    }
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -111,6 +117,7 @@ final class AppPreferences {
         }
         lastGuidePage = min(6, max(0, defaults.integer(forKey: Key.guidePage)))
         isInitialLevelSyncPending = defaults.bool(forKey: Key.initialLevelSyncPending)
+        studyRemindersEnabled = defaults.bool(forKey: Key.studyReminders)
         initialLevel = storedInitialLevel
         targetLevel = storedTargetLevel ?? storedInitialLevel?.expectedTargetLevel
         if let data = defaults.data(forKey: Key.background),

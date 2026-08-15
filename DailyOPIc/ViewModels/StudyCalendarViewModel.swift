@@ -104,6 +104,8 @@ final class StudyCalendarViewModel {
             preferences.studyPlanSettings = settings
             isShowingCachedSettings = false
             loadState = .loaded
+            // 알림 재조정은 저장 성공과 별개다. 여기서 실패해도 저장은 성공으로 남는다.
+            Task { await reconcileStudyReminders() }
             return true
         } catch {
             saveErrorMessage = error.localizedDescription
@@ -136,6 +138,47 @@ final class StudyCalendarViewModel {
             ),
             today: LocalCalendarDate.text(from: today, timeZone: settings.timeZone)
         )
+    }
+
+    // MARK: 학습 알림
+
+    var studyReminders: StudyReminderService { environment.studyReminders }
+
+    /// 최근 분석 결과의 예상 등급. 오래된 기록은 현재 실력으로 보지 않는다.
+    /// 화면(@Query)과 알림 예약이 같은 규칙을 쓰도록 여기 한 곳에만 둔다.
+    static func recentLevel(from record: PracticeHistoryRecord?, now: Date = .now) -> OPIcLevel? {
+        guard let record else { return nil }
+        let age = Calendar.current.dateComponents([.day], from: record.createdAt, to: now).day ?? 0
+        guard age <= StudyPlanEstimatorConfig.recentLevelMaxAgeDays else { return nil }
+        return record.predictedLevel
+    }
+
+    /// 지금 일정 기준으로 예약돼 있어야 할 알림. 캘린더 화면이 열려 있지 않아도 계산할 수 있도록
+    /// @Query 대신 저장소에서 직접 읽는다(같은 기록이다).
+    func plannedReminders(now: Date = .now) -> [StudyReminderRequest] {
+        guard let settings else { return [] }
+        let completions = StudyCalendarEngine.completionCounts(
+            completedAt: (try? persistence.studySetCompletionDates()) ?? [],
+            calendar: settings.calendar
+        )
+        let historicalTargets = ((try? persistence.studyDayPlans()) ?? [])
+            .reduce(into: [String: Int]()) { $0[$1.localDate] = $1.targetSets }
+        guard let snapshot = snapshot(
+            completions: completions,
+            recentLevel: Self.recentLevel(from: try? persistence.latestPracticeRecord(), now: now),
+            historicalTargets: historicalTargets
+        ) else { return [] }
+        return StudyReminderPlanner.reminders(
+            plan: snapshot.plan,
+            settings: settings,
+            completions: completions,
+            now: now
+        )
+    }
+
+    /// 대기 중인 알림을 현재 일정과 같게 맞춘다. 여러 번 호출해도 결과가 같다.
+    func reconcileStudyReminders(now: Date = .now) async {
+        await studyReminders.reconcile(plannedReminders(now: now))
     }
 
     func snapshot(

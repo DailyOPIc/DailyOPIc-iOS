@@ -105,6 +105,22 @@ final class PersistenceService {
         return true
     }
 
+    /// 캘린더 화면 밖(알림 예약 등)에서도 완료 기록을 읽어야 한다. 화면의 @Query와 같은 기록이다.
+    func studySetCompletionDates() throws -> [Date] {
+        guard let context else { return [] }
+        return try context.fetch(FetchDescriptor<StudySetCompletionRecord>()).map(\.completedAt)
+    }
+
+    /// 가장 최근 분석 기록 하나. 최근 등급을 "언제 기록됐는지"와 함께 판단해야 해서 날짜도 준다.
+    func latestPracticeRecord() throws -> PracticeHistoryRecord? {
+        guard let context else { return nil }
+        var descriptor = FetchDescriptor<PracticeHistoryRecord>(
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     func studyDayPlans() throws -> [StudyDayPlanRecord] {
         guard let context else { return [] }
         return try context.fetch(FetchDescriptor<StudyDayPlanRecord>())

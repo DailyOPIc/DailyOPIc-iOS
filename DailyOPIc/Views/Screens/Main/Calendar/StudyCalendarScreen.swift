@@ -29,16 +29,9 @@ struct StudyCalendarScreen: View {
         )
     }
 
-    /// 최근 분석 결과의 예상 등급. 오래된 기록은 현재 실력으로 보지 않는다.
+    /// 최근 분석 결과의 예상 등급. 판정 규칙은 알림 예약과 공유한다.
     private var recentLevel: OPIcLevel? {
-        guard let latest = practiceRecords.first else { return nil }
-        let age = Calendar.current.dateComponents(
-            [.day],
-            from: latest.createdAt,
-            to: .now
-        ).day ?? 0
-        guard age <= StudyPlanEstimatorConfig.recentLevelMaxAgeDays else { return nil }
-        return latest.predictedLevel
+        StudyCalendarViewModel.recentLevel(from: practiceRecords.first)
     }
 
     var body: some View {
@@ -62,6 +55,10 @@ struct StudyCalendarScreen: View {
                         isShowingCachedSettings: viewModel.isShowingCachedSettings,
                         completions: completions,
                         lockedFeatures: viewModel.lockedFeatures,
+                        studyReminders: viewModel.studyReminders,
+                        onReconcileReminders: {
+                            Task { await viewModel.reconcileStudyReminders() }
+                        },
                         onStartDaily: onStartDaily,
                         onEditPlan: { isEditingPlan = true },
                         onLockedFeature: { feature in
@@ -74,7 +71,11 @@ struct StudyCalendarScreen: View {
                     )
                     // 오늘까지의 배정 학습량을 고정해 둔다. 내일 설정을 바꿔도 오늘의 기록은
                     // 그대로 남는다.
-                    .onAppear { viewModel.freezeSchedule(snapshot) }
+                    .onAppear {
+                        viewModel.freezeSchedule(snapshot)
+                        // 알림 예약은 캘린더를 새로 그릴 때 맞춘다. 이걸 위해 새 API를 부르지 않는다.
+                        Task { await viewModel.reconcileStudyReminders() }
+                    }
                 } else {
                     StudyPlanSetupView(
                         viewModel: viewModel,
@@ -135,6 +136,9 @@ struct StudyCalendarDashboard: View {
     let completions: [Date: Int]
     /// 아직 잠긴 자동화 기능. 비어 있으면 잠금 영역 자체를 그리지 않는다.
     var lockedFeatures: [CalendarLockedFeature] = []
+    /// 없으면 알림 칸 자체를 그리지 않는다(프리뷰·테스트용).
+    var studyReminders: StudyReminderService?
+    var onReconcileReminders: () -> Void = {}
     let onStartDaily: () -> Void
     let onEditPlan: () -> Void
     var onLockedFeature: (CalendarLockedFeature) -> Void = { _ in }
@@ -151,6 +155,14 @@ struct StudyCalendarDashboard: View {
                 weekStrip
                 todayCard
                 weekSummaryCard
+                if let studyReminders {
+                    StudyReminderCard(
+                        service: studyReminders,
+                        studyTime: settings.preferredStudyTime,
+                        onEditPlan: onEditPlan,
+                        onReconcile: onReconcileReminders
+                    )
+                }
                 lockedFeatureCard
                 StudyMonthView(
                     settings: settings,
