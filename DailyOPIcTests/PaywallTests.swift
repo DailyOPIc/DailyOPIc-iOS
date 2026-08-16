@@ -90,6 +90,40 @@ struct PaywallTests {
         }
     }
 
+    /// 가격은 스토어(`package.storeProduct.localizedPriceString`)만 말한다.
+    /// 앱 소스에 원화 상수가 들어오는 순간, 스토어 가격이 바뀌면 둘 중 하나가 거짓말이 된다.
+    /// (옛 가격 ₩2,900/4,900/7,900도, 목표가 ₩3,900/6,900/9,900도 똑같이 금지다.)
+    @Test func runtimeSourceHasNoHardcodedWonPrice() throws {
+        let root = URL(fileURLWithPath: #filePath)
+            .deletingLastPathComponent()
+            .deletingLastPathComponent()
+            .appendingPathComponent("DailyOPIc")
+        let sources = FileManager.default.enumerator(at: root, includingPropertiesForKeys: nil)?
+            .compactMap { $0 as? URL }
+            .filter { $0.pathExtension == "swift" } ?? []
+        let forbidden = ["₩", "2,900", "4,900", "7,900", "3,900", "6,900", "9,900", "원/월"]
+        for source in sources {
+            let text = try String(contentsOf: source, encoding: .utf8)
+            for literal in forbidden {
+                #expect(!text.contains(literal), "\(source.lastPathComponent)에 원화 상수 '\(literal)'가 있다")
+            }
+        }
+    }
+
+    /// 기존 구독자의 갱신 가격은 App Store만 안다(`localizedPriceString`은 신규 구매가다).
+    /// 앱이 인상·유예·다음 결제 금액을 추측해서 말하지 않는다.
+    @Test func copyNeverClaimsPriceChangeOrGrandfathering() {
+        let banned = ["인상", "다음 결제", "기존가", "가격이 바뀌", "요금 인상"]
+        let allCopy = (PaywallPlanCopy.paid + [PaywallPlanCopy.free])
+            .flatMap { [$0.tagline] + $0.benefits }
+            + PaywallComparisonRow.all.flatMap { [$0.title] + $0.values }
+        for line in allCopy {
+            for word in banned {
+                #expect(!line.contains(word), "\(line) 이 앱이 알 수 없는 가격 변경을 주장한다")
+            }
+        }
+    }
+
     @Test func comparisonRowsCoverEveryPlanColumn() {
         #expect(PaywallComparisonRow.planColumns == [.free, .basic, .plus, .pro])
         for row in PaywallComparisonRow.all {
