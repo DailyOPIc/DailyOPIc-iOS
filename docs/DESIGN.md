@@ -2340,6 +2340,33 @@ StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
 `AppTypography`·`AppPalette` 토큰만 쓰고 커스텀 폰트를 쓰지 않는다. 본문은 Dynamic Type에서
 잘리지 않도록 `.fixedSize(horizontal: false, vertical: true)`.
 
+## 34.10 App Store 평점 요청 (G6)
+
+**화면에 추가되는 것은 없다.** 별 UI·만족도 질문·리뷰 모달·설정의 "평가하기" 항목을 만들지
+않는다. 뜨는 것은 Apple의 네이티브 창뿐이고, 그 창을 띄울지는 Apple이 정한다. 창이 뜨지
+않아도 결과 화면은 평소와 똑같다 — 리뷰가 화면 전환이나 결과 표시를 막지 않는다.
+
+**호출 지점.** `PracticeScreen`에서 **방금 성공한 분석 결과가 화면에 올라온 뒤** 한 번만
+`@Environment(\.requestReview)`를 호출한다. `PracticeViewModel.freshResultToken`은 분석
+성공 경로에서만 켜지고 화면이 소비하면 비워진다. 그래서 이전 문항 결과를 다시 보거나
+(`savedResult`), 기록 화면(`HistoryDetailView`)에서 같은 `PracticeResultView`를 다시
+그려도 요청이 나가지 않는다. `onAppear` 호출 횟수에 기대지 않고, 시도 시각을 남기는
+30일 쿨다운이 한 번 더 막는다.
+
+**계층.**
+
+| 층 | 역할 |
+|---|---|
+| `AppReviewEligibility` | 순수 판단 — 순간·배포 경로·성공 기록·쿨다운만 본다 |
+| `AppReviewCoordinator` | 시도 기록(쿨다운 타임스탬프) · 계측 |
+| 뷰 | 네이티브 `RequestReviewAction` 호출 한 줄 |
+
+자격 계산은 등급을 **입력으로 받지 않는다**(PRODUCT §20.3). 근거는 캘린더와 같은
+`StudySetCompletionRecord`이고 리뷰 전용 카운터를 새로 만들지 않는다. `AppDistribution`은
+DEBUG 빌드와 영수증 파일명(`sandboxReceipt` = TestFlight/샌드박스)으로 판별하며,
+TestFlight와 판별 불가(unknown)는 요청하지 않는다. 테스트는 배포 경로와 요청 동작을 모두
+주입해 **실제 네이티브 창을 띄우지 않는다**.
+
 ---
 
 # 부록 A. 이번 리뉴얼 범위 밖 (명시적 제외)
@@ -2355,6 +2382,7 @@ StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
 | 발음/음소 분석 | 서버 프롬프트가 명시적으로 금지 | `ai.py` |
 | 실시간 오디오 레벨 파형 | 레벨 수집 미구현 | §16.2 |
 | 푸시 알림(FCM) / 서버 발송 | 미구현 · 불필요 | 학습 알림은 로컬 알림만 쓴다 (§34.9) |
+| 자체 평점 UI / 만족도 게이트 / 리뷰 보상 | 만들지 않음 | 네이티브 요청만 쓴다 (§34.10) |
 | 학습 기록 기간 제한 | 강제하지 않음 | Q6 LOCKED |
 | 스마트 기능 플랜 게이팅 | 강제하지 않음 | Q7 LOCKED |
 | 모의고사 이전 문항 되돌아가기 | `previousQuestion()` 빈 함수 · 실전 OPIc과 일치 | 유지 |

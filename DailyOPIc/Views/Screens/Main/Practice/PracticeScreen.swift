@@ -1,8 +1,11 @@
+import StoreKit
 import SwiftUI
 
 struct PracticeScreen: View {
     let viewModel: PracticeViewModel
     let preferences: AppPreferences
+    @Environment(AppEnvironment.self) private var environment
+    @Environment(\.requestReview) private var requestReview
     @ObservedObject private var speech: SpeechRecognitionService
     @ObservedObject private var promptPlayback: PromptPlaybackService
     @State private var showsSetup = false
@@ -86,6 +89,15 @@ struct PracticeScreen: View {
             .task {
                 await viewModel.load()
                 await viewModel.refreshUsage()
+            }
+            // 분석에 성공한 결과가 화면에 올라온 뒤에만 리뷰를 요청한다. 표식은 한 번 쓰고
+            // 비우므로 같은 결과를 다시 봐도 재요청하지 않고, 자격이 안 되면 아무 일도 없다.
+            .task(id: viewModel.freshResultToken) {
+                guard viewModel.freshResultToken != nil else { return }
+                viewModel.freshResultToken = nil
+                environment.appReview.requestReviewIfEligible(
+                    context: .successfulPracticeResult
+                ) { requestReview() }
             }
     }
 

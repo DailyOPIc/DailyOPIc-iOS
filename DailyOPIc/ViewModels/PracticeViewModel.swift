@@ -39,6 +39,9 @@ final class PracticeViewModel {
     /// 답변 최대 180초. 모의고사와 같은 제한을 연습에도 적용한다.
     var remainingSeconds = PracticeViewModel.maxAnswerSeconds
     static let maxAnswerSeconds = 180
+    /// 방금 성공한 분석 결과가 화면에 나타나는 **한 번**을 가리키는 표식.
+    /// 화면이 소비하면 비운다. 결과 재진입·재렌더링·기록 화면에서는 켜지지 않는다.
+    var freshResultToken: UUID?
     var showsRefreshDialog = false
     var isRefreshingQuestions = false
     var refreshProgressMessage: String?
@@ -326,6 +329,9 @@ final class PracticeViewModel {
             self.pendingRecording = nil
             usage = try? await api.usage()
             phase = .completed
+            // 방금 분석에 성공한 결과가 화면에 뜨는 순간을 한 번만 알린다.
+            // 이전 문항의 결과를 다시 보거나 화면이 다시 그려질 때는 켜지지 않는다.
+            freshResultToken = UUID()
             operationState = .completed
             evaluationOperationID = nil
         } catch is CancellationError {

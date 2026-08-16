@@ -24,6 +24,7 @@ final class AppPreferences {
         static let initialLevelSyncPending = "native_initial_level_sync_pending"
         static let studyPlan = "native_study_plan"
         static let studyReminders = "native_study_reminders_enabled"
+        static let reviewRequestAttempt = "native_review_request_attempted_at"
     }
 
     private let defaults: UserDefaults
@@ -84,6 +85,17 @@ final class AppPreferences {
     var studyRemindersEnabled: Bool {
         didSet { defaults.set(studyRemindersEnabled, forKey: Key.studyReminders) }
     }
+    /// 앱 스토어 리뷰를 마지막으로 **요청한** 시각. 창이 실제로 떴는지는 알 수 없으므로
+    /// 시도 시각만 남긴다. 기기별 쿨다운이라 서버로 보내지 않는다.
+    var lastReviewRequestAttemptAt: Date? {
+        didSet {
+            if let lastReviewRequestAttemptAt {
+                defaults.set(lastReviewRequestAttemptAt, forKey: Key.reviewRequestAttempt)
+            } else {
+                defaults.removeObject(forKey: Key.reviewRequestAttempt)
+            }
+        }
+    }
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -118,6 +130,7 @@ final class AppPreferences {
         lastGuidePage = min(6, max(0, defaults.integer(forKey: Key.guidePage)))
         isInitialLevelSyncPending = defaults.bool(forKey: Key.initialLevelSyncPending)
         studyRemindersEnabled = defaults.bool(forKey: Key.studyReminders)
+        lastReviewRequestAttemptAt = defaults.object(forKey: Key.reviewRequestAttempt) as? Date
         initialLevel = storedInitialLevel
         targetLevel = storedTargetLevel ?? storedInitialLevel?.expectedTargetLevel
         if let data = defaults.data(forKey: Key.background),

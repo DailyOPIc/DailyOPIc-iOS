@@ -77,6 +77,20 @@ enum AppTelemetry {
         logger.info("study_reminder_disabled")
     }
 
+    // MARK: - 앱 스토어 리뷰
+    //
+    // 남기는 것은 **앱이 한 일**뿐이다. 창이 떴는지·평점이 몇 점인지·리뷰가 등록됐는지는
+    // 앱이 알 수 없으므로, 표시·제출·성공을 주장하는 이름은 쓰지 않는다.
+    // 예상 등급·답변·전사는 어떤 형태로도 넣지 않는다(등급은 자격 조건도 아니다).
+
+    static func appReviewEligible(context: AppReviewContext) {
+        logger.info("app_review_eligible context=\(context.rawValue, privacy: .public)")
+    }
+
+    static func appReviewRequestAttempted(context: AppReviewContext) {
+        logger.info("app_review_request_attempted context=\(context.rawValue, privacy: .public)")
+    }
+
     static func restoreStarted() {
         logger.info("restore_started")
     }
