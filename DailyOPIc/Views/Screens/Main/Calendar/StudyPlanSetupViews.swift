@@ -94,8 +94,9 @@ enum StudyPlanSetupSection {
                 Text("언제 공부할 수 있나요?")
                     .font(AppTypography.cardTitle)
                 // 작은 아이폰에서도 7칸이 잘리지 않도록 고정 크기 대신 균등 분할.
+                // 순서만 일~토다. 저장되는 값은 ISO(월=1 … 일=7) 그대로다.
                 HStack(spacing: AppSpacing.xs) {
-                    ForEach(StudyWeekday.allCases) { weekday in
+                    ForEach(StudyWeekday.displayOrder) { weekday in
                         chip(weekday)
                     }
                 }
@@ -308,13 +309,18 @@ struct StudyPlanSetupView: View {
     }
 }
 
-/// 학습 계획 수정. 온보딩과 달리 한 화면에서 바로 고친다.
+/// 플래너 설정. 온보딩과 달리 한 화면에서 바로 고친다.
 /// 목표 등급은 여기서도 기존 난이도 재선택 경로를 그대로 연다.
-struct StudyPlanEditView: View {
+///
+/// 플래너 홈에서 설정을 걷어낸 뒤 갈 곳이 여기다. 학습 알림(P1)과 잠긴 자동화 기능도
+/// "오늘 뭘 할까"를 묻는 홈이 아니라 이 화면이 맡는다.
+struct PlannerSettingsView: View {
     let viewModel: StudyCalendarViewModel
     let onChangeTargetLevel: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var draft: StudyPlanSettings
+    /// 잠긴 기능을 **직접 눌렀을 때만** Paywall이 열린다. 화면 진입으로는 열지 않는다.
+    @State private var paywallFeature: CalendarLockedFeature?
 
     init(
         viewModel: StudyCalendarViewModel,
@@ -326,52 +332,99 @@ struct StudyPlanEditView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                    StudyPlanSetupSection.TargetLevel(
-                        targetLevel: viewModel.targetLevel,
-                        onChange: onChangeTargetLevel
-                    )
-                    StudyPlanSetupSection.ExamDate(
-                        examDate: $draft.examDate,
-                        calendar: draft.calendar
-                    )
-                    StudyPlanSetupSection.Weekdays(weekdays: $draft.studyWeekdays)
-                    StudyPlanSetupSection.Intensity(
-                        intensity: $draft.intensity,
-                        dailyCapacity: viewModel.dailyCapacity,
-                        planName: viewModel.plan.displayName
-                    )
-                    StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
-                    // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
-                    Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                StudyPlanSetupSection.TargetLevel(
+                    targetLevel: viewModel.targetLevel,
+                    onChange: onChangeTargetLevel
+                )
+                StudyPlanSetupSection.ExamDate(
+                    examDate: $draft.examDate,
+                    calendar: draft.calendar
+                )
+                StudyPlanSetupSection.Weekdays(weekdays: $draft.studyWeekdays)
+                StudyPlanSetupSection.Intensity(
+                    intensity: $draft.intensity,
+                    dailyCapacity: viewModel.dailyCapacity,
+                    planName: viewModel.plan.displayName
+                )
+                StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
+                // 알림 시각은 저장된 공부 시간이다. 아직 저장하지 않은 draft를 알림 문구로 쓰면
+                // 실제로 예약된 시각과 다른 말을 하게 된다.
+                StudyReminderCard(
+                    service: viewModel.studyReminders,
+                    studyTime: viewModel.settings?.preferredStudyTime ?? draft.preferredStudyTime,
+                    onReconcile: { Task { await viewModel.reconcileStudyReminders() } }
+                )
+                lockedFeatureCard
+                // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
+                Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                if let message = viewModel.saveErrorMessage {
+                    Text(message)
                         .font(AppTypography.footnote)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                    if let message = viewModel.saveErrorMessage {
-                        Text(message)
-                            .font(AppTypography.footnote)
-                            .foregroundStyle(AppPalette.dangerInk)
+                        .foregroundStyle(AppPalette.dangerInk)
+                }
+                PrimaryButton(
+                    title: "저장",
+                    isLoading: viewModel.isSaving,
+                    isDisabled: draft.studyWeekdays.isEmpty
+                ) {
+                    Task {
+                        if await viewModel.save(draft) { dismiss() }
                     }
-                    PrimaryButton(
-                        title: "저장",
-                        isLoading: viewModel.isSaving,
-                        isDisabled: draft.studyWeekdays.isEmpty
-                    ) {
-                        Task {
-                            if await viewModel.save(draft) { dismiss() }
+                }
+            }
+            .padding(AppSpacing.lg)
+        }
+        .navigationTitle("플래너 설정")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $paywallFeature) { _ in PaywallView(source: .calendarLocked) }
+    }
+
+    /// 잠긴 자동화 기능. 한 칸에 모아 두고, 여기를 **직접 누를 때만** Paywall이 열린다.
+    @ViewBuilder
+    private var lockedFeatureCard: some View {
+        let lockedFeatures = viewModel.lockedFeatures
+        if !lockedFeatures.isEmpty {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("학습 플랜 기능")
+                    .font(AppTypography.sectionTitle)
+                ForEach(lockedFeatures, id: \.rawValue) { feature in
+                    Button {
+                        AppTelemetry.calendarFeatureLockedTap(
+                            feature: feature,
+                            plan: viewModel.plan
+                        )
+                        paywallFeature = feature
+                    } label: {
+                        HStack(alignment: .top, spacing: AppSpacing.sm) {
+                            Image(systemName: "lock.fill")
+                                .font(AppTypography.callout)
+                                .foregroundStyle(AppPalette.secondaryInk)
+                            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                                Text(feature.title)
+                                    .font(AppTypography.callout)
+                                Text(feature.detail)
+                                    .font(AppTypography.footnote)
+                                    .foregroundStyle(AppPalette.secondaryInk)
+                                    .multilineTextAlignment(.leading)
+                            }
+                            Spacer(minLength: 0)
+                            Text(feature.requirementText)
+                                .font(AppTypography.caption)
+                                .foregroundStyle(AppPalette.secondaryInk)
                         }
+                        .frame(maxWidth: .infinity, alignment: .leading)
                     }
-                }
-                .padding(AppSpacing.lg)
-            }
-            .navigationTitle("학습 설정 수정")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("닫기") { dismiss() }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget()
+                    .accessibilityLabel(feature.accessibilityLabel)
+                    .accessibilityHint(feature.detail)
                 }
             }
+            .cardStyle()
         }
     }
 }

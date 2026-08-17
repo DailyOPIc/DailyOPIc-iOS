@@ -57,6 +57,15 @@ enum StudyWeekday: Int, Codable, CaseIterable, Identifiable, Sendable, Comparabl
     /// VoiceOver는 "월"을 요일로 읽지 못한다.
     var accessibilityLabel: String { "\(shortLabel)요일" }
 
+    /// 화면에 늘어놓는 순서(일~토). **표시 순서일 뿐** 저장·전송 값은 ISO 그대로다(월=1 … 일=7).
+    static let displayOrder: [StudyWeekday] = [
+        .sunday, .monday, .tuesday, .wednesday, .thursday, .friday, .saturday
+    ]
+
+    /// 일요일 시작 격자에서 이 요일이 놓일 열(일=0 … 토=6).
+    /// 주간 스트립·월간 격자·요일 선택이 전부 이 값 하나로 자리를 잡는다.
+    var displayColumn: Int { rawValue % 7 }
+
     static func from(date: Date, calendar: Calendar = .current) -> StudyWeekday {
         // Calendar.weekday: 일=1 … 토=7 → ISO: 월=1 … 일=7
         let iso = (calendar.component(.weekday, from: date) + 5) % 7 + 1

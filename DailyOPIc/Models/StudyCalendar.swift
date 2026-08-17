@@ -268,11 +268,11 @@ enum StudyCalendarEngine {
         }
     }
 
-    /// 그 주의 월요일. 주간 스트립은 사용자 지역 설정과 무관하게 월~일로 고정한다
-    /// (공부 요일 선택 화면과 순서를 맞추기 위해).
+    /// 그 주의 일요일. 주간 스트립은 사용자 지역 설정과 무관하게 일~토로 고정한다
+    /// (월간 격자·공부 요일 선택 화면과 순서를 맞추기 위해). 저장되는 요일 값은 ISO 그대로다.
     static func startOfWeek(for date: Date, calendar: Calendar) -> Date {
         let day = calendar.startOfDay(for: date)
-        let offset = StudyWeekday.from(date: day, calendar: calendar).rawValue - 1
+        let offset = StudyWeekday.from(date: day, calendar: calendar).displayColumn
         return calendar.date(byAdding: .day, value: -offset, to: day) ?? day
     }
 }

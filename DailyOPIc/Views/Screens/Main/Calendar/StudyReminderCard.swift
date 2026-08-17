@@ -1,12 +1,13 @@
 import SwiftUI
 
-/// 학습 알림 한 칸. 캘린더 안에서 알림 이야기를 하는 곳은 여기뿐이다.
+/// 학습 알림 한 칸. 플래너 안에서 알림 이야기를 하는 곳은 여기뿐이다.
 /// 카드마다 알림 배지를 붙이지 않고, 유료 잠금과도 섞지 않는다(모든 플랜이 쓴다).
 struct StudyReminderCard: View {
     let service: StudyReminderService
     /// 알림 시각은 학습 설정의 "공부 시간" 하나뿐이다. 별도 알림 시각 필드를 두지 않는다.
     let studyTime: StudyTimeOfDay
-    let onEditPlan: () -> Void
+    /// 시간을 고치러 갈 곳. 공부 시간 피커가 이미 같은 화면에 있으면 nil(버튼을 감춘다).
+    var onEditPlan: (() -> Void)?
     let onReconcile: () -> Void
 
     @State private var isConfirmingEnable = false
@@ -62,8 +63,10 @@ struct StudyReminderCard: View {
                 .font(AppTypography.body)
                 .accessibilityLabel("학습 알림 켜짐, 학습일 \(studyTime.displayText)")
             HStack(spacing: AppSpacing.md) {
-                Button("시간 변경", action: onEditPlan)
-                    .minimumTouchTarget()
+                if let onEditPlan {
+                    Button("시간 변경", action: onEditPlan)
+                        .minimumTouchTarget()
+                }
                 Button("알림 끄기") {
                     Task { await service.disable() }
                 }

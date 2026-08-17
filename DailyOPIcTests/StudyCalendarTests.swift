@@ -304,7 +304,7 @@ struct StudyCalendarTests {
         #expect(snapshot.weekScheduledDays == 5)
         #expect(snapshot.weekCompletedDays == 1)
         #expect(snapshot.weekDays.count == 7)
-        #expect(snapshot.weekDays.first?.date == date("2026-08-10")) // 주는 월요일에 시작
+        #expect(snapshot.weekDays.first?.date == date("2026-08-09")) // 주는 일요일에 시작
     }
 
     // MARK: 설정 직렬화
