@@ -25,6 +25,9 @@ enum PaywallSource: String, Sendable {
 ///   있지만 앱이 이 엔드포인트를 호출하는 화면이 아직 없다.
 /// - **취약점 기반 학습 일정**: 구현이 없다(G8). 캘린더 문구는 실제로 동작하는
 ///   자동 재조정 · 평가 반영 · 시험일 역산 세 가지만 말한다.
+///
+/// 학습 알림은 **기기가 예약하는 로컬 알림**이다. 서버 푸시가 아니므로 "푸시 알림"·
+/// "스마트 알림"이라고 쓰지 않는다. 무료는 잠기고 베이직·플러스·프로가 똑같이 쓴다.
 struct PaywallPlanCopy: Identifiable, Sendable {
     let plan: PlanEntitlement
     /// 이 플랜이 누구에게 맞는지 한 줄. 상시 포지셔닝이며 기간 한정 문구가 아니다.
@@ -55,6 +58,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "결과 전체 해제 — 교정 답안 · 모범 답안 · 목표 등급까지",
                 "모의고사 매일 1회",
                 "놓친 학습을 반영한 자동 일정 재조정",
+                "정한 공부 시간에 학습 알림",
                 "광고 없음",
             ]
         ),
@@ -106,6 +110,8 @@ struct PaywallComparisonRow: Identifiable, Sendable {
             title: "학습 일정 자동화",
             values: ["기본 캘린더", "자동 재조정", "평가 반영 · 시험일 역산", "평가 반영 · 시험일 역산"]
         ),
+        // 기기에서 보내는 로컬 알림이다. 유료 플랜 사이에는 차이가 없다.
+        PaywallComparisonRow(title: "학습 알림", values: ["없음", "있음", "있음", "있음"]),
         PaywallComparisonRow(title: "광고", values: ["있음", "없음", "없음", "없음"]),
     ]
 

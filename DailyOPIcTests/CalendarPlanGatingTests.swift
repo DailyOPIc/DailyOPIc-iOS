@@ -224,7 +224,8 @@ struct CalendarPlanGatingTests {
         plan: String?,
         autoReplan: Bool? = nil,
         evaluationAdaptive: Bool? = nil,
-        examBackplan: Bool? = nil
+        examBackplan: Bool? = nil,
+        studyReminder: Bool? = nil
     ) -> Capabilities {
         Capabilities(
             minimumSupportedAppVersion: "1.0.0",
@@ -247,7 +248,8 @@ struct CalendarPlanGatingTests {
                 adsEnabled: true,
                 calendarAutoReplan: autoReplan,
                 calendarEvaluationAdaptive: evaluationAdaptive,
-                calendarExamBackplan: examBackplan
+                calendarExamBackplan: examBackplan,
+                calendarStudyReminder: studyReminder
             )
         )
     }
@@ -298,9 +300,10 @@ struct CalendarPlanGatingTests {
     // MARK: 잠금 UI 계약
 
     @Test func lockedFeatureListShrinksAsThePlanGrows() {
+        // 설정 화면의 "학습 플랜 기능" 칸은 자동화 3종만 모은다(학습 알림은 자기 카드에서 잠긴다).
         func locked(_ plan: PlanEntitlement) -> [CalendarLockedFeature] {
             let policy = CalendarFeaturePolicy.fallback(for: plan)
-            return CalendarLockedFeature.allCases.filter { $0.isLocked(under: policy) }
+            return CalendarLockedFeature.automationCases.filter { $0.isLocked(under: policy) }
         }
         #expect(locked(.free) == [.autoReplan, .evaluationAdaptive, .examBackplan])
         #expect(locked(.basic) == [.evaluationAdaptive, .examBackplan])
@@ -310,10 +313,13 @@ struct CalendarPlanGatingTests {
 
     @Test func lockedFeatureMetadataIsAFixedSchema() {
         #expect(CalendarLockedFeature.allCases.map(\.rawValue)
+            == ["auto_replan", "evaluation_adaptive", "exam_backplan", "study_reminder"])
+        #expect(CalendarLockedFeature.automationCases.map(\.rawValue)
             == ["auto_replan", "evaluation_adaptive", "exam_backplan"])
         #expect(CalendarLockedFeature.autoReplan.requiredPlan == .basic)
         #expect(CalendarLockedFeature.evaluationAdaptive.requiredPlan == .plus)
         #expect(CalendarLockedFeature.examBackplan.requiredPlan == .plus)
+        #expect(CalendarLockedFeature.studyReminder.requiredPlan == .basic)
     }
 
     @Test func lockedFeatureAccessibilityLabelDoesNotRelyOnTheLockIcon() {

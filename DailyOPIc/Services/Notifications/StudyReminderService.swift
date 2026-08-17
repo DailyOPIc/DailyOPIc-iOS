@@ -142,8 +142,19 @@ final class StudyReminderService {
     /// `nil`은 "지금은 일정을 모른다"(계획 미로딩·저장소 미준비)이고 `[]`는 "예약할 것이 없다"이다.
     /// 둘을 같은 값으로 다루면 앱이 켜지는 순간의 재조정이 — 계획을 읽기도 전에 —
     /// 앞으로의 멀쩡한 예약을 전부 지운다. 모를 때는 권한 상태만 최신화하고 손대지 않는다.
-    func reconcile(_ desired: [StudyReminderRequest]?) async {
+    ///
+    /// `isEligible`은 유료 자격(`CalendarFeaturePolicy.canUseStudyReminder`)이다. 자격 판단은
+    /// 이 인자 하나로만 들어온다 — 서비스가 플랜을 직접 보지 않는다.
+    /// 기본값 `true`는 자격과 무관한 P1 경로(테스트 포함)를 그대로 두기 위한 것이고,
+    /// 앱에서 부르는 곳은 `StudyCalendarViewModel.reconcileStudyReminders()` 하나뿐이다.
+    func reconcile(_ desired: [StudyReminderRequest]?, isEligible: Bool = true) async {
         await refreshAuthorizationStatus()
+        // 자격 상실은 일정을 알기 전에 처리한다. 일정을 모른다고 미루면
+        // 강등된 사용자가 유료 시절 예약된 알림을 계속 받는다.
+        guard isEligible else {
+            await revokeForIneligibility()
+            return
+        }
         guard let desired else {
             StudyReminderDiagnostics.log("skipped reason=schedule_unknown")
             return
@@ -175,6 +186,22 @@ final class StudyReminderService {
             "reconciled status=\(authorizationStatus.telemetryValue) "
             + "desired=\(desired.count) kept=\(kept.count) added=\(added) removed=\(stale.count)"
         )
+    }
+
+    /// 유료 자격을 잃었을 때(강등). 우리 알림만 걷어내고 로컬 "켜 둠" 의도를 끈다.
+    ///
+    /// - 시스템 권한은 건드리지 않는다. 알림 허용은 사용자가 OS에 준 것이고 우리가 뺏을 것이 아니다.
+    /// - 권한을 다시 요청하지도 않는다.
+    /// - 의도(`studyRemindersEnabled`)를 끄는 것은 일부러다. 나중에 다시 업그레이드해도
+    ///   알림이 저절로 켜지지 않고, 사용자가 직접 켜야 한다.
+    /// - 여러 번 불러도 결과가 같다(두 번째부터는 지울 것도 끌 것도 없다).
+    private func revokeForIneligibility() async {
+        let hadIntent = preferences.studyRemindersEnabled
+        preferences.studyRemindersEnabled = false
+        await cancelAll()
+        if hadIntent {
+            StudyReminderDiagnostics.log("revoked reason=plan_ineligible")
+        }
     }
 
     /// 우리 네임스페이스의 알림만 제거한다. 전체 삭제(removeAllPending…)는 쓰지 않는다.

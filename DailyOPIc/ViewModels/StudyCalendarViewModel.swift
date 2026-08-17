@@ -57,10 +57,14 @@ final class StudyCalendarViewModel {
         )
     }
 
-    /// 이 플랜에서 아직 잠겨 있는 캘린더 기능(화면 노출 순서 그대로).
+    /// 이 플랜에서 아직 잠겨 있는 자동화 기능(화면 노출 순서 그대로).
+    /// 학습 알림은 설정 화면의 자기 카드에서 잠기므로 이 목록에 넣지 않는다.
     var lockedFeatures: [CalendarLockedFeature] {
-        CalendarLockedFeature.allCases.filter { $0.isLocked(under: featurePolicy) }
+        CalendarLockedFeature.automationCases.filter { $0.isLocked(under: featurePolicy) }
     }
+
+    /// 학습 알림을 쓸 수 있는 플랜인가. 화면과 서비스는 플랜을 직접 보지 않고 이 값만 본다.
+    var canUseStudyReminder: Bool { featurePolicy.canUseStudyReminder }
 
     var hasFailed: Bool {
         if case .failed = loadState { return true }
@@ -182,10 +186,17 @@ final class StudyCalendarViewModel {
         )
     }
 
-    /// 대기 중인 알림을 현재 일정과 같게 맞춘다. 여러 번 호출해도 결과가 같다.
+    /// 대기 중인 알림을 현재 일정·현재 플랜과 같게 맞춘다. 여러 번 호출해도 결과가 같다.
     /// 계획을 아직 모르면(`nil`) 서비스가 예약을 건드리지 않는다.
+    ///
+    /// 학습 알림 자격 강제는 여기 **한 곳**에서만 한다. 앱 포그라운드 복귀·계획 로드·
+    /// 설정 저장·학습 완료·플래너 진입이 전부 이 함수를 지나므로, 강등된 사용자의
+    /// 예약은 다음 재조정에서 반드시 걷힌다.
     func reconcileStudyReminders(now: Date = .now) async {
-        await studyReminders.reconcile(plannedReminders(now: now))
+        await studyReminders.reconcile(
+            plannedReminders(now: now),
+            isEligible: canUseStudyReminder
+        )
     }
 
     func snapshot(

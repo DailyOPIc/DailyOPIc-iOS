@@ -340,6 +340,9 @@ struct Capabilities: Codable, Sendable {
         let calendarAutoReplan: Bool?
         let calendarEvaluationAdaptive: Bool?
         let calendarExamBackplan: Bool?
+        /// 학습 알림(P4). 이 필드를 모르는 구 서버가 있을 수 있으므로 옵셔널이고,
+        /// 없다고 해서 capabilities 전체 디코딩이 실패하지 않는다.
+        let calendarStudyReminder: Bool?
     }
 
     let minimumSupportedAppVersion: String

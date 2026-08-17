@@ -349,13 +349,19 @@ struct PlannerSettingsView: View {
                     planName: viewModel.plan.displayName
                 )
                 StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
-                // 알림 시각은 저장된 공부 시간이다. 아직 저장하지 않은 draft를 알림 문구로 쓰면
-                // 실제로 예약된 시각과 다른 말을 하게 된다.
-                StudyReminderCard(
-                    service: viewModel.studyReminders,
-                    studyTime: viewModel.settings?.preferredStudyTime ?? draft.preferredStudyTime,
-                    onReconcile: { Task { await viewModel.reconcileStudyReminders() } }
-                )
+                // 학습 알림은 유료 기능이다(P4). 무료에게는 켜는 버튼 대신 잠긴 칸을 보여준다 —
+                // 켤 수 없는 기능에 "매일 21:00"이라고 말하지 않기 위해서다.
+                if viewModel.canUseStudyReminder {
+                    // 알림 시각은 저장된 공부 시간이다. 아직 저장하지 않은 draft를 알림 문구로 쓰면
+                    // 실제로 예약된 시각과 다른 말을 하게 된다.
+                    StudyReminderCard(
+                        service: viewModel.studyReminders,
+                        studyTime: viewModel.settings?.preferredStudyTime ?? draft.preferredStudyTime,
+                        onReconcile: { Task { await viewModel.reconcileStudyReminders() } }
+                    )
+                } else {
+                    lockedStudyReminderCard
+                }
                 lockedFeatureCard
                 // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
                 Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")
@@ -392,39 +398,51 @@ struct PlannerSettingsView: View {
                 Text("학습 플랜 기능")
                     .font(AppTypography.sectionTitle)
                 ForEach(lockedFeatures, id: \.rawValue) { feature in
-                    Button {
-                        AppTelemetry.calendarFeatureLockedTap(
-                            feature: feature,
-                            plan: viewModel.plan
-                        )
-                        paywallFeature = feature
-                    } label: {
-                        HStack(alignment: .top, spacing: AppSpacing.sm) {
-                            Image(systemName: "lock.fill")
-                                .font(AppTypography.callout)
-                                .foregroundStyle(AppPalette.secondaryInk)
-                            VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                                Text(feature.title)
-                                    .font(AppTypography.callout)
-                                Text(feature.detail)
-                                    .font(AppTypography.footnote)
-                                    .foregroundStyle(AppPalette.secondaryInk)
-                                    .multilineTextAlignment(.leading)
-                            }
-                            Spacer(minLength: 0)
-                            Text(feature.requirementText)
-                                .font(AppTypography.caption)
-                                .foregroundStyle(AppPalette.secondaryInk)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.plain)
-                    .minimumTouchTarget()
-                    .accessibilityLabel(feature.accessibilityLabel)
-                    .accessibilityHint(feature.detail)
+                    lockedFeatureRow(feature)
                 }
             }
             .cardStyle()
         }
+    }
+
+    /// 무료 사용자가 보는 학습 알림. 기능을 숨기지 않고 잠긴 채로 보여준다.
+    /// 제목·설명·필요 플랜은 잠긴 기능 한 줄이 그대로 말해 주므로 머리글을 겹쳐 두지 않는다.
+    /// 여기서는 알림 권한을 묻지 않고 `StudyReminderService`도 건드리지 않는다.
+    private var lockedStudyReminderCard: some View {
+        lockedFeatureRow(.studyReminder).cardStyle()
+    }
+
+    /// 잠긴 기능 한 줄. 누르면(=의도적인 탭) 그때만 Paywall이 열린다.
+    private func lockedFeatureRow(_ feature: CalendarLockedFeature) -> some View {
+        Button {
+            AppTelemetry.calendarFeatureLockedTap(
+                feature: feature,
+                plan: viewModel.plan
+            )
+            paywallFeature = feature
+        } label: {
+            HStack(alignment: .top, spacing: AppSpacing.sm) {
+                Image(systemName: "lock.fill")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    Text(feature.title)
+                        .font(AppTypography.callout)
+                    Text(feature.detail)
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .multilineTextAlignment(.leading)
+                }
+                Spacer(minLength: 0)
+                Text(feature.requirementText)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+        .accessibilityLabel(feature.accessibilityLabel)
+        .accessibilityHint(feature.detail)
     }
 }
