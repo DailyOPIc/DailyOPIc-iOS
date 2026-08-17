@@ -22,7 +22,7 @@ struct PracticeResultView: View {
                 ScrollView { content.padding(AppSpacing.lg) }
             }
         }
-        .sheet(isPresented: $showsPaywall) { PaywallView() }
+        .sheet(isPresented: $showsPaywall) { PaywallView(source: .resultLocked) }
     }
 
     private var content: some View {

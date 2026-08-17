@@ -20,6 +20,13 @@ final class PracticeViewModel {
     private let environment: AppEnvironment
     /// 유료 플랜 한도 소진 등 결제 유도가 필요할 때 true.
     var showsPaywall = false
+    /// 페이월을 연 지점(분석 전용). `showsPaywall`을 직접 켜지 말고 `presentPaywall(from:)`을 쓴다.
+    private(set) var paywallSource: PaywallSource = .settings
+
+    func presentPaywall(from source: PaywallSource) {
+        paywallSource = source
+        showsPaywall = true
+    }
 
     var phase: Phase = .loading
     var questionSet: QuestionSet?
@@ -32,6 +39,9 @@ final class PracticeViewModel {
     /// 답변 최대 180초. 모의고사와 같은 제한을 연습에도 적용한다.
     var remainingSeconds = PracticeViewModel.maxAnswerSeconds
     static let maxAnswerSeconds = 180
+    /// 방금 성공한 분석 결과가 화면에 나타나는 **한 번**을 가리키는 표식.
+    /// 화면이 소비하면 비운다. 결과 재진입·재렌더링·기록 화면에서는 켜지지 않는다.
+    var freshResultToken: UUID?
     var showsRefreshDialog = false
     var isRefreshingQuestions = false
     var refreshProgressMessage: String?
@@ -309,10 +319,19 @@ final class PracticeViewModel {
                 transcript: pendingRecording.transcript,
                 evaluation: result
             )
+            // 캘린더 완료 집계. 세트를 받은 것이 아니라 분석이 성공한 순간에 센다.
+            // 세트당 한 번만 기록되므로 재분석·결과 재진입은 중복되지 않는다.
+            // 기록 실패가 학습 흐름을 막아선 안 되므로 오류는 삼킨다.
+            _ = try? persistence.recordStudySetCompletion(setId: questionSet.setId)
+            // 오늘 계획을 다 채웠으면 남은 알림을 걷어낸다. 알림 정리가 실패해도 학습은 성공이다.
+            Task { await environment.studyCalendarViewModel.reconcileStudyReminders() }
             AudioFileService.remove(pendingRecording.audioURL)
             self.pendingRecording = nil
             usage = try? await api.usage()
             phase = .completed
+            // 방금 분석에 성공한 결과가 화면에 뜨는 순간을 한 번만 알린다.
+            // 이전 문항의 결과를 다시 보거나 화면이 다시 그려질 때는 켜지지 않는다.
+            freshResultToken = UUID()
             operationState = .completed
             evaluationOperationID = nil
         } catch is CancellationError {
@@ -424,7 +443,7 @@ final class PracticeViewModel {
     private func handleRefreshQuotaExhausted(adjustment: DifficultyAdjustment) async {
         guard !environment.currentPlan.isPaid else {
             showsRefreshDialog = false
-            showsPaywall = true
+            presentPaywall(from: .tokenExhausted)
             operationState = .idle
             return
         }
@@ -443,7 +462,7 @@ final class PracticeViewModel {
             where error.isPracticeQuotaExhausted || error.isRewardQuotaExhausted {
             // 광고 보너스까지 소진. 지금 세트는 그대로 두고 상위 플랜 안내로 넘긴다.
             showsRefreshDialog = false
-            showsPaywall = true
+            presentPaywall(from: .tokenExhausted)
             operationState = .idle
         } catch {
             errorMessage = error.localizedDescription

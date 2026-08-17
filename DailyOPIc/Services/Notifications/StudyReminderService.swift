@@ -1,0 +1,170 @@
+import Foundation
+import UserNotifications
+
+/// 테스트가 실제 권한 창을 띄우지 않도록 시스템 센터를 이 좁은 창구로만 쓴다.
+protocol UserNotificationCenterProtocol: Sendable {
+    func authorizationStatus() async -> UNAuthorizationStatus
+    func requestAuthorization() async -> Bool
+    func pendingRequests() async -> [UNNotificationRequest]
+    func add(_ request: UNNotificationRequest) async
+    func removePendingRequests(identifiers: [String])
+}
+
+struct SystemNotificationCenter: UserNotificationCenterProtocol {
+    private var center: UNUserNotificationCenter { .current() }
+
+    func authorizationStatus() async -> UNAuthorizationStatus {
+        await center.notificationSettings().authorizationStatus
+    }
+
+    func requestAuthorization() async -> Bool {
+        (try? await center.requestAuthorization(options: [.alert, .sound, .badge])) ?? false
+    }
+
+    func pendingRequests() async -> [UNNotificationRequest] {
+        await center.pendingNotificationRequests()
+    }
+
+    func add(_ request: UNNotificationRequest) async {
+        try? await center.add(request)
+    }
+
+    func removePendingRequests(identifiers: [String]) {
+        center.removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+}
+
+extension UNAuthorizationStatus {
+    /// 이 상태에서 알림을 예약할 수 있는가. provisional/ephemeral도 조용히 전달된다.
+    var allowsScheduling: Bool {
+        switch self {
+        case .authorized, .provisional, .ephemeral: true
+        default: false
+        }
+    }
+
+    /// 로그용 고정 값. 자유 텍스트를 남기지 않는다.
+    var telemetryValue: String {
+        switch self {
+        case .authorized: "authorized"
+        case .provisional: "provisional"
+        case .ephemeral: "ephemeral"
+        case .denied: "denied"
+        default: "not_determined"
+        }
+    }
+}
+
+/// 학습 알림 예약 담당. UNUserNotificationCenter를 만지는 곳은 여기 하나뿐이다.
+///
+/// 권한은 **사용자가 명시적으로 켤 때만** 요청한다. 앱 실행·캘린더 진입·구매·오류 어디서도
+/// 자동으로 시스템 창을 띄우지 않는다.
+///
+/// 앱 안의 `studyRemindersEnabled`는 "이 기기에서 알림을 받고 싶다"는 **사용자 의도**이고,
+/// 실제 발송 권한은 언제나 OS다. 그래서 거부 상태에서 설정으로 권한을 켜고 돌아오면
+/// 별도 조작 없이 예약이 다시 살아난다.
+@MainActor
+@Observable
+final class StudyReminderService {
+    private let center: UserNotificationCenterProtocol
+    private let preferences: AppPreferences
+
+    private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
+
+    init(preferences: AppPreferences, center: UserNotificationCenterProtocol = SystemNotificationCenter()) {
+        self.preferences = preferences
+        self.center = center
+    }
+
+    /// 사용자가 앱에서 알림을 켜 뒀는가(시스템 권한과 별개).
+    var isEnabled: Bool { preferences.studyRemindersEnabled }
+    /// 실제로 예약이 가능한 상태.
+    var isActive: Bool { isEnabled && authorizationStatus.allowsScheduling }
+    /// 앱에서는 켰지만 OS 권한이 막혀 있는 상태 → 설정으로 안내한다.
+    var needsSystemPermission: Bool { isEnabled && !authorizationStatus.allowsScheduling }
+
+    func refreshAuthorizationStatus() async {
+        authorizationStatus = await center.authorizationStatus()
+    }
+
+    /// 명시적 CTA에서만 호출한다.
+    /// 아직 물어본 적 없을 때만 시스템 권한 창을 띄우고, 거부 상태에서는 다시 묻지 않는다.
+    @discardableResult
+    func enable() async -> UNAuthorizationStatus {
+        AppTelemetry.studyReminderEnableTapped()
+        var status = await center.authorizationStatus()
+        if status == .notDetermined {
+            _ = await center.requestAuthorization()
+            status = await center.authorizationStatus()
+        }
+        authorizationStatus = status
+        preferences.studyRemindersEnabled = true
+        AppTelemetry.studyReminderPermissionResult(status)
+        return status
+    }
+
+    /// 앱 안에서 끄기. 시스템 권한은 건드리지 않고 우리 알림만 걷어낸다.
+    func disable() async {
+        preferences.studyRemindersEnabled = false
+        await cancelAll()
+        AppTelemetry.studyReminderDisabled()
+    }
+
+    /// 대기 중인 알림을 원하는 목록과 같게 만든다. 같은 입력으로 여러 번 돌려도 결과가 같다.
+    func reconcile(_ desired: [StudyReminderRequest]) async {
+        await refreshAuthorizationStatus()
+        guard isActive else {
+            await cancelAll()
+            return
+        }
+        let pending = await studyReminderRequests()
+        let desiredByIdentifier = Dictionary(
+            desired.map { ($0.identifier, $0) },
+            uniquingKeysWith: { first, _ in first }
+        )
+        // 사라진 날짜 + 내용/시각이 바뀐 날짜를 걷어낸다.
+        let stale = pending.filter { !(desiredByIdentifier[$0.identifier]?.matches($0) ?? false) }
+        if !stale.isEmpty {
+            center.removePendingRequests(identifiers: stale.map(\.identifier))
+        }
+        let kept = Set(pending.map(\.identifier)).subtracting(stale.map(\.identifier))
+        for request in desired where !kept.contains(request.identifier) {
+            await center.add(request.notificationRequest)
+        }
+    }
+
+    /// 우리 네임스페이스의 알림만 제거한다. 전체 삭제(removeAllPending…)는 쓰지 않는다.
+    func cancelAll() async {
+        let identifiers = await studyReminderRequests().map(\.identifier)
+        guard !identifiers.isEmpty else { return }
+        center.removePendingRequests(identifiers: identifiers)
+    }
+
+    private func studyReminderRequests() async -> [UNNotificationRequest] {
+        await center.pendingRequests().filter { StudyReminderPolicy.isStudyReminder($0.identifier) }
+    }
+}
+
+extension StudyReminderRequest {
+    var notificationRequest: UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        return UNNotificationRequest(
+            identifier: identifier,
+            content: content,
+            trigger: UNCalendarNotificationTrigger(dateMatching: dateComponents, repeats: false)
+        )
+    }
+
+    /// 이미 예약된 알림이 지금 원하는 것과 같은가(문구·시각까지).
+    func matches(_ request: UNNotificationRequest) -> Bool {
+        guard request.identifier == identifier,
+              request.content.title == title,
+              request.content.body == body,
+              let trigger = request.trigger as? UNCalendarNotificationTrigger
+        else { return false }
+        return trigger.dateComponents == dateComponents
+    }
+}

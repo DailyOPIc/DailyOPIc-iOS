@@ -16,6 +16,10 @@ final class AppEnvironment {
     let api: APIClient
     let ads: AdService
     let store: StoreService
+    /// 학습 알림. 권한은 사용자가 캘린더에서 직접 켤 때만 요청한다(여기서는 아무것도 하지 않는다).
+    let studyReminders: StudyReminderService
+    /// 앱 스토어 리뷰 요청. 학습 결과가 성공적으로 나온 순간에만 호출된다.
+    let appReview: AppReviewCoordinator
     var launchState: LaunchState = .launching
     var capabilities: Capabilities?
 
@@ -29,6 +33,9 @@ final class AppEnvironment {
     /// 불필요한 오디오 자원을 잡지 않는다. 생성 시점은 그대로 두고 수명만 늘린다.
     @ObservationIgnored private(set) lazy var practiceViewModel = PracticeViewModel(environment: self)
     @ObservationIgnored private(set) lazy var mockViewModel = MockExamViewModel(environment: self)
+    /// 캘린더도 탭을 떠나도 살아 있어야 서버 설정을 매번 다시 받지 않는다.
+    /// 오디오 자원을 잡지 않으므로 생성 비용은 사실상 없다.
+    @ObservationIgnored private(set) lazy var studyCalendarViewModel = StudyCalendarViewModel(environment: self)
 
     /// 현재 유효 플랜.
     /// RevenueCat(StoreService)가 설정돼 있으면 Apple의 실제 활성 엔타이틀먼트를
@@ -49,8 +56,15 @@ final class AppEnvironment {
     init() {
         let authentication = AuthenticationService()
         self.authentication = authentication
-        preferences = AppPreferences()
-        persistence = PersistenceService()
+        let preferences = AppPreferences()
+        self.preferences = preferences
+        let persistence = PersistenceService()
+        self.persistence = persistence
+        studyReminders = StudyReminderService(preferences: preferences)
+        // 리뷰 자격의 근거는 캘린더가 쓰는 완료 원장 그대로다(세트당 한 줄, 분석 성공 시에만).
+        appReview = AppReviewCoordinator(preferences: preferences) {
+            (try? persistence.studySetCompletionDates()) ?? []
+        }
         let apiBaseURL = AppConfiguration.apiBaseURL
         api = APIClient(baseURL: apiBaseURL, authentication: authentication)
         ads = AdService()

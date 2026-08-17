@@ -22,6 +22,9 @@ final class AppPreferences {
         static let guideState = "native_guide_state"
         static let guidePage = "native_guide_page"
         static let initialLevelSyncPending = "native_initial_level_sync_pending"
+        static let studyPlan = "native_study_plan"
+        static let studyReminders = "native_study_reminders_enabled"
+        static let reviewRequestAttempt = "native_review_request_attempted_at"
     }
 
     private let defaults: UserDefaults
@@ -65,6 +68,34 @@ final class AppPreferences {
             }
         }
     }
+    /// 서버에 저장된 학습 계획의 로컬 사본. 진실은 서버지만, 캘린더가 네트워크
+    /// 실패 하나로 빈 화면이 되지 않도록 마지막으로 성공한 설정을 들고 있는다.
+    var studyPlanSettings: StudyPlanSettings? {
+        didSet {
+            if let studyPlanSettings,
+               let data = try? JSONCoding.encoder.encode(studyPlanSettings) {
+                defaults.set(data, forKey: Key.studyPlan)
+            } else {
+                defaults.removeObject(forKey: Key.studyPlan)
+            }
+        }
+    }
+    /// 이 기기에서 학습 알림을 받고 싶은지에 대한 **사용자 의도**.
+    /// 실제 발송 권한은 언제나 OS이고, 서버로 보내지 않는다(기기별 설정이다).
+    var studyRemindersEnabled: Bool {
+        didSet { defaults.set(studyRemindersEnabled, forKey: Key.studyReminders) }
+    }
+    /// 앱 스토어 리뷰를 마지막으로 **요청한** 시각. 창이 실제로 떴는지는 알 수 없으므로
+    /// 시도 시각만 남긴다. 기기별 쿨다운이라 서버로 보내지 않는다.
+    var lastReviewRequestAttemptAt: Date? {
+        didSet {
+            if let lastReviewRequestAttemptAt {
+                defaults.set(lastReviewRequestAttemptAt, forKey: Key.reviewRequestAttempt)
+            } else {
+                defaults.removeObject(forKey: Key.reviewRequestAttempt)
+            }
+        }
+    }
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -98,6 +129,8 @@ final class AppPreferences {
         }
         lastGuidePage = min(6, max(0, defaults.integer(forKey: Key.guidePage)))
         isInitialLevelSyncPending = defaults.bool(forKey: Key.initialLevelSyncPending)
+        studyRemindersEnabled = defaults.bool(forKey: Key.studyReminders)
+        lastReviewRequestAttemptAt = defaults.object(forKey: Key.reviewRequestAttempt) as? Date
         initialLevel = storedInitialLevel
         targetLevel = storedTargetLevel ?? storedInitialLevel?.expectedTargetLevel
         if let data = defaults.data(forKey: Key.background),
@@ -105,6 +138,11 @@ final class AppPreferences {
             backgroundProfile = profile
         } else {
             backgroundProfile = BackgroundProfile()
+        }
+        if let data = defaults.data(forKey: Key.studyPlan) {
+            studyPlanSettings = try? JSONCoding.decoder.decode(StudyPlanSettings.self, from: data)
+        } else {
+            studyPlanSettings = nil
         }
         if let data = defaults.data(forKey: Key.mockSurvey),
            let survey = try? JSONCoding.decoder.decode(BackgroundSurvey.self, from: data) {

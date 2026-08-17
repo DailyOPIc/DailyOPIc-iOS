@@ -24,7 +24,9 @@ struct DailyOPIcApp: App {
         let schema = Schema([
             PracticeHistoryRecord.self,
             MockHistoryRecord.self,
-            MockDraftRecord.self
+            MockDraftRecord.self,
+            StudySetCompletionRecord.self,
+            StudyDayPlanRecord.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
@@ -45,6 +47,8 @@ struct DailyOPIcApp: App {
                         // 포그라운드 복귀 시 구독 상태(해지/갱신/만료)를 즉시 최신화.
                         if phase == .active {
                             Task { await environment.refreshEntitlements() }
+                            // 날짜가 바뀌었거나 설정에서 알림 권한을 바꿨을 수 있다.
+                            Task { await environment.studyCalendarViewModel.reconcileStudyReminders() }
                         }
                     }
             } else {

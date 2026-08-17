@@ -223,6 +223,25 @@ actor APIClient {
         )
     }
 
+    /// 학습 계획 설정. 캘린더를 쓴 적 없는 사용자는 오류가 아니라 `configured == false`.
+    func studyPlan() async throws -> StudyPlanResponse {
+        try await send(path: "/v1/users/me/study-plan", method: "GET", body: nil)
+    }
+
+    /// 설정 전체를 덮어쓴다(멱등). 목표 등급은 여기가 아니라 target-level이 진실이다.
+    func updateStudyPlan(
+        _ settings: StudyPlanSettings,
+        requestID: UUID
+    ) async throws -> StudyPlanResponse {
+        try await sendJSON(
+            path: "/v1/users/me/study-plan",
+            method: "PUT",
+            body: StudyPlanRequest(settings: settings),
+            requestID: requestID,
+            timeout: RequestTimeout.read
+        )
+    }
+
     func operation(id: UUID) async throws -> OperationResult {
         try await send(path: "/v1/operations/\(id.uuidString)", method: "GET", body: nil)
     }
