@@ -116,11 +116,11 @@ struct PaywallView: View {
     private var dailyTokenExplainer: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xs) {
             HStack(spacing: AppSpacing.xs) {
-                Image(systemName: "bolt.fill")
+                DailyTokenIcon(size: 28)
                 Text("데일리 토큰")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.primary)
             }
-            .font(AppTypography.caption)
-            .foregroundStyle(AppPalette.primary)
 
             Text("토큰 1개로 새로운 Daily 문제 세트 1개를 시작할 수 있어요.")
                 .font(AppTypography.body)
