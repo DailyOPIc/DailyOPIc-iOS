@@ -9,6 +9,10 @@ final class PersistenceService {
         self.context = context
     }
 
+    /// 컨텍스트가 붙기 전에는 조회가 전부 빈 값이다. 그 빈 값을 "기록이 없다"로
+    /// 읽으면 안 되는 곳(알림 재조정)이 있어서 준비 여부를 밖에서 볼 수 있게 둔다.
+    var isReady: Bool { context != nil }
+
     func savePractice(
         targetLevel: OPIcLevel,
         question: GeneratedQuestion,

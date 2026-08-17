@@ -80,6 +80,8 @@ final class StudyCalendarViewModel {
             preferences.studyPlanSettings = settings
             isShowingCachedSettings = false
             loadState = .loaded
+            // 다른 기기에서 계획을 바꿨을 수 있다. 캘린더 화면을 그리기 전에 한 번 맞춘다.
+            Task { await reconcileStudyReminders() }
         } catch {
             // 캐시가 있으면 캘린더는 계속 쓸 수 있다. 없으면 재시도 화면.
             settings = preferences.studyPlanSettings
@@ -155,8 +157,12 @@ final class StudyCalendarViewModel {
 
     /// 지금 일정 기준으로 예약돼 있어야 할 알림. 캘린더 화면이 열려 있지 않아도 계산할 수 있도록
     /// @Query 대신 저장소에서 직접 읽는다(같은 기록이다).
-    func plannedReminders(now: Date = .now) -> [StudyReminderRequest] {
-        guard let settings else { return [] }
+    ///
+    /// `nil`은 "아직 모른다"(계획 미로딩·저장소 미준비)이고 `[]`는 "예약할 것이 없다"이다.
+    /// 둘을 같은 값으로 다루면, 앱이 켜지는 순간(계획을 읽기 전)의 재조정이 멀쩡한
+    /// 앞으로의 예약을 전부 지워 버린다.
+    func plannedReminders(now: Date = .now) -> [StudyReminderRequest]? {
+        guard let settings, persistence.isReady else { return nil }
         let completions = StudyCalendarEngine.completionCounts(
             completedAt: (try? persistence.studySetCompletionDates()) ?? [],
             calendar: settings.calendar
@@ -177,6 +183,7 @@ final class StudyCalendarViewModel {
     }
 
     /// 대기 중인 알림을 현재 일정과 같게 맞춘다. 여러 번 호출해도 결과가 같다.
+    /// 계획을 아직 모르면(`nil`) 서비스가 예약을 건드리지 않는다.
     func reconcileStudyReminders(now: Date = .now) async {
         await studyReminders.reconcile(plannedReminders(now: now))
     }

@@ -26,11 +26,38 @@ struct SystemNotificationCenter: UserNotificationCenterProtocol {
     }
 
     func add(_ request: UNNotificationRequest) async {
-        try? await center.add(request)
+        do {
+            try await center.add(request)
+        } catch {
+            // 예약 실패는 조용히 사라지면 안 된다(예: 대기 알림 상한 초과).
+            // 식별자·문구는 남기지 않고 실패했다는 사실만 남긴다.
+            StudyReminderDiagnostics.log("add failed")
+        }
     }
 
     func removePendingRequests(identifiers: [String]) {
         center.removePendingNotificationRequests(withIdentifiers: identifiers)
+    }
+}
+
+/// 앱을 보고 있는 동안 도착한 알림을 어떻게 띄울지.
+///
+/// delegate를 붙이지 않으면 iOS는 포그라운드 알림을 **조용히 버린다**. 학습 알림은
+/// 사용자가 정한 "공부할 시간"에 울리므로 앱을 켜 둔 채 그 시각을 맞는 경우가 흔하다.
+enum StudyReminderPresentation {
+    static func options(for identifier: String) -> UNNotificationPresentationOptions {
+        // 우리 알림만 띄운다. 다른 출처의 알림은 지금까지의 동작(표시 안 함)을 그대로 둔다.
+        StudyReminderPolicy.isStudyReminder(identifier) ? [.banner, .list, .sound] : []
+    }
+}
+
+/// DEBUG 전용 진단. 실기기에서 "왜 안 왔는지"를 보려고 두는 것이라
+/// 개수·상태 같은 고정 값만 남기고 UID·문구·날짜는 남기지 않는다.
+enum StudyReminderDiagnostics {
+    static func log(_ message: @autoclosure () -> String) {
+        #if DEBUG
+        print("[DailyOPIc][Reminder] \(message())")
+        #endif
     }
 }
 
@@ -111,9 +138,20 @@ final class StudyReminderService {
     }
 
     /// 대기 중인 알림을 원하는 목록과 같게 만든다. 같은 입력으로 여러 번 돌려도 결과가 같다.
-    func reconcile(_ desired: [StudyReminderRequest]) async {
+    ///
+    /// `nil`은 "지금은 일정을 모른다"(계획 미로딩·저장소 미준비)이고 `[]`는 "예약할 것이 없다"이다.
+    /// 둘을 같은 값으로 다루면 앱이 켜지는 순간의 재조정이 — 계획을 읽기도 전에 —
+    /// 앞으로의 멀쩡한 예약을 전부 지운다. 모를 때는 권한 상태만 최신화하고 손대지 않는다.
+    func reconcile(_ desired: [StudyReminderRequest]?) async {
         await refreshAuthorizationStatus()
+        guard let desired else {
+            StudyReminderDiagnostics.log("skipped reason=schedule_unknown")
+            return
+        }
         guard isActive else {
+            StudyReminderDiagnostics.log(
+                "skipped reason=inactive enabled=\(isEnabled) status=\(authorizationStatus.telemetryValue)"
+            )
             await cancelAll()
             return
         }
@@ -128,9 +166,15 @@ final class StudyReminderService {
             center.removePendingRequests(identifiers: stale.map(\.identifier))
         }
         let kept = Set(pending.map(\.identifier)).subtracting(stale.map(\.identifier))
+        var added = 0
         for request in desired where !kept.contains(request.identifier) {
             await center.add(request.notificationRequest)
+            added += 1
         }
+        StudyReminderDiagnostics.log(
+            "reconciled status=\(authorizationStatus.telemetryValue) "
+            + "desired=\(desired.count) kept=\(kept.count) added=\(added) removed=\(stale.count)"
+        )
     }
 
     /// 우리 네임스페이스의 알림만 제거한다. 전체 삭제(removeAllPending…)는 쓰지 않는다.

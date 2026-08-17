@@ -525,6 +525,67 @@ struct StudyReminderTests {
         #expect((free + plus).allSatisfy { localDates([$0])[0] >= "2026-08-14" })
     }
 
+    // MARK: 전달 (P1 회귀)
+
+    /// P1-1. 앱이 켜지는 순간의 재조정은 계획을 읽기 전에 돌 수 있다.
+    /// 이때(일정 모름 = nil) 앞으로의 멀쩡한 예약을 지우면 알림이 영영 오지 않는다.
+    @Test func unknownScheduleNeverErasesPendingReminders() async {
+        let center = FakeNotificationCenter()
+        center.status = .authorized
+        let (service, defaults, suite) = service(center: center, enabled: true)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        await service.reconcile(reminders())
+        let scheduled = center.studyReminderIdentifiers
+        #expect(!scheduled.isEmpty)
+
+        await service.reconcile(nil)
+
+        #expect(center.studyReminderIdentifiers == scheduled)
+    }
+
+    /// P1-2. "모른다"와 "예약할 것이 없다"는 다르다. 계획을 알고 비어 있으면 걷어낸다.
+    @Test func knownEmptyScheduleStillClearsReminders() async {
+        let center = FakeNotificationCenter()
+        center.status = .authorized
+        let (service, defaults, suite) = service(center: center, enabled: true)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        await service.reconcile(reminders())
+        #expect(!center.studyReminderIdentifiers.isEmpty)
+
+        await service.reconcile([])
+
+        #expect(center.studyReminderIdentifiers.isEmpty)
+    }
+
+    /// P1-3. 일정을 모르는 동안에도 권한 상태는 최신으로 만든다.
+    /// (설정에서 권한을 켜고 돌아왔을 때 카드가 꺼진 상태로 남지 않는다.)
+    @Test func unknownScheduleStillRefreshesAuthorizationStatus() async {
+        let center = FakeNotificationCenter()
+        center.status = .authorized
+        let (service, defaults, suite) = service(center: center, enabled: true)
+        defer { defaults.removePersistentDomain(forName: suite) }
+        #expect(service.authorizationStatus == .notDetermined)
+
+        await service.reconcile(nil)
+
+        #expect(service.authorizationStatus == .authorized)
+        #expect(center.authorizationRequestCount == 0)
+    }
+
+    /// P1-4. 학습 시간에 앱을 보고 있어도 알림이 뜬다.
+    /// delegate가 이 옵션을 돌려주지 않으면 iOS가 포그라운드 알림을 조용히 버린다.
+    @Test func foregroundStudyReminderIsPresentedWithBannerAndSound() {
+        let options = StudyReminderPresentation.options(
+            for: StudyReminderPolicy.identifier(forLocalDate: "2026-08-14")
+        )
+
+        #expect(options.contains(.banner))
+        #expect(options.contains(.sound))
+        #expect(options.contains(.list))
+        // 우리 알림이 아니면 표시 방식을 바꾸지 않는다.
+        #expect(StudyReminderPresentation.options(for: "someone.else.reminder").isEmpty)
+    }
+
     /// 26. 알림 문구에는 답변·전사·UID·점수가 들어가지 않는다. 고정 템플릿뿐이다.
     @Test func notificationCopyCarriesNoUserContent() {
         let requests = reminders(settings: settings(examDate: "2026-08-21"))
