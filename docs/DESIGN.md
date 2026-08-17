@@ -2187,7 +2187,7 @@ RevenueCat 로컬 엔타이틀먼트   ←  즉시성 (구매 직후)
 
 ---
 
-# 34. 플래너 (Calendar Foundation · G2 / 적응형 플래너 · G3 / 플랜 게이팅 · G4 / IA · P2)
+# 34. 플래너 (Calendar Foundation · G2 / 적응형 플래너 · G3 / 플랜 게이팅 · G4 / IA · P2 / 하루 상세 · P3)
 
 제품 정의 · 예측 상수 · 완료 정의는 PRODUCT.md §16, 적응형 계획 규칙은 §17,
 화면 구성과 일요일 시작은 §21이 진실이다. 여기서는 화면과 계층만 다룬다.
@@ -2218,7 +2218,8 @@ RevenueCat 로컬 엔타이틀먼트   ←  즉시성 (구매 직후)
    시험일과 완료 예상일은 **다른 줄**에 둔다. 섞으면 취득일 약속으로 읽힌다.
 
 전체 캘린더: 월 이동 · 일~토 머리글 · `LazyVGrid` 7열 · 범례 · 이번 달 요약 한 줄.
-**외부 캘린더 라이브러리 없음.** 날짜를 눌러 여는 상세는 아직 없다(P3).
+**외부 캘린더 라이브러리 없음.** 날짜 칸은 `NavigationLink(value: .dayDetail("yyyy-MM-dd"))`라
+같은 스택에서 **하루 상세**(§34.11)로 밀린다.
 
 플래너 설정: 목표 등급 · 시험일 · 공부 요일 · 학습 강도 · 선호 공부 시간 ·
 학습 알림(§34.9) · 잠긴 자동화 기능(§34.8) · 저장. 저장 성공하면 홈으로 돌아온다.
@@ -2395,6 +2396,50 @@ StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
 DEBUG 빌드와 영수증 파일명(`sandboxReceipt` = TestFlight/샌드박스)으로 판별하며,
 TestFlight와 판별 불가(unknown)는 요청하지 않는다. 테스트는 배포 경로와 요청 동작을 모두
 주입해 **실제 네이티브 창을 띄우지 않는다**.
+
+## 34.11 하루 상세 · 개인 일정 · 메모 (P3)
+
+제품 규칙은 PRODUCT.md §22가 진실이다. 여기서는 화면과 계층만 다룬다.
+
+**내비게이션.** 시트를 겹치지 않는다. 전체 캘린더의 날짜 칸이
+`PlannerRoute.dayDetail(String)`을 밀어 탭이 이미 가진 `NavigationStack` 안에서 열린다.
+경로 값은 `Date`가 아니라 **"yyyy-MM-dd" 문자열**이다 — `Date`를 실으면 기기 타임존이
+바뀔 때 다른 날이 열린다. 유일한 시트는 하루 상세 안의 일정 편집기이고,
+페이월 시트는 플래너 설정 쪽 가지에 있어 서로 만나지 않는다.
+
+제목은 `"8월 20일 목요일"`을 직접 조립한다(`dateComponents` + `StudyWeekday.accessibilityLabel`).
+로케일 포맷터를 쓰면 계획 타임존과 기기 타임존이 어긋날 때 하루가 밀린다.
+
+**구성.** 위에서부터 ① 학습 기록 카드(읽기 전용) ② 개인 일정 ③ 메모.
+
+**학습 상태는 두 번 계산하지 않는다.** `StudyCalendarScreen`이 격자와 **같은**
+`StudyCalendarEngine.day(...)` 호출로 `StudyDay`를 만들어 넘기고, 화면은
+`PlannerDayStudyStatus.make(day:isStudyWeekday:)`로 문구·기호만 고른다. 지난 날짜의
+배정량은 `snapshot.schedule`에 이미 합쳐진 `historicalTargets`에서 나오므로
+강도를 올려도 어제의 판정이 바뀌지 않는다(§34.6과 같은 불변식). 배정량이 0이면
+`Daily 0 / 0`처럼 없는 목표를 지어내지 않고 세트 줄을 접는다.
+
+**계층.**
+
+| 층 | 역할 |
+|---|---|
+| `PlannerEventRecord` · `PlannerDayNoteRecord` | 로컬 SwiftData 모델. 키는 `localDate` 문자열, 시각은 `timeMinutes`(자정 이후 분) |
+| `PersistenceService` | 쓰기 전담 — 저장·수정·삭제, 제목 트림/빈 값 거부, 공백 메모 삭제 |
+| `PlannerDayDetailView` · `PlannerFullCalendarView` | `@Query`로 읽기만 한다(기존 `StudyCalendarScreen` 관례 그대로) |
+
+`PersistenceService`는 `MainTabView` → `StudyCalendarScreen` 인자 하나로 내려온다.
+새 리포지토리 추상화를 만들지 않는다.
+
+`DailyOPIcApp`의 `Schema`에 두 모델을 **추가만** 한다. 기존 모델을 하나라도 빠뜨리면
+그 모델의 저장 데이터가 통째로 사라진다.
+
+**메모 저장 시점.** 타이핑마다 저장하지 않는다. 내용이 바뀌었을 때만 나타나는
+`메모 저장` 버튼 + 화면을 벗어날 때(`onDisappear`) 한 번, 두 경로뿐이다.
+
+**격자 표시와 접근성.** 학습 상태 기호(16pt) 아래에 개인 일정 5pt 점,
+메모 7pt `text.alignleft`를 얹고 둘 다 `accessibilityHidden`이다. 대신 칸의 한 문장
+레이블 끝에 "개인 일정 있음" · "메모 있음"을 덧붙인다(색·모양 단독 금지, §9).
+일정 행은 "시간 없음, 스터디 모임"처럼 시각을 먼저 읽는다.
 
 ---
 

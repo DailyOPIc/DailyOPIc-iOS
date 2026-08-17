@@ -25,6 +25,7 @@ struct MainTabView: View {
                 StudyCalendarScreen(
                     viewModel: environment.studyCalendarViewModel,
                     preferences: environment.preferences,
+                    persistence: environment.persistence,
                     // 플래너는 학습 화면을 따로 만들지 않고 기존 데일리 탭으로 보낸다.
                     onStartDaily: { selectedTab = 0 }
                 )

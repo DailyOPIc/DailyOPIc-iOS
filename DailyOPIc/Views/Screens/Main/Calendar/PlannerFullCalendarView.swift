@@ -1,13 +1,21 @@
 import SwiftUI
+import SwiftData
 
 /// 전체 캘린더. 플래너 홈에서 밀어낸 월간 격자가 사는 곳이다.
-/// 날짜를 눌러 고치는 기능(일정·메모)은 아직 없다 — P3가 맡는다.
+/// 날짜를 누르면 하루 상세(`PlannerDayDetailView`)로 간다.
 struct PlannerFullCalendarView: View {
     let settings: StudyPlanSettings
     let schedule: StudySchedule
     let completions: [Date: Int]
 
+    /// 개인 일정·메모가 있는 날에만 작은 표시를 얹는다. 격자를 시끄럽게 만들지 않는다.
+    @Query private var events: [PlannerEventRecord]
+    @Query private var notes: [PlannerDayNoteRecord]
+
     @State private var monthOffset = 0
+
+    private var eventDates: Set<String> { Set(events.map(\.localDate)) }
+    private var noteDates: Set<String> { Set(notes.map(\.localDate)) }
 
     private var calendar: Calendar { settings.calendar }
 
@@ -79,11 +87,18 @@ struct PlannerFullCalendarView: View {
                 Color.clear.frame(height: 1)
             }
             ForEach(days) { day in
-                StudyDayCell(
-                    day: day,
-                    calendar: calendar,
-                    isToday: calendar.isDateInToday(day.date)
-                )
+                let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
+                NavigationLink(value: PlannerRoute.dayDetail(key)) {
+                    StudyDayCell(
+                        day: day,
+                        calendar: calendar,
+                        isToday: calendar.isDateInToday(day.date),
+                        hasEvent: eventDates.contains(key),
+                        hasNote: noteDates.contains(key)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("하루 상세를 봅니다")
             }
         }
     }

@@ -7,6 +7,8 @@ import SwiftData
 struct StudyCalendarScreen: View {
     let viewModel: StudyCalendarViewModel
     let preferences: AppPreferences
+    /// 하루 상세의 개인 일정·메모 저장소. 화면이 SwiftData를 직접 만지지 않게 서비스로 받는다.
+    let persistence: PersistenceService
     /// Daily 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
     let onStartDaily: () -> Void
 
@@ -85,6 +87,8 @@ struct StudyCalendarScreen: View {
                         completions: completions
                     )
                 }
+            case let .dayDetail(localDate):
+                dayDetail(localDate)
             case .settings:
                 PlannerSettingsView(viewModel: viewModel) {
                     preferences.isPresentingLevelSelection = true
@@ -92,6 +96,28 @@ struct StudyCalendarScreen: View {
             }
         }
         .task { await viewModel.loadIfNeeded() }
+    }
+
+    /// 하루 상세. 학습 상태는 격자와 **같은** 계산에서 뽑는다(두 번째 계산 경로를 만들지 않는다).
+    @ViewBuilder
+    private func dayDetail(_ localDate: String) -> some View {
+        if let snapshot,
+           let settings = viewModel.settings,
+           let date = LocalCalendarDate.date(from: localDate, timeZone: settings.timeZone) {
+            PlannerDayDetailView(
+                localDate: localDate,
+                day: StudyCalendarEngine.day(
+                    date: date,
+                    today: snapshot.today.date,
+                    settings: settings,
+                    schedule: snapshot.schedule,
+                    completions: completions
+                ),
+                isStudyWeekday: settings.isStudyDay(date),
+                calendar: settings.calendar,
+                persistence: persistence
+            )
+        }
     }
 
     private var loadingView: some View {

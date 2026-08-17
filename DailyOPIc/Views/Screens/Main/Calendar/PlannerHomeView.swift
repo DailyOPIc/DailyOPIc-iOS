@@ -3,6 +3,8 @@ import SwiftUI
 /// 플래너 탭 안의 이동 경로. 탭이 이미 갖고 있는 NavigationStack을 그대로 쓴다.
 enum PlannerRoute: Hashable {
     case fullCalendar
+    /// 하루 상세. 값은 "yyyy-MM-dd"다 — Date로 실으면 기기 타임존이 바뀔 때 다른 날이 열린다.
+    case dayDetail(String)
     case settings
 }
 
@@ -255,6 +257,9 @@ struct StudyDayCell: View {
     /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 요일·날짜가 하루 어긋날 수 있다.
     let calendar: Calendar
     var isToday = false
+    /// 개인 일정·메모가 있는지. 학습 상태와 다른 기호로, 훨씬 작게 그린다.
+    var hasEvent = false
+    var hasNote = false
 
     var body: some View {
         VStack(spacing: AppSpacing.xs) {
@@ -266,6 +271,7 @@ struct StudyDayCell: View {
                 .foregroundStyle(tint)
             Text("\(calendar.component(.day, from: day.date))")
                 .font(AppTypography.footnote)
+            entryIndicators
         }
         .frame(maxWidth: .infinity)
         .padding(.vertical, AppSpacing.sm)
@@ -275,13 +281,35 @@ struct StudyDayCell: View {
         .accessibilityLabel(accessibilityText)
     }
 
+    /// 개인 일정·메모 표시. 학습 상태 기호(16pt)와 겹쳐 보이지 않게 아주 작게 둔다.
+    /// 색이 아니라 모양이 다르고, 읽어 주는 문장에도 따로 들어간다.
+    @ViewBuilder
+    private var entryIndicators: some View {
+        if hasEvent || hasNote {
+            HStack(spacing: 2) {
+                if hasEvent {
+                    Image(systemName: "circle.fill").font(.system(size: 5))
+                }
+                if hasNote {
+                    Image(systemName: "text.alignleft").font(.system(size: 7))
+                }
+            }
+            .foregroundStyle(AppPalette.secondaryInk)
+            .accessibilityHidden(true)
+        }
+    }
+
     /// 오늘 여부는 배경색으로만 알리면 안 된다. 한 문장으로 조립해 읽어 준다.
     private var accessibilityText: String {
         let weekday = StudyWeekday.from(date: day.date, calendar: calendar).accessibilityLabel
         let date = day.date.formatted(.dateTime.month().day())
         let today = isToday ? "오늘, " : ""
         let sets = day.isScheduled ? ", \(day.completedSets) / \(day.targetSets) 세트" : ""
-        return "\(date) \(weekday), \(today)\(day.state.title)\(sets)"
+        let entries = [hasEvent ? "개인 일정 있음" : nil, hasNote ? "메모 있음" : nil]
+            .compactMap { $0 }
+            .map { ", \($0)" }
+            .joined()
+        return "\(date) \(weekday), \(today)\(day.state.title)\(sets)\(entries)"
     }
 
     private var tint: Color {

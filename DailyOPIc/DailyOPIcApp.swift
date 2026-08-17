@@ -41,7 +41,11 @@ struct DailyOPIcApp: App {
             MockHistoryRecord.self,
             MockDraftRecord.self,
             StudySetCompletionRecord.self,
-            StudyDayPlanRecord.self
+            StudyDayPlanRecord.self,
+            // 플래너 개인 일정·메모(P3). 추가만 하고 기존 모델은 그대로 둔다 —
+            // 하나라도 빠뜨리면 그 모델의 저장 데이터가 통째로 사라진다.
+            PlannerEventRecord.self,
+            PlannerDayNoteRecord.self
         ])
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
