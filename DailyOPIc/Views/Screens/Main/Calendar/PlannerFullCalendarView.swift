@@ -7,6 +7,8 @@ struct PlannerFullCalendarView: View {
     let settings: StudyPlanSettings
     let schedule: StudySchedule
     let completions: [Date: Int]
+    /// 학습 계획 타임존 기준의 오늘. 기기 시계로 다시 구하면 여행 중에 다른 칸이 오늘이 된다.
+    let today: Date
 
     /// 개인 일정·메모가 있는 날에만 작은 표시를 얹는다. 격자를 시끄럽게 만들지 않는다.
     @Query private var events: [PlannerEventRecord]
@@ -14,13 +16,9 @@ struct PlannerFullCalendarView: View {
 
     @State private var monthOffset = 0
 
-    private var eventDates: Set<String> { Set(events.map(\.localDate)) }
-    private var noteDates: Set<String> { Set(notes.map(\.localDate)) }
-
     private var calendar: Calendar { settings.calendar }
 
     private var monthStart: Date {
-        let today = calendar.startOfDay(for: .now)
         let components = calendar.dateComponents([.year, .month], from: today)
         let firstOfThisMonth = calendar.date(from: components) ?? today
         return calendar.date(byAdding: .month, value: monthOffset, to: firstOfThisMonth)
@@ -31,7 +29,7 @@ struct PlannerFullCalendarView: View {
         StudyCalendarEngine.days(
             from: monthStart,
             count: calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30,
-            today: .now,
+            today: today,
             settings: settings,
             schedule: schedule,
             completions: completions
@@ -72,7 +70,11 @@ struct PlannerFullCalendarView: View {
     }
 
     private var monthGrid: some View {
-        LazyVGrid(
+        // 날짜 칸마다 다시 만들면 한 달에 30번 도는 일이다. 격자를 그리기 전에 한 번만 만든다.
+        let eventDates = Set(events.map(\.localDate))
+        let noteDates = Set(notes.map(\.localDate))
+        let startOfToday = calendar.startOfDay(for: today)
+        return LazyVGrid(
             columns: Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7),
             spacing: AppSpacing.sm
         ) {
@@ -88,11 +90,11 @@ struct PlannerFullCalendarView: View {
             }
             ForEach(days) { day in
                 let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
-                NavigationLink(value: PlannerRoute.dayDetail(key)) {
+                NavigationLink(value: PlannerRoute.dayDetail(for: day.date, timeZone: settings.timeZone)) {
                     StudyDayCell(
                         day: day,
                         calendar: calendar,
-                        isToday: calendar.isDateInToday(day.date),
+                        isToday: day.date == startOfToday,
                         hasEvent: eventDates.contains(key),
                         hasNote: noteDates.contains(key)
                     )

@@ -84,7 +84,8 @@ struct StudyCalendarScreen: View {
                     PlannerFullCalendarView(
                         settings: viewModel.settings ?? .draft,
                         schedule: snapshot.schedule,
-                        completions: completions
+                        completions: completions,
+                        today: snapshot.today.date
                     )
                 }
             case let .dayDetail(localDate):

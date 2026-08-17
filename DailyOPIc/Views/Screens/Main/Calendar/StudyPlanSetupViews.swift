@@ -334,6 +334,9 @@ struct PlannerSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                // 무엇을 고치러 왔는지 바로 찾도록 세 묶음으로 나눈다:
+                // 학습 목표 · 학습 시간 · 플래너 기능.
+                groupHeader("학습 목표")
                 StudyPlanSetupSection.TargetLevel(
                     targetLevel: viewModel.targetLevel,
                     onChange: onChangeTargetLevel
@@ -348,6 +351,7 @@ struct PlannerSettingsView: View {
                     dailyCapacity: viewModel.dailyCapacity,
                     planName: viewModel.plan.displayName
                 )
+                groupHeader("학습 시간")
                 StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
                 // 학습 알림은 유료 기능이다(P4). 무료에게는 켜는 버튼 대신 잠긴 칸을 보여준다 —
                 // 켤 수 없는 기능에 "매일 21:00"이라고 말하지 않기 위해서다.
@@ -389,13 +393,21 @@ struct PlannerSettingsView: View {
         .sheet(item: $paywallFeature) { _ in PaywallView(source: .calendarLocked) }
     }
 
+    /// 묶음 머리글. 카드를 하나 더 두지 않고 한 줄로만 구분한다.
+    private func groupHeader(_ title: String) -> some View {
+        Text(title)
+            .font(AppTypography.caption)
+            .foregroundStyle(AppPalette.secondaryInk)
+            .accessibilityAddTraits(.isHeader)
+    }
+
     /// 잠긴 자동화 기능. 한 칸에 모아 두고, 여기를 **직접 누를 때만** Paywall이 열린다.
     @ViewBuilder
     private var lockedFeatureCard: some View {
         let lockedFeatures = viewModel.lockedFeatures
         if !lockedFeatures.isEmpty {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text("학습 플랜 기능")
+                Text("플래너 기능")
                     .font(AppTypography.sectionTitle)
                 ForEach(lockedFeatures, id: \.rawValue) { feature in
                     lockedFeatureRow(feature)

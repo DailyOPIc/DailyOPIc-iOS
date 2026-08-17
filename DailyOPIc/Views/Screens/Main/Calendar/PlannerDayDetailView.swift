@@ -23,6 +23,8 @@ struct PlannerDayDetailView: View {
     @State private var editingEvent: PlannerEventDraft?
     /// nil이면 아직 저장된 메모를 읽기 전이다. 읽기 전에 빈 문자열로 덮어써서 지우면 안 된다.
     @State private var memoText: String?
+    /// 메모 입력 중인지. 키보드를 내릴 방법이 이 화면에 하나는 있어야 한다.
+    @FocusState private var isEditingMemo: Bool
 
     init(
         localDate: String,
@@ -55,6 +57,14 @@ struct PlannerDayDetailView: View {
                 memoSection
             }
             .padding(AppSpacing.lg)
+        }
+        // 메모를 쓰다 보면 키보드가 화면을 덮는다. 스크롤로도, 완료 버튼으로도 내릴 수 있게 둔다.
+        .scrollDismissesKeyboard(.interactively)
+        .toolbar {
+            ToolbarItemGroup(placement: .keyboard) {
+                Spacer()
+                Button("완료") { isEditingMemo = false }
+            }
         }
         .navigationTitle(titleText)
         .navigationBarTitleDisplayMode(.inline)
@@ -136,7 +146,7 @@ struct PlannerDayDetailView: View {
 
     private var eventSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("내 일정")
+            Text("개인 일정")
                 .font(AppTypography.sectionTitle)
             if sortedEvents.isEmpty {
                 Text("아직 등록한 일정이 없어요.")
@@ -205,6 +215,7 @@ struct PlannerDayDetailView: View {
             )
             .frame(minHeight: 120)
             .font(AppTypography.body)
+            .focused($isEditingMemo)
             .scrollContentBackground(.hidden)
             .padding(AppSpacing.sm)
             .background(AppPalette.surface)
@@ -215,6 +226,11 @@ struct PlannerDayDetailView: View {
                 Button("메모 저장") { saveMemoIfNeeded() }
                     .font(AppTypography.callout)
                     .minimumTouchTarget()
+            } else if !storedMemo.isEmpty {
+                // 버튼이 사라진 것만으로는 저장됐는지 알 수 없다. 상태를 한 줄로 말해 준다.
+                Label("저장됨", systemImage: "checkmark.circle")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)

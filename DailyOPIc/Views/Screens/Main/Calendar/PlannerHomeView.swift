@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// 플래너 탭 안의 이동 경로. 탭이 이미 갖고 있는 NavigationStack을 그대로 쓴다.
 enum PlannerRoute: Hashable {
@@ -6,6 +7,12 @@ enum PlannerRoute: Hashable {
     /// 하루 상세. 값은 "yyyy-MM-dd"다 — Date로 실으면 기기 타임존이 바뀔 때 다른 날이 열린다.
     case dayDetail(String)
     case settings
+
+    /// 하루 상세로 가는 유일한 경로 생성기. 주간 스트립과 전체 캘린더가 같은 함수를 써야
+    /// 같은 날짜에서 같은 화면이 열린다(키를 각자 만들면 언젠가 하루가 어긋난다).
+    static func dayDetail(for date: Date, timeZone: TimeZone) -> PlannerRoute {
+        .dayDetail(LocalCalendarDate.text(from: date, timeZone: timeZone))
+    }
 }
 
 /// 플래너 홈. 첫 화면에서 "오늘 뭘 해야 하지?"에 답하는 것이 이 화면의 전부다.
@@ -18,6 +25,10 @@ struct PlannerHomeView: View {
     let isShowingCachedSettings: Bool
     /// 데일리 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
     let onStartDaily: () -> Void
+
+    /// 주간 스트립의 작은 표시용. 전체 캘린더와 같은 날에 같은 표시가 뜨게 한다.
+    @Query private var events: [PlannerEventRecord]
+    @Query private var notes: [PlannerDayNoteRecord]
 
     var body: some View {
         ScrollView {
@@ -34,8 +45,7 @@ struct PlannerHomeView: View {
                     tip: OPIcTipCatalog.tip(for: snapshot.today.date, timeZone: settings.timeZone)
                 )
                 todayCard
-                weekStrip
-                progressCard
+                weekCard
                 plannerStateMessage
                 fullCalendarLink
                 Text(StudyPlanEstimator.disclaimer)
@@ -97,6 +107,10 @@ struct PlannerHomeView: View {
                 Text("오늘은 쉬는 날이에요. 원하면 그냥 연습해도 좋아요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
+                // 권하지는 않되 길은 열어 둔다. 주 버튼으로 만들면 쉬는 날이 아니게 된다.
+                Button("그래도 연습하기", action: onStartDaily)
+                    .font(AppTypography.callout)
+                    .minimumTouchTarget()
             } else {
                 // 오늘 배정량은 압축 모드에서 달라진다. 고정된 기본 학습량이 아니다.
                 Text("\(snapshot.today.completedSets) / \(snapshot.today.targetSets)세트")
@@ -135,24 +149,42 @@ struct PlannerHomeView: View {
         .cardStyle()
     }
 
-    // MARK: 주간 스트립
+    // MARK: 이번 주
 
-    /// 일요일부터 시작하는 7칸. 두 번째 월간 캘린더가 되지 않도록 상태 기호만 얹는다.
+    /// 주간 스트립과 주간 요약은 같은 7일을 말한다. 카드를 둘로 나누면 같은 이야기가
+    /// 두 번 쌓이므로 한 칸에 담는다.
+    private var weekCard: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            weekStrip
+            weekSummary
+        }
+        .cardStyle()
+    }
+
+    /// 일요일부터 시작하는 7칸. 두 번째 월간 캘린더가 되지 않도록 상태 기호만 얹고,
+    /// 누르면 전체 캘린더와 **같은** 하루 상세로 간다.
     private var weekStrip: some View {
-        HStack(spacing: AppSpacing.xs) {
+        let eventDates = Set(events.map(\.localDate))
+        let noteDates = Set(notes.map(\.localDate))
+        return HStack(spacing: AppSpacing.xs) {
             ForEach(snapshot.weekDays) { day in
-                StudyDayCell(
-                    day: day,
-                    calendar: settings.calendar,
-                    isToday: day.date == snapshot.today.date
-                )
+                let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
+                NavigationLink(value: PlannerRoute.dayDetail(for: day.date, timeZone: settings.timeZone)) {
+                    StudyDayCell(
+                        day: day,
+                        calendar: settings.calendar,
+                        isToday: day.date == snapshot.today.date,
+                        hasEvent: eventDates.contains(key),
+                        hasNote: noteDates.contains(key)
+                    )
+                }
+                .buttonStyle(.plain)
+                .accessibilityHint("하루 상세를 봅니다")
             }
         }
     }
 
-    // MARK: 진행 상황
-
-    private var progressCard: some View {
+    private var weekSummary: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             HStack {
                 VStack(alignment: .leading, spacing: AppSpacing.xs) {
