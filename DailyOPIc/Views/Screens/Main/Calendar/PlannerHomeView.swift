@@ -28,6 +28,11 @@ struct PlannerHomeView: View {
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
                 contextLine
+                // 오늘의 팁은 학습 CTA보다 위에 있지만 주인공은 아니다. 앱에 담긴 고정
+                // 문구라 네트워크·플랜·토큰과 아무 관계가 없다.
+                OPIcTipCard(
+                    tip: OPIcTipCatalog.tip(for: snapshot.today.date, timeZone: settings.timeZone)
+                )
                 todayCard
                 weekStrip
                 progressCard
