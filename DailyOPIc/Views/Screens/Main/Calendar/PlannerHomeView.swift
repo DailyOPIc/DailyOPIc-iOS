@@ -303,7 +303,7 @@ struct StudyDayCell: View {
             Text(StudyWeekday.from(date: day.date, calendar: calendar).shortLabel)
                 .font(AppTypography.caption)
                 .foregroundStyle(AppPalette.secondaryInk)
-            Image(systemName: day.state.symbolName)
+            Image(systemName: symbolName)
                 .font(.system(size: 16))
                 .foregroundStyle(tint)
             Text("\(calendar.component(.day, from: day.date))")
@@ -337,24 +337,31 @@ struct StudyDayCell: View {
     }
 
     /// 오늘 여부는 배경색으로만 알리면 안 된다. 한 문장으로 조립해 읽어 준다.
+    /// 휴식일에 스스로 학습한 날은 "휴식"만 읽고 끝내지 않는다 — 실제로 한 일이 사라진다.
     private var accessibilityText: String {
         let weekday = StudyWeekday.from(date: day.date, calendar: calendar).accessibilityLabel
         let date = day.date.formatted(.dateTime.month().day())
         let today = isToday ? "오늘, " : ""
-        let sets = day.isScheduled ? ", \(day.completedSets) / \(day.targetSets) 세트" : ""
         let entries = [hasEvent ? "개인 일정 있음" : nil, hasNote ? "메모 있음" : nil]
             .compactMap { $0 }
             .map { ", \($0)" }
             .joined()
-        return "\(date) \(weekday), \(today)\(day.state.title)\(sets)\(entries)"
+        return "\(date) \(weekday), \(today)\(day.studyAccessibilityText)\(entries)"
+    }
+
+    /// 휴식일 자율 학습은 "계획된 완료"로 위장하지 않되 아무 일도 없던 휴식일과는 구분한다.
+    /// 새 색 체계를 만들지 않고 기존 기호·색을 조합만 바꿔 쓴다.
+    private var symbolName: String {
+        day.hasUnscheduledLearning ? "moon.stars.fill" : day.state.symbolName
     }
 
     private var tint: Color {
+        if day.hasUnscheduledLearning { return AppPalette.primaryMid }
         switch day.state {
-        case .completed: AppPalette.primary
-        case .partial: AppPalette.primaryMid
-        case .missed: AppPalette.danger
-        case .planned, .rest: AppPalette.secondaryInk
+        case .completed: return AppPalette.primary
+        case .partial: return AppPalette.primaryMid
+        case .missed: return AppPalette.danger
+        case .planned, .rest: return AppPalette.secondaryInk
         }
     }
 }

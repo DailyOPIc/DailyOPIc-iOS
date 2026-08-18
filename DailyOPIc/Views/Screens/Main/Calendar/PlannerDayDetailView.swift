@@ -122,11 +122,10 @@ struct PlannerDayDetailView: View {
         .cardStyle()
     }
 
-    /// 배정이 없던 날에 가짜 목표를 만들어 붙이지 않는다.
+    /// 배정이 없던 날에 가짜 목표를 만들어 붙이지 않는다("1 / 0세트"도, "1 / 1세트 완료"도 아니다).
+    /// 휴식일에 그냥 학습한 날은 한 일만 있는 그대로 말한다.
     private var setsText: String? {
-        if day.targetSets > 0 { return "Daily \(day.completedSets) / \(day.targetSets)세트" }
-        // 휴식일에 그냥 학습한 날. 기록은 있는 그대로 보여준다.
-        return day.completedSets > 0 ? "Daily \(day.completedSets)세트" : nil
+        day.setsSummaryText.map { "Daily \($0)" }
     }
 
     private var setsAccessibilityText: String? {

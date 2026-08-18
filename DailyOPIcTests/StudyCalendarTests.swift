@@ -205,86 +205,38 @@ struct StudyCalendarTests {
         #expect(day.targetSets == 0)
     }
 
-    // MARK: 스트릭
+    // MARK: 스트릭 (P8: 실제 학습일 기준)
 
-    @Test func streakCountsConsecutiveCompletedStudyDays() {
-        let plan = settings() // 월~금
-        let today = date("2026-08-14")
-        let completions = StudyCalendarFixture.completions([
-            "2026-08-12": 2, "2026-08-13": 2, "2026-08-14": 2
-        ])
-        #expect(
-            StudyCalendarEngine.streak(
-                today: today,
-                settings: plan,
-                schedule: schedule(
-                    historical: ["2026-08-12": 2, "2026-08-13": 2],
-                    settings: plan,
-                    today: today,
-                    completions: completions
-                ),
-                completions: completions
-            ) == 3
+    /// 스트릭은 실제 학습이 있었던 날을 센다. 배정량 달성 여부는 보지 않는다.
+    private func streak(_ completions: [String: Int], today: String = "2026-08-14") -> Int {
+        let days = StudyCalendarFixture.completions(completions)
+        return LearningStreak.current(
+            learningDays: LearningStreak.learningDays(from: days),
+            today: date(today),
+            calendar: settings().calendar
         )
     }
 
-    /// 계획된 휴식일은 스트릭을 끊지 않는다.
-    @Test func plannedRestDaysDoNotBreakTheStreak() {
-        let plan = settings(weekdays: [.monday, .thursday, .friday])
-        let today = date("2026-08-14")
-        let completions = StudyCalendarFixture.completions(["2026-08-13": 1, "2026-08-14": 1])
-        #expect(
-            StudyCalendarEngine.streak(
-                today: today,
-                settings: plan,
-                schedule: schedule(
-                    historical: ["2026-08-13": 1],
-                    settings: plan,
-                    today: today,
-                    dailyCapacity: 1,
-                    completions: completions
-                ),
-                completions: completions
-            ) == 2
-        )
+    @Test func streakCountsConsecutiveLearningDays() {
+        #expect(streak(["2026-08-12": 2, "2026-08-13": 2, "2026-08-14": 2]) == 3)
     }
 
-    /// 아직 끝나지 않은 오늘은 스트릭을 끊지 않지만, 놓친 학습일은 끊는다.
+    /// 배정량을 다 못 채운 날도 실제로 학습했으면 연속이다(옛 규칙은 여기서 끊었다).
+    @Test func partialCompletionKeepsTheStreak() {
+        #expect(streak(["2026-08-12": 1, "2026-08-13": 1, "2026-08-14": 1]) == 3)
+    }
+
+    /// 아직 끝나지 않은 오늘은 스트릭을 끊지 않지만, 기록 없이 지나간 날은 끊는다.
     @Test func todayIsNotCountedAsMissedButPastMissesBreakTheStreak() {
-        let plan = settings()
-        let today = date("2026-08-14")
-        let historical = ["2026-08-12": 2, "2026-08-13": 2]
-        func streak(_ completions: [Date: Int]) -> Int {
-            StudyCalendarEngine.streak(
-                today: today,
-                settings: plan,
-                schedule: schedule(
-                    historical: historical,
-                    settings: plan,
-                    today: today,
-                    completions: completions
-                ),
-                completions: completions
-            )
-        }
-        #expect(streak(StudyCalendarFixture.completions(["2026-08-12": 2, "2026-08-13": 2])) == 2)
-        // 13일(목) 미달 → 끊김
-        #expect(streak(StudyCalendarFixture.completions(["2026-08-12": 2])) == 0)
+        // 14일(금)은 아직 안 끝났다 → 12·13일의 연속이 남는다
+        #expect(streak(["2026-08-12": 2, "2026-08-13": 2]) == 2)
+        // 13일(목)은 기록 없이 지나갔다 → 끊김
+        #expect(streak(["2026-08-12": 2]) == 0)
     }
 
     /// 미래 날짜의 기록은 스트릭에 영향을 주지 않는다.
     @Test func futureCompletionsDoNotInflateTheStreak() {
-        let plan = settings()
-        let today = date("2026-08-14")
-        let completions = StudyCalendarFixture.completions(["2026-08-17": 5])
-        #expect(
-            StudyCalendarEngine.streak(
-                today: today,
-                settings: plan,
-                schedule: schedule(settings: plan, today: today, completions: completions),
-                completions: completions
-            ) == 0
-        )
+        #expect(streak(["2026-08-17": 5]) == 0)
     }
 
     // MARK: 주간 요약
@@ -891,13 +843,15 @@ struct StudyCompletionStoreTests {
         #expect(next.count == 3)
     }
 
-    /// 휴식일(배정 0)은 기록하지 않는다. 지난 휴식일이 학습일로 바뀌지 않게 하는 값이다.
-    @Test func restDaysAreNotFrozen() throws {
+    /// 휴식일(배정 0)도 기록한다(P8.1). 비워 두면 "기록 없음"이 되어 나중에 공부 요일을
+    /// 바꿨을 때 지난 휴식일이 현재 설정으로 되살아나 학습일이 된다.
+    @Test func restDaysAreFrozenAsZero() throws {
         let persistence = try makePersistence()
         try persistence.freezeStudyDayPlans(["2026-08-15": 0, "2026-08-14": 2], today: "2026-08-14")
         let records = try persistence.studyDayPlans()
-        #expect(records.count == 1)
-        #expect(records.first?.localDate == "2026-08-14")
+        #expect(records.count == 2)
+        #expect(records.first { $0.localDate == "2026-08-15" }?.targetSets == 0)
+        #expect(records.first { $0.localDate == "2026-08-14" }?.targetSets == 2)
     }
 
     /// 같은 backfill을 몇 번 돌려도 날짜당 기록은 하나다.
@@ -984,7 +938,7 @@ struct HistoricalBackfillTests {
         #expect(frozen["2026-08-11"] == 2)
         #expect(frozen["2026-08-12"] == 2)
         #expect(frozen["2026-08-13"] == 2)
-        #expect(frozen["2026-08-09"] == nil)  // 일요일은 휴식
+        #expect(frozen["2026-08-09"] == 0)  // 일요일은 휴식 — 0으로 고정한다(P8.1)
     }
 
     /// 이미 고정된 지난 기록은 현재 설정으로 덮이지 않는다.

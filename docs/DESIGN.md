@@ -2265,7 +2265,8 @@ RevenueCat 로컬 엔타이틀먼트   ←  즉시성 (구매 직후)
 StudyPlanEstimator      권장 총 학습량 · 기본 하루 학습량 · 하루 상한 (순수 함수 · 상수 한 곳)
 AdaptiveStudyPlanner    남은 학습량 → 모드 판정 → 날짜별 분배 (결정론적 · 저장 없음)
 StudySchedule           날짜 → 배정 학습량. 과거는 고정 기록, 오늘·미래는 계획
-StudyCalendarEngine     배정량 + 완료량 → 하루 상태 · 스트릭 · 주간 요약
+StudyCalendarEngine     배정량 + 완료량 → 하루 상태 · 주간 요약(계획 이행률)
+LearningStreak          실제 학습한 로컬 날짜들 → 연속 학습일 (계획을 보지 않는 순수 함수)
 StudyCalendarSnapshot   화면이 한 번에 쓰는 파생값 묶음 (매번 계산 · 저장 안 함)
 StudyCalendarViewModel  I/O만 — 서버 설정 로드/저장, 배정량 고정(freeze)
 StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
@@ -2275,6 +2276,38 @@ StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
 (그레고리력 + 저장된 타임존)로 통일한다(PRODUCT §17.9). 유일한 예외는 최근 분석
 결과의 "나이(일수)" 판정으로, 로컬 날짜 키가 아니라 절대 시각 간 경과라서 그대로 둔다.
 
+## 34.5.1 연속 학습과 계획 이행률은 다른 지표다 (P8)
+
+한 곳에서만 계산한다. 플래너 홈 · 전체 캘린더 · 하루 상세가 각자 다른 식을 쓰지
+않는다.
+
+```
+LearningStreak.learningDays(from: [Date: Int]) → Set<Date>   완료 1개 이상인 로컬 날짜
+LearningStreak.current(learningDays:today:calendar:) → Int   오늘부터 거슬러 센 연속 일수
+```
+
+입력은 **실제 학습한 로컬 날짜**뿐이다. 계획(배정량 · 공부 요일)을 보지 않기 때문에
+"목표를 다 채웠는가"가 스트릭에 끼어들 수 없다. 오늘은 아직 끝나지 않았으므로
+비어 있어도 끊지 않고, 그 앞의 빈 날에서 끊는다(PRODUCT §16.9).
+
+계획 이행률은 그대로 `StudyCalendarEngine.weekSummary`가 맡는다 — 배정된 날 중
+배정량을 다 채운 날만 센다. 휴식일 자율 학습에 새로운 `StudyDayState` 케이스를
+주지 않은 이유가 이것이다. 새 케이스는 `isScheduled`를 참으로 만들어 주간 이행률의
+분모를 부풀린다. 대신 실제 활동은 파생 값 세 개로만 얹는다.
+
+```
+StudyDay.hasLearning              완료 1세트 이상
+StudyDay.hasUnscheduledLearning   배정 0인데 학습함 (휴식일 자율 학습)
+StudyDay.setsSummaryText          "1 / 2세트" | "1세트 학습" | nil
+```
+
+`setsSummaryText`가 화면 세 곳의 유일한 문구 출처다. 배정이 없던 날에 가짜 분모
+("1 / 0세트")도, 가짜 완료("1 / 1세트 완료")도 만들지 않는다. 주간 스트립과 월간
+격자의 칸은 휴식일 자율 학습을 **기존 시각 언어 안에서** 구분한다 — 새 색 체계를
+만들지 않고 기호만 `moon.stars.fill`로 바꾸고 색은 부분 완료와 같은 톤을 쓴다.
+읽어 주는 문장은 `StudyDay.studyAccessibilityText`("휴식, 1세트 학습")로, 휴식일에
+한 일이 소리에서 사라지지 않게 한다.
+
 ## 34.6 배정량 고정 (`StudyDayPlanRecord`)
 
 지난 날의 목표가 현재 설정으로 다시 계산되던 G2 결함을 막는 최소 저장소다.
@@ -2283,7 +2316,7 @@ StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
 | 필드 | 의미 |
 |---|---|
 | `localDate` | "yyyy-MM-dd" · **유일 키** · 계획 타임존 기준 |
-| `targetSets` | 그날 배정된 학습량. 휴식일(0)은 저장하지 않는다 |
+| `targetSets` | 그날 배정된 학습량. **휴식일도 0으로 저장한다**(P8.1) |
 | `createdAt` | 고정 시각 |
 
 대시보드가 나타날 때 `freezeStudyDayPlans`가 오늘까지의 배정량을 채운다. **지난
@@ -2300,9 +2333,18 @@ StudyCalendarScreen     렌더링만 — 날짜 계산 · 매직 넘버 없음
 | 화면 계산 (`StudySchedule.init`) | `AdaptiveStudyPlanner.historicalTargets`로 계획 시작일~오늘의 학습일 배정량을 되살리고, 고정 기록이 있으면 **기록이 이긴다** | 저장 여부와 무관하게 지난 학습일이 휴식으로 보이지 않는다 |
 | 설정 저장 직전 (`StudyCalendarViewModel.sealHistory`) | **바뀌기 전 설정**으로 오늘까지를 고정한다 | 설정 변경 뒤에 되살리면 과거가 새 설정으로 왜곡된다 |
 
-되살리기와 고정은 같은 함수(`historicalTargets`)를 쓴다 — 화면에 보인 값이 그대로
-저장된다. 되살리기는 계획 시작일 이후의 **학습일**에만 적용되므로 휴식일은 휴식으로
-남고, 앱 시작 시 네트워크 작업이나 별도 일정 DB·서버 동기화는 만들지 않는다.
+되살리기와 고정은 같은 규칙(`historicalTargets`)을 쓴다 — 화면에 보인 값이 그대로
+저장된다. 앱 시작 시 네트워크 작업이나 별도 일정 DB·서버 동기화는 만들지 않는다.
+
+고정할 때만 한 가지가 더 붙는다(P8.1). `AdaptiveStudyPlanner.targetsToFreeze`는
+계획 시작일~오늘의 **모든** 날짜를 0으로 깔고 그 위에 학습일 배정량을 얹는다.
+휴식일을 비워 두면 "기록 없음"이 되어, 나중에 그 요일을 공부 요일로 추가했을 때
+`StudySchedule`이 현재 설정으로 지난 휴식일을 되살려 학습일로 만든다 —
+휴식일에 자율 학습한 날이 "1 / N세트 일부 완료"로 다시 그려지는 것이 그 증상이다.
+0도 그날의 계획이므로 저장한다.
+
+창은 보관 기간(1년)으로 자른다. 그보다 오래된 과거는 어차피 `trimStudyDayPlans`가
+지우므로 만들지 않는다 — 0을 채워도 기록은 최대 366행이다.
 
 ## 34.7 적응형 상태 문구
 

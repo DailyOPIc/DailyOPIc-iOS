@@ -135,7 +135,9 @@ final class PersistenceService {
     /// 오늘만 아직 확정 전이라 현재 설정에 맞춰 갱신한다.
     ///
     /// - Parameters:
-    ///   - targets: "yyyy-MM-dd" → 그날 배정 학습량. 휴식일은 넣지 않는다.
+    ///   - targets: "yyyy-MM-dd" → 그날 배정 학습량. **휴식일은 0으로 넣는다**(P8.1) —
+    ///     비워 두면 "기록 없음"이 되어 나중에 공부 요일을 바꿨을 때 그날이 현재 설정으로
+    ///     되살아난다. 0도 그날의 계획이다.
     ///   - today: 오늘의 "yyyy-MM-dd"(학습 계획 타임존 기준).
     func freezeStudyDayPlans(_ targets: [String: Int], today: String) throws {
         guard let context, !targets.isEmpty else { return }
@@ -144,7 +146,7 @@ final class PersistenceService {
             uniquingKeysWith: { first, _ in first }
         )
         var changed = false
-        for (localDate, targetSets) in targets where targetSets > 0 {
+        for (localDate, targetSets) in targets {
             if let record = existing[localDate] {
                 // 지난 날은 그대로 둔다. 오늘은 설정이 바뀌었으면 따라간다.
                 guard localDate == today, record.targetSets != targetSets else { continue }

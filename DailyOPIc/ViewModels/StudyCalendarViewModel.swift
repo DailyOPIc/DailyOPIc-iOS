@@ -137,7 +137,7 @@ final class StudyCalendarViewModel {
             dailyCapacity: dailyCapacity
         )
         try? persistence.freezeStudyDayPlans(
-            AdaptiveStudyPlanner.historicalTargets(
+            AdaptiveStudyPlanner.targetsToFreeze(
                 settings: settings,
                 baseDailyTarget: base,
                 today: today

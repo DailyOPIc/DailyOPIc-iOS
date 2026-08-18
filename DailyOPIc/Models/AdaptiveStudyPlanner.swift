@@ -202,6 +202,46 @@ enum AdaptiveStudyPlanner {
             }
     }
 
+    /// 고정 저장용 배정량. 학습일뿐 아니라 **휴식일도 0으로** 담는다(P8.1).
+    /// 휴식일을 비워 두면 기록이 없다는 뜻이 되어, 나중에 공부 요일을 바꿨을 때 지난
+    /// 휴식일이 현재 설정으로 되살아나 학습일이 된다. 0도 엄연한 그날의 계획이다.
+    /// 보관 기간(1년)을 넘는 과거는 어차피 지워지므로 만들지 않는다.
+    static func targetsToFreeze(
+        settings: StudyPlanSettings,
+        baseDailyTarget: Int,
+        today: Date
+    ) -> [String: Int] {
+        guard baseDailyTarget > 0 else { return [:] }
+        let calendar = settings.calendar
+        let startOfToday = calendar.startOfDay(for: today)
+        let retentionStart = calendar.date(
+            byAdding: .day,
+            value: -StudyPlanEstimatorConfig.maximumForecastDays,
+            to: startOfToday
+        ) ?? startOfToday
+        let start = max(planStartDay(settings: settings, today: startOfToday), retentionStart)
+        var targets: [String: Int] = [:]
+        var day = start
+        while day <= startOfToday {
+            targets[LocalCalendarDate.text(from: day, timeZone: settings.timeZone)] = 0
+            guard let next = calendar.date(byAdding: .day, value: 1, to: day) else { break }
+            day = next
+        }
+        // 학습일만 배정량으로 덮는다. `historicalTargets`와 같은 규칙이되 창을 보관 기간으로
+        // 자른 뒤 계산한다(오래된 계획이라도 최근 1년은 빠짐없이 나온다).
+        // `studyDates`의 기본 한도는 예측 길이(365일)라 1년 창의 마지막 날을 놓친다.
+        let window = studyDates(
+            from: start,
+            through: startOfToday,
+            settings: settings,
+            limit: targets.count
+        )
+        for date in window {
+            targets[LocalCalendarDate.text(from: date, timeZone: settings.timeZone)] = baseDailyTarget
+        }
+        return targets
+    }
+
     /// 계획 시작일 이후의 완료만 남은 학습량을 줄인다. 계획을 세우기 전에 해 둔 연습이
     /// 새 계획을 이미 끝낸 것처럼 만들지 않는다.
     /// `createdAt`이 없으면(아직 서버 왕복 전) 오늘을 시작일로 본다.

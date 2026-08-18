@@ -154,6 +154,6 @@ struct PlannerPresentationTests {
         // 다시 고정해도 지난 값이 그대로 나온다("yyyy-MM-dd" 키 형식도 그대로).
         let refrozen = snapshot.targetsToFreeze(settings: settings, today: date("2026-08-14"))
         #expect(refrozen["2026-08-10"] != nil)
-        #expect(refrozen["2026-08-09"] == nil) // 일요일은 휴식일이라 고정하지 않는다
+        #expect(refrozen["2026-08-09"] == 0) // 일요일은 휴식일 — 0으로 고정한다(P8.1)
     }
 }
