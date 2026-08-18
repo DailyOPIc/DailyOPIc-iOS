@@ -6,7 +6,9 @@ protocol UserNotificationCenterProtocol: Sendable {
     func authorizationStatus() async -> UNAuthorizationStatus
     func requestAuthorization() async -> Bool
     func pendingRequests() async -> [UNNotificationRequest]
-    func add(_ request: UNNotificationRequest) async
+    /// 실패를 돌려준다. 예약이 조용히 사라지면 "원한 목록"만 보고 성공했다고 착각하게 된다.
+    @discardableResult
+    func add(_ request: UNNotificationRequest) async -> StudyReminderAddFailure?
     func removePendingRequests(identifiers: [String])
 }
 
@@ -25,13 +27,16 @@ struct SystemNotificationCenter: UserNotificationCenterProtocol {
         await center.pendingNotificationRequests()
     }
 
-    func add(_ request: UNNotificationRequest) async {
+    @discardableResult
+    func add(_ request: UNNotificationRequest) async -> StudyReminderAddFailure? {
         do {
             try await center.add(request)
+            return nil
         } catch {
             // 예약 실패는 조용히 사라지면 안 된다(예: 대기 알림 상한 초과).
-            // 식별자·문구는 남기지 않고 실패했다는 사실만 남긴다.
-            StudyReminderDiagnostics.log("add failed")
+            // 식별자·문구는 남기지 않고 도메인·코드만 남긴다.
+            let error = error as NSError
+            return StudyReminderAddFailure(domain: error.domain, code: error.code)
         }
     }
 
@@ -47,7 +52,12 @@ struct SystemNotificationCenter: UserNotificationCenterProtocol {
 enum StudyReminderPresentation {
     static func options(for identifier: String) -> UNNotificationPresentationOptions {
         // 우리 알림만 띄운다. 다른 출처의 알림은 지금까지의 동작(표시 안 함)을 그대로 둔다.
-        StudyReminderPolicy.isStudyReminder(identifier) ? [.banner, .list, .sound] : []
+        if StudyReminderPolicy.isStudyReminder(identifier) { return [.banner, .list, .sound] }
+        #if DEBUG
+        // 60초 테스트 알림도 포그라운드에서 보여야 "전달 자체는 되는가"를 판별할 수 있다.
+        if StudyReminderSelfTest.isSelfTest(identifier) { return [.banner, .list, .sound] }
+        #endif
+        return []
     }
 }
 
@@ -97,6 +107,10 @@ final class StudyReminderService {
     private let preferences: AppPreferences
 
     private(set) var authorizationStatus: UNAuthorizationStatus = .notDetermined
+    /// 마지막 재조정이 예약을 건너뛴 이유. DEBUG 진단 화면이 읽는다.
+    private(set) var lastSkipReason: StudyReminderSkipReason?
+    /// 마지막 `add` 실패. iOS가 예약을 거절하면 여기에만 흔적이 남는다.
+    private(set) var lastAddFailure: StudyReminderAddFailure?
 
     init(preferences: AppPreferences, center: UserNotificationCenterProtocol = SystemNotificationCenter()) {
         self.preferences = preferences
@@ -147,22 +161,35 @@ final class StudyReminderService {
     /// 이 인자 하나로만 들어온다 — 서비스가 플랜을 직접 보지 않는다.
     /// 기본값 `true`는 자격과 무관한 P1 경로(테스트 포함)를 그대로 두기 위한 것이고,
     /// 앱에서 부르는 곳은 `StudyCalendarViewModel.reconcileStudyReminders()` 하나뿐이다.
+    /// 자격을 **아직 모를 때**는 아무것도 하지 않는다(P7). 앱이 막 켜진 순간에는
+    /// RevenueCat도 서버도 대답하기 전이라 플랜이 기본값 무료로 보이는데, 그것을 강등으로
+    /// 착각하면 유료 사용자의 예약을 전부 지우고 로컬 의도까지 꺼 버린다.
     func reconcile(_ desired: [StudyReminderRequest]?, isEligible: Bool = true) async {
+        await reconcile(desired, eligibility: isEligible ? .eligible : .ineligible)
+    }
+
+    func reconcile(_ desired: [StudyReminderRequest]?, eligibility: StudyReminderEligibility) async {
         await refreshAuthorizationStatus()
-        // 자격 상실은 일정을 알기 전에 처리한다. 일정을 모른다고 미루면
-        // 강등된 사용자가 유료 시절 예약된 알림을 계속 받는다.
-        guard isEligible else {
+        switch eligibility {
+        case .unknown:
+            // 모를 때는 예약도 삭제도 하지 않는다. 다음 재조정이 알고 나서 정리한다.
+            skip(.eligibilityUnknown)
+            return
+        case .ineligible:
+            // 자격 상실은 일정을 알기 전에 처리한다. 일정을 모른다고 미루면
+            // 강등된 사용자가 유료 시절 예약된 알림을 계속 받는다.
+            lastSkipReason = .featureLocked
             await revokeForIneligibility()
             return
+        case .eligible:
+            break
         }
         guard let desired else {
-            StudyReminderDiagnostics.log("skipped reason=schedule_unknown")
+            skip(.scheduleUnknown)
             return
         }
         guard isActive else {
-            StudyReminderDiagnostics.log(
-                "skipped reason=inactive enabled=\(isEnabled) status=\(authorizationStatus.telemetryValue)"
-            )
+            skip(isEnabled ? permissionSkipReason : .userDisabled)
             await cancelAll()
             return
         }
@@ -178,14 +205,32 @@ final class StudyReminderService {
         }
         let kept = Set(pending.map(\.identifier)).subtracting(stale.map(\.identifier))
         var added = 0
+        var failed = 0
         for request in desired where !kept.contains(request.identifier) {
-            await center.add(request.notificationRequest)
-            added += 1
+            if let failure = await center.add(request.notificationRequest) {
+                failed += 1
+                lastAddFailure = failure
+            } else {
+                added += 1
+            }
         }
+        if failed == 0 { lastAddFailure = nil }
+        lastSkipReason = desired.isEmpty ? .noTarget : nil
         StudyReminderDiagnostics.log(
             "reconciled status=\(authorizationStatus.telemetryValue) "
-            + "desired=\(desired.count) kept=\(kept.count) added=\(added) removed=\(stale.count)"
+            + "desired=\(desired.count) kept=\(kept.count) added=\(added) "
+            + "removed=\(stale.count) failed=\(failed)"
+            + (lastAddFailure.map { " error=\($0.displayText)" } ?? "")
         )
+    }
+
+    private var permissionSkipReason: StudyReminderSkipReason {
+        authorizationStatus == .denied ? .permissionDenied : .permissionNotDetermined
+    }
+
+    private func skip(_ reason: StudyReminderSkipReason) {
+        lastSkipReason = reason
+        StudyReminderDiagnostics.log("skipped reason=\(reason.rawValue)")
     }
 
     /// 유료 자격을 잃었을 때(강등). 우리 알림만 걷어내고 로컬 "켜 둠" 의도를 끈다.
@@ -214,7 +259,77 @@ final class StudyReminderService {
     private func studyReminderRequests() async -> [UNNotificationRequest] {
         await center.pendingRequests().filter { StudyReminderPolicy.isStudyReminder($0.identifier) }
     }
+
+    /// iOS에 **실제로** 남아 있는 우리 알림. 앱이 원한 목록과 다를 수 있고,
+    /// 다르다는 사실 자체가 진단의 핵심이라 desired로 대신하지 않는다.
+    func pendingSnapshot() async -> PendingStudyReminders {
+        PendingStudyReminders(requests: await studyReminderRequests())
+    }
+
+    #if DEBUG
+    /// DEBUG 진단용 60초 테스트 알림. 학습 알림 설정·예약을 건드리지 않는다.
+    func scheduleSelfTestNotification() async -> StudyReminderSelfTest.Result {
+        await StudyReminderSelfTest.schedule(center: center)
+    }
+    #endif
 }
+
+#if DEBUG
+/// 실기기에서 "OS 전달 경로 자체가 되는가"만 떼어 보기 위한 DEBUG 전용 테스트 알림.
+///
+/// 이 알림이 오는데 학습 알림이 안 오면 문제는 플래너 예약 판단에 있고,
+/// 이것마저 오지 않으면 권한·기기 표시 설정을 봐야 한다.
+///
+/// 학습 알림과 **다른 네임스페이스**를 쓴다. 학습 알림 정리(`cancelAll`)가 이것을 지우지
+/// 않고, 이것이 학습 알림 예약·설정·토큰·StudyPlan에 아무 영향을 주지 않게 하려는 것이다.
+enum StudyReminderSelfTest {
+    static let identifierPrefix = "dailyopic.debug.notification-test."
+    static let delay: TimeInterval = 60
+
+    static func isSelfTest(_ identifier: String) -> Bool {
+        identifier.hasPrefix(identifierPrefix)
+    }
+
+    /// 60초 뒤 한 번. 반복하지 않는다.
+    static func request(id: UUID = UUID()) -> UNNotificationRequest {
+        let content = UNMutableNotificationContent()
+        content.title = "DailyOPIc 알림 테스트"
+        content.body = "60초 테스트 알림이 도착했어요."
+        content.sound = .default
+        return UNNotificationRequest(
+            identifier: identifierPrefix + id.uuidString,
+            content: content,
+            trigger: UNTimeIntervalNotificationTrigger(timeInterval: delay, repeats: false)
+        )
+    }
+
+    enum Result: Equatable {
+        case scheduled(Date)
+        case unauthorized(String)
+        case failed(String)
+
+        var displayText: String {
+            switch self {
+            case let .scheduled(fireDate):
+                "예약됨 · \(fireDate.formatted(date: .omitted, time: .standard))"
+            case let .unauthorized(status): "권한 없음 (\(status))"
+            case let .failed(error): "실패 · \(error)"
+            }
+        }
+    }
+
+    /// 권한이 있을 때만 예약한다. 여기서 권한 창을 새로 띄우지 않는다.
+    static func schedule(
+        center: UserNotificationCenterProtocol,
+        now: Date = .now
+    ) async -> Result {
+        let status = await center.authorizationStatus()
+        guard status.allowsScheduling else { return .unauthorized(status.telemetryValue) }
+        if let failure = await center.add(request()) { return .failed(failure.displayText) }
+        return .scheduled(now.addingTimeInterval(delay))
+    }
+}
+#endif
 
 extension StudyReminderRequest {
     var notificationRequest: UNNotificationRequest {

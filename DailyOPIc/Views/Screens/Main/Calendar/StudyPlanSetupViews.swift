@@ -366,6 +366,11 @@ struct PlannerSettingsView: View {
                 } else {
                     lockedStudyReminderCard
                 }
+                #if DEBUG
+                // 실기기에서 알림이 안 올 때 원인을 좁히는 칸. Release에는 존재하지 않는다.
+                // 잠긴 사용자에게도 보여야 "무료라서 안 온다"를 확인할 수 있다.
+                StudyReminderDiagnosticsSection(viewModel: viewModel)
+                #endif
                 lockedFeatureCard
                 // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
                 Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")

@@ -166,6 +166,20 @@ final class StudyCalendarViewModel {
     /// 둘을 같은 값으로 다루면, 앱이 켜지는 순간(계획을 읽기 전)의 재조정이 멀쩡한
     /// 앞으로의 예약을 전부 지워 버린다.
     func plannedReminders(now: Date = .now) -> [StudyReminderRequest]? {
+        guard let inputs = reminderInputs(now: now) else { return nil }
+        return StudyReminderPlanner.reminders(
+            plan: inputs.plan,
+            settings: inputs.settings,
+            completions: inputs.completions,
+            now: now
+        )
+    }
+
+    /// 알림 예약과 진단이 **같은 입력**을 보게 하는 한 곳.
+    /// `nil`은 "아직 모른다"(계획 미로딩·저장소 미준비)이다.
+    private func reminderInputs(
+        now: Date
+    ) -> (plan: AdaptiveStudyPlan, settings: StudyPlanSettings, completions: [Date: Int])? {
         guard let settings, persistence.isReady else { return nil }
         let completions = StudyCalendarEngine.completionCounts(
             completedAt: (try? persistence.studySetCompletionDates()) ?? [],
@@ -177,13 +191,8 @@ final class StudyCalendarViewModel {
             completions: completions,
             recentLevel: Self.recentLevel(from: try? persistence.latestPracticeRecord(), now: now),
             historicalTargets: historicalTargets
-        ) else { return [] }
-        return StudyReminderPlanner.reminders(
-            plan: snapshot.plan,
-            settings: settings,
-            completions: completions,
-            now: now
-        )
+        ) else { return nil }
+        return (snapshot.plan, settings, completions)
     }
 
     /// 대기 중인 알림을 현재 일정·현재 플랜과 같게 맞춘다. 여러 번 호출해도 결과가 같다.
@@ -195,7 +204,51 @@ final class StudyCalendarViewModel {
     func reconcileStudyReminders(now: Date = .now) async {
         await studyReminders.reconcile(
             plannedReminders(now: now),
-            isEligible: canUseStudyReminder
+            eligibility: studyReminderEligibility
+        )
+    }
+
+    /// 알림 자격. 플랜을 아직 확인하지 못했으면 `.unknown`이고, 그때 서비스는
+    /// 예약도 삭제도 하지 않는다. 무료로 단정하면 유료 사용자의 예약이 지워진다(P7).
+    var studyReminderEligibility: StudyReminderEligibility {
+        .resolve(
+            isEntitlementResolved: environment.isEntitlementResolved,
+            canUseStudyReminder: canUseStudyReminder
+        )
+    }
+
+    /// "오늘 왜 알림이 없지?"를 한 값으로 답한다. DEBUG 진단 화면과 로그가 같이 쓴다.
+    func studyReminderDiagnosis(now: Date = .now) -> StudyReminderDiagnosis {
+        let inputs = reminderInputs(now: now)
+        let today = inputs.map { $0.settings.calendar.startOfDay(for: now) }
+        let outcome = inputs.map {
+            StudyReminderPlanner.outcome(
+                for: today ?? now,
+                plan: $0.plan,
+                settings: $0.settings,
+                completions: $0.completions,
+                now: now
+            )
+        }
+        return StudyReminderDiagnosis.make(
+            eligibility: studyReminderEligibility,
+            isEnabled: studyReminders.isEnabled,
+            authorization: studyReminders.authorizationStatus,
+            desired: inputs.map {
+                StudyReminderPlanner.reminders(
+                    plan: $0.plan,
+                    settings: $0.settings,
+                    completions: $0.completions,
+                    now: now
+                )
+            },
+            todayOutcome: outcome,
+            todayTargetSets: inputs.flatMap { input in
+                today.flatMap { input.plan.plan(for: $0)?.targetSets }
+            },
+            todayCompletedSets: inputs.flatMap { input in
+                today.flatMap { input.completions[$0] } ?? 0
+            }
         )
     }
 

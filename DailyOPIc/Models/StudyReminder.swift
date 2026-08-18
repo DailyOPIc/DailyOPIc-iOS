@@ -37,47 +37,73 @@ enum StudyReminderPlanner {
         completions: [Date: Int],
         now: Date = .now
     ) -> [StudyReminderRequest] {
+        // upcomingDays에는 휴식일도, 계획을 다 끝낸 뒤의 날도 들어 있지 않다.
+        plan.upcomingDays.compactMap { day in
+            outcome(
+                for: day.date,
+                plan: plan,
+                settings: settings,
+                completions: completions,
+                now: now
+            ).request
+        }
+    }
+
+    /// 하루치 판단. 예약 목록과 진단이 **같은 함수**를 쓰게 하려고 분리했다 —
+    /// 두 벌로 나뉘면 "화면은 된다는데 알림은 안 온다"를 영영 설명할 수 없다.
+    ///
+    /// 조건은 전부 AND라서 실패 이유의 순서만 다를 뿐 예약 결과는 이전과 같다.
+    static func outcome(
+        for date: Date,
+        plan: AdaptiveStudyPlan,
+        settings: StudyPlanSettings,
+        completions: [Date: Int],
+        now: Date = .now
+    ) -> StudyReminderOutcome {
         let calendar = settings.calendar
+        let day = calendar.startOfDay(for: date)
         let startOfToday = calendar.startOfDay(for: now)
         guard let horizonEnd = calendar.date(
             byAdding: .day,
             value: StudyReminderPolicy.horizonDays,
             to: startOfToday
-        ) else { return [] }
-        let examDay = settings.examDate.map { calendar.startOfDay(for: $0) }
+        ), day >= startOfToday, day < horizonEnd else { return .skipped(.outsideHorizon) }
 
-        // upcomingDays에는 휴식일도, 계획을 다 끝낸 뒤의 날도 들어 있지 않다.
-        // 따라서 "휴식일 제외"·"계획 완료 시 알림 없음"은 여기서 다시 판단하지 않는다.
-        return plan.upcomingDays.compactMap { day in
-            let date = calendar.startOfDay(for: day.date)
-            guard day.targetSets > 0, date >= startOfToday, date < horizonEnd else { return nil }
-            // 시험 당일에는 학습 숙제 알림을 보내지 않는다.
-            guard date != examDay else { return nil }
-            let remaining = day.targetSets - (completions[date] ?? 0)
-            guard remaining > 0 else { return nil }
-            // 이미 지난 시각은 예약하지 않는다(오늘의 알림 시간이 지난 경우).
-            guard settings.preferredStudyTime.date(on: date, calendar: calendar) > now else {
-                return nil
-            }
-            var components = calendar.dateComponents([.year, .month, .day], from: date)
-            components.hour = settings.preferredStudyTime.hour
-            components.minute = settings.preferredStudyTime.minute
-            components.timeZone = settings.timeZone
-            return StudyReminderRequest(
+        let examDay = settings.examDate.map { calendar.startOfDay(for: $0) }
+        // 시험 당일에는 학습 숙제 알림을 보내지 않는다.
+        guard day != examDay else { return .skipped(.examDay) }
+        guard settings.isStudyDay(day) else { return .skipped(.restDay) }
+        guard let dayPlan = plan.plan(for: day), dayPlan.targetSets > 0 else {
+            // 계획에 없는 학습일: 권장 학습량을 다 채웠거나(완료) 계획이 그 전에 끝난다.
+            return .skipped(plan.remainingSets > 0 ? .noTarget : .targetComplete)
+        }
+        let remaining = dayPlan.targetSets - (completions[day] ?? 0)
+        guard remaining > 0 else { return .skipped(.targetComplete) }
+        // 이미 지난 시각은 예약하지 않는다(오늘의 알림 시간이 지난 경우).
+        guard settings.preferredStudyTime.date(on: day, calendar: calendar) > now else {
+            return .skipped(.preferredTimePassed)
+        }
+
+        var components = calendar.dateComponents([.year, .month, .day], from: day)
+        components.hour = settings.preferredStudyTime.hour
+        components.minute = settings.preferredStudyTime.minute
+        components.timeZone = settings.timeZone
+        return .scheduled(
+            StudyReminderRequest(
                 identifier: StudyReminderPolicy.identifier(
-                    forLocalDate: LocalCalendarDate.text(from: date, timeZone: settings.timeZone)
+                    forLocalDate: LocalCalendarDate.text(from: day, timeZone: settings.timeZone)
                 ),
                 title: title,
                 body: body(
                     remaining: remaining,
-                    isPartiallyDone: remaining < day.targetSets,
+                    isPartiallyDone: remaining < dayPlan.targetSets,
                     daysToExam: examDay.flatMap {
-                        calendar.dateComponents([.day], from: date, to: $0).day
+                        calendar.dateComponents([.day], from: day, to: $0).day
                     }
                 ),
                 dateComponents: components
             )
-        }
+        )
     }
 
     /// 고정 템플릿. 답변·전사·UID 같은 사용자 콘텐츠는 절대 넣지 않는다.

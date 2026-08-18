@@ -11,6 +11,8 @@ final class FakeNotificationCenter: UserNotificationCenterProtocol, @unchecked S
     /// 권한 창에서 사용자가 누를 결과.
     var grantsAuthorization = true
     var pending: [UNNotificationRequest] = []
+    /// iOS가 예약을 거절하는 상황(대기 상한 초과 등)을 재현한다.
+    var addFailure: StudyReminderAddFailure?
 
     func authorizationStatus() async -> UNAuthorizationStatus { status }
 
@@ -22,9 +24,12 @@ final class FakeNotificationCenter: UserNotificationCenterProtocol, @unchecked S
 
     func pendingRequests() async -> [UNNotificationRequest] { pending }
 
-    func add(_ request: UNNotificationRequest) async {
+    @discardableResult
+    func add(_ request: UNNotificationRequest) async -> StudyReminderAddFailure? {
+        if let addFailure { return addFailure }
         pending.removeAll { $0.identifier == request.identifier }
         pending.append(request)
+        return nil
     }
 
     func removePendingRequests(identifiers: [String]) {

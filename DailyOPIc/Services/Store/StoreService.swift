@@ -46,6 +46,10 @@ final class StoreService {
     private(set) var appUserID: String?
     /// 구매 직후 CustomerInfo 기준 즉시 반영용 힌트(서버 반영 전 UI 잠금 해제).
     private(set) var localEntitlement: PlanEntitlement = .free
+    /// CustomerInfo를 **한 번이라도** 실제로 읽었는가.
+    /// 읽기 전의 기본값 `.free`를 "무료 사용자"로 단정하면 유료 사용자의 기능이
+    /// 앱을 켤 때마다 잠깐 사라진다(학습 알림은 그 순간 예약까지 지워졌다).
+    private(set) var hasResolvedEntitlement = false
 
     /// 엔타이틀먼트가 바뀌었을 수 있을 때 호출(호출부에서 서버 capabilities 재조회).
     var onEntitlementMayHaveChanged: (() async -> Void)?
@@ -198,6 +202,7 @@ final class StoreService {
 
     private func updateLocalEntitlement(from info: CustomerInfo) {
         localEntitlement = Self.highestPlan(from: Array(info.entitlements.active.keys))
+        hasResolvedEntitlement = true
     }
 
     private static func plan(for package: Package) -> PlanEntitlement {
