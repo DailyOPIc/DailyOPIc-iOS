@@ -24,6 +24,7 @@ final class AppPreferences {
         static let initialLevelSyncPending = "native_initial_level_sync_pending"
         static let studyPlan = "native_study_plan"
         static let studyReminders = "native_study_reminders_enabled"
+        static let studyReminderPreference = "native_study_reminder_preference"
         static let reviewRequestAttempt = "native_review_request_attempted_at"
     }
 
@@ -82,8 +83,11 @@ final class AppPreferences {
     }
     /// 이 기기에서 학습 알림을 받고 싶은지에 대한 **사용자 의도**.
     /// 실제 발송 권한은 언제나 OS이고, 서버로 보내지 않는다(기기별 설정이다).
-    var studyRemindersEnabled: Bool {
-        didSet { defaults.set(studyRemindersEnabled, forKey: Key.studyReminders) }
+    /// 학습 알림 의도. `unspecified`는 "사용자가 아직 고른 적 없음"이고, 이때는 켜진 것으로 본다(P9).
+    /// Bool 하나로는 "끈 적 없음"과 "직접 껐음"을 구분할 수 없어 기본 ON이 사용자의
+    /// 명시적 OFF를 덮어쓰게 된다.
+    var studyReminderPreference: StudyReminderPreference {
+        didSet { defaults.set(studyReminderPreference.rawValue, forKey: Key.studyReminderPreference) }
     }
     /// 앱 스토어 리뷰를 마지막으로 **요청한** 시각. 창이 실제로 떴는지는 알 수 없으므로
     /// 시도 시각만 남긴다. 기기별 쿨다운이라 서버로 보내지 않는다.
@@ -129,7 +133,15 @@ final class AppPreferences {
         }
         lastGuidePage = min(6, max(0, defaults.integer(forKey: Key.guidePage)))
         isInitialLevelSyncPending = defaults.bool(forKey: Key.initialLevelSyncPending)
-        studyRemindersEnabled = defaults.bool(forKey: Key.studyReminders)
+        // 구버전 Bool → 3상태 이관. 저장된 `false`는 "직접 껐다"의 증거가 아니다:
+        // P4의 무료 강등 회수 경로가 사용자 동의 없이 false를 써 넣었다. 그래서
+        // true만 명시적 ON으로 올리고 나머지는 "고른 적 없음"으로 둔다.
+        if let raw = defaults.string(forKey: Key.studyReminderPreference),
+           let stored = StudyReminderPreference(rawValue: raw) {
+            studyReminderPreference = stored
+        } else {
+            studyReminderPreference = defaults.bool(forKey: Key.studyReminders) ? .enabled : .unspecified
+        }
         lastReviewRequestAttemptAt = defaults.object(forKey: Key.reviewRequestAttempt) as? Date
         initialLevel = storedInitialLevel
         targetLevel = storedTargetLevel ?? storedInitialLevel?.expectedTargetLevel

@@ -58,13 +58,14 @@ final class StudyCalendarViewModel {
     }
 
     /// 이 플랜에서 아직 잠겨 있는 자동화 기능(화면 노출 순서 그대로).
-    /// 학습 알림은 설정 화면의 자기 카드에서 잠기므로 이 목록에 넣지 않는다.
+    /// 개인 일정 알림은 일정 편집 화면에서 잠기므로 이 목록에 넣지 않는다.
     var lockedFeatures: [CalendarLockedFeature] {
         CalendarLockedFeature.automationCases.filter { $0.isLocked(under: featurePolicy) }
     }
 
-    /// 학습 알림을 쓸 수 있는 플랜인가. 화면과 서비스는 플랜을 직접 보지 않고 이 값만 본다.
-    var canUseStudyReminder: Bool { featurePolicy.canUseStudyReminder }
+    /// 개인 일정 알림을 쓸 수 있는 플랜인가. 화면과 서비스는 플랜을 직접 보지 않고 이 값만 본다.
+    /// 학습 알림에는 이런 값이 없다 — 전 플랜 공통이라 잠글 곳이 없어야 한다(P9).
+    var canUseEventReminder: Bool { featurePolicy.canUseEventReminder }
 
     var hasFailed: Bool {
         if case .failed = loadState { return true }
@@ -85,7 +86,7 @@ final class StudyCalendarViewModel {
             isShowingCachedSettings = false
             loadState = .loaded
             // 다른 기기에서 계획을 바꿨을 수 있다. 캘린더 화면을 그리기 전에 한 번 맞춘다.
-            Task { await reconcileStudyReminders() }
+            Task { await reconcileReminders() }
         } catch {
             // 캐시가 있으면 캘린더는 계속 쓸 수 있다. 없으면 재시도 화면.
             settings = preferences.studyPlanSettings
@@ -111,7 +112,7 @@ final class StudyCalendarViewModel {
             isShowingCachedSettings = false
             loadState = .loaded
             // 알림 재조정은 저장 성공과 별개다. 여기서 실패해도 저장은 성공으로 남는다.
-            Task { await reconcileStudyReminders() }
+            Task { await reconcileReminders() }
             return true
         } catch {
             saveErrorMessage = error.localizedDescription
@@ -159,16 +160,15 @@ final class StudyCalendarViewModel {
         return record.predictedLevel
     }
 
-    /// 지금 일정 기준으로 예약돼 있어야 할 알림. 캘린더 화면이 열려 있지 않아도 계산할 수 있도록
-    /// @Query 대신 저장소에서 직접 읽는다(같은 기록이다).
+    /// 지금 일정 기준으로 예약돼 있어야 할 학습 알림. 캘린더 화면이 열려 있지 않아도 계산할 수
+    /// 있도록 @Query 대신 저장소에서 직접 읽는다(같은 기록이다).
     ///
     /// `nil`은 "아직 모른다"(계획 미로딩·저장소 미준비)이고 `[]`는 "예약할 것이 없다"이다.
     /// 둘을 같은 값으로 다루면, 앱이 켜지는 순간(계획을 읽기 전)의 재조정이 멀쩡한
     /// 앞으로의 예약을 전부 지워 버린다.
-    func plannedReminders(now: Date = .now) -> [StudyReminderRequest]? {
+    func plannedReminders(now: Date = .now) -> [LocalNotificationRequest]? {
         guard let inputs = reminderInputs(now: now) else { return nil }
         return StudyReminderPlanner.reminders(
-            plan: inputs.plan,
             settings: inputs.settings,
             completions: inputs.completions,
             now: now
@@ -177,78 +177,95 @@ final class StudyCalendarViewModel {
 
     /// 알림 예약과 진단이 **같은 입력**을 보게 하는 한 곳.
     /// `nil`은 "아직 모른다"(계획 미로딩·저장소 미준비)이다.
+    ///
+    /// 배정 학습량(target)은 더 이상 보지 않는다(P9). 알림은 숙제 독촉이 아니라
+    /// "오늘 아직 안 했으면 한 문제라도" 하는 신호라서, 휴식일에도 목표가 0이어도 간다.
     private func reminderInputs(
         now: Date
-    ) -> (plan: AdaptiveStudyPlan, settings: StudyPlanSettings, completions: [Date: Int])? {
+    ) -> (settings: StudyPlanSettings, completions: [Date: Int])? {
         guard let settings, persistence.isReady else { return nil }
         let completions = StudyCalendarEngine.completionCounts(
             completedAt: (try? persistence.studySetCompletionDates()) ?? [],
             calendar: settings.calendar
         )
-        let historicalTargets = ((try? persistence.studyDayPlans()) ?? [])
-            .reduce(into: [String: Int]()) { $0[$1.localDate] = $1.targetSets }
-        guard let snapshot = snapshot(
-            completions: completions,
-            recentLevel: Self.recentLevel(from: try? persistence.latestPracticeRecord(), now: now),
-            historicalTargets: historicalTargets
-        ) else { return nil }
-        return (snapshot.plan, settings, completions)
+        return (settings, completions)
+    }
+
+    /// 지금 저장된 일정 기준으로 예약돼 있어야 할 개인 일정 알림.
+    /// `nil`은 저장소를 아직 못 읽었다는 뜻이라 기존 예약을 건드리지 않는다.
+    func plannedEventReminders(now: Date = .now) -> [LocalNotificationRequest]? {
+        guard let settings, persistence.isReady,
+              let events = try? persistence.plannerEventReminderInputs() else { return nil }
+        return PlannerEventReminderPlanner.reminders(
+            events: events,
+            timeZone: settings.timeZone,
+            now: now
+        )
     }
 
     /// 대기 중인 알림을 현재 일정·현재 플랜과 같게 맞춘다. 여러 번 호출해도 결과가 같다.
     /// 계획을 아직 모르면(`nil`) 서비스가 예약을 건드리지 않는다.
     ///
-    /// 학습 알림 자격 강제는 여기 **한 곳**에서만 한다. 앱 포그라운드 복귀·계획 로드·
-    /// 설정 저장·학습 완료·플래너 진입이 전부 이 함수를 지나므로, 강등된 사용자의
-    /// 예약은 다음 재조정에서 반드시 걷힌다.
+    /// 예약 판단은 여기 **한 곳**만 지난다. 앱 포그라운드 복귀·계획 로드·설정 저장·
+    /// 학습 완료·일정 저장/삭제·엔타이틀먼트 갱신이 전부 이 함수를 부른다.
+    func reconcileReminders(now: Date = .now) async {
+        await reconcileStudyReminders(now: now)
+        await reconcileEventReminders(now: now)
+    }
+
     func reconcileStudyReminders(now: Date = .now) async {
-        await studyReminders.reconcile(
-            plannedReminders(now: now),
-            eligibility: studyReminderEligibility
+        await studyReminders.reconcile(plannedReminders(now: now))
+    }
+
+    func reconcileEventReminders(now: Date = .now) async {
+        await studyReminders.reconcileEventReminders(
+            plannedEventReminders(now: now),
+            eligibility: eventReminderEligibility
         )
     }
 
-    /// 알림 자격. 플랜을 아직 확인하지 못했으면 `.unknown`이고, 그때 서비스는
+    /// 개인 일정 알림 자격. 플랜을 아직 확인하지 못했으면 `.unknown`이고, 그때 서비스는
     /// 예약도 삭제도 하지 않는다. 무료로 단정하면 유료 사용자의 예약이 지워진다(P7).
-    var studyReminderEligibility: StudyReminderEligibility {
+    var eventReminderEligibility: ReminderEligibility {
         .resolve(
             isEntitlementResolved: environment.isEntitlementResolved,
-            canUseStudyReminder: canUseStudyReminder
+            isCapable: canUseEventReminder
         )
     }
 
-    /// "오늘 왜 알림이 없지?"를 한 값으로 답한다. DEBUG 진단 화면과 로그가 같이 쓴다.
-    func studyReminderDiagnosis(now: Date = .now) -> StudyReminderDiagnosis {
+    /// "오늘 왜 학습 알림이 없지?"를 한 값으로 답한다. DEBUG 진단 화면과 로그가 같이 쓴다.
+    /// 자격은 언제나 `.eligible`이다 — 무료라서 잠기는 일이 없어야 한다(P9).
+    func studyReminderDiagnosis(now: Date = .now) -> ReminderDiagnosis {
         let inputs = reminderInputs(now: now)
         let today = inputs.map { $0.settings.calendar.startOfDay(for: now) }
-        let outcome = inputs.map {
-            StudyReminderPlanner.outcome(
-                for: today ?? now,
-                plan: $0.plan,
-                settings: $0.settings,
-                completions: $0.completions,
-                now: now
-            )
-        }
-        return StudyReminderDiagnosis.make(
-            eligibility: studyReminderEligibility,
+        return ReminderDiagnosis.make(
+            eligibility: .eligible,
             isEnabled: studyReminders.isEnabled,
             authorization: studyReminders.authorizationStatus,
-            desired: inputs.map {
-                StudyReminderPlanner.reminders(
-                    plan: $0.plan,
+            desired: plannedReminders(now: now),
+            todayOutcome: inputs.map {
+                StudyReminderPlanner.outcome(
+                    for: today ?? now,
                     settings: $0.settings,
                     completions: $0.completions,
                     now: now
                 )
             },
-            todayOutcome: outcome,
-            todayTargetSets: inputs.flatMap { input in
-                today.flatMap { input.plan.plan(for: $0)?.targetSets }
-            },
             todayCompletedSets: inputs.flatMap { input in
                 today.flatMap { input.completions[$0] } ?? 0
             }
+        )
+    }
+
+    /// "왜 일정 알림이 없지?" 학습 알림과 **따로** 답한다. 일정 제목은 담지 않는다.
+    func eventReminderDiagnosis(now: Date = .now) -> ReminderDiagnosis {
+        let desired = plannedEventReminders(now: now)
+        return ReminderDiagnosis.make(
+            eligibility: eventReminderEligibility,
+            isEnabled: true,
+            authorization: studyReminders.authorizationStatus,
+            desired: desired,
+            todayOutcome: (desired?.isEmpty ?? true) ? .skipped(.userSelectedNone) : nil
         )
     }
 

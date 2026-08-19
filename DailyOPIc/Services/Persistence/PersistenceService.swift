@@ -176,22 +176,29 @@ final class PersistenceService {
 
     /// 일정 추가·수정 한 경로. `id`가 있으면 수정, 없으면 추가다.
     /// 제목은 공백을 털어 저장하고, 빈 제목은 저장하지 않는다.
+    /// 시간을 지우면 알림도 같이 지워진다 — 시각 없는 일정에는 걸 곳이 없다.
     /// - Returns: 저장했으면 true.
     @discardableResult
     func savePlannerEvent(
         id: UUID? = nil,
         localDate: String,
         title: String,
-        timeMinutes: Int? = nil
+        timeMinutes: Int? = nil,
+        reminderOffsetMinutes: Int? = nil
     ) throws -> Bool {
         guard let context else { return false }
         let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty, !localDate.isEmpty else { return false }
         let minutes = PlannerEventRecord.normalizedTimeMinutes(timeMinutes)
+        let offset = PlannerEventReminderPolicy.normalizedOffset(
+            reminderOffsetMinutes,
+            hasTime: minutes != nil
+        )
         if let id, let existing = try plannerEvent(id: id, context: context) {
             existing.localDate = localDate
             existing.title = trimmed
             existing.timeMinutes = minutes
+            existing.reminderOffsetMinutes = offset
             existing.updatedAt = .now
         } else {
             context.insert(
@@ -199,12 +206,22 @@ final class PersistenceService {
                     id: id ?? UUID(),
                     localDate: localDate,
                     title: trimmed,
-                    timeMinutes: minutes
+                    timeMinutes: minutes,
+                    reminderOffsetMinutes: offset
                 )
             )
         }
         try context.save()
         return true
+    }
+
+    /// 알림을 켜 둔 일정 전부. 플래너 화면이 열려 있지 않아도 재조정이 돌아야 해서
+    /// @Query가 아니라 여기서 직접 읽는다(같은 기록이다).
+    func plannerEventReminderInputs() throws -> [PlannerEventReminderInput] {
+        guard let context else { return [] }
+        return try context.fetch(FetchDescriptor<PlannerEventRecord>())
+            .filter { $0.reminderOffsetMinutes != nil }
+            .map(PlannerEventReminderInput.init(record:))
     }
 
     func deletePlannerEvent(id: UUID) throws {

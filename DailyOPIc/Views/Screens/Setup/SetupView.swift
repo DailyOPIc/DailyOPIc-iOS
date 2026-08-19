@@ -15,6 +15,8 @@ struct SetupView: View {
     @State private var alert: SetupAlert?
     @State private var showsGoalLevelDialog = false
     @State private var copyFeedbackTrigger = 0
+    /// 화면 진입만으로는 절대 열리지 않는다. 의도적으로 눌렀을 때만 true가 된다.
+    @State private var isPresentingPaywall = false
 
     private var appUserID: String? {
         guard let value = environment.store.appUserID, !value.isEmpty else { return nil }
@@ -51,6 +53,15 @@ struct SetupView: View {
                                 showsGoalLevelDialog = true
                             }
                         }
+                    }
+                    Section("알림") {
+                        notificationToggle
+                        Text(reminderState.statusText)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Section("구독") {
+                        subscriptionRows
                     }
                     Section("앱") {
                         Button {
@@ -128,7 +139,10 @@ struct SetupView: View {
             .navigationTitle("학습 설정")
             .task {
                 environment.store.refreshAppUserID()
+                // 설정 앱에서 권한을 바꾸고 돌아왔을 수 있다. 여기서 권한을 **묻지는** 않는다.
+                await environment.studyReminders.refreshAuthorizationStatus()
             }
+            .sheet(isPresented: $isPresentingPaywall) { PaywallView(source: .settings) }
             .sensoryFeedback(.success, trigger: copyFeedbackTrigger)
             .alert(item: $alert) { item in
                 Alert(
@@ -140,6 +154,75 @@ struct SetupView: View {
             .toolbar {
                 ToolbarItem(placement: .confirmationAction) { Button("닫기") { dismiss() } }
             }
+        }
+    }
+
+    // MARK: 알림
+
+    private var reminderState: StudyReminderSettingsState {
+        .make(
+            preference: environment.studyReminders.preference,
+            authorization: environment.studyReminders.authorizationStatus
+        )
+    }
+
+    /// 학습 알림 스위치. **앱 전체에서 여기 하나뿐이다** — 플래너 설정에는 시간만 있다.
+    /// 전 플랜이 쓸 수 있으므로 잠금도 Paywall도 없다(P9).
+    private var notificationToggle: some View {
+        Toggle(
+            "학습 알림",
+            isOn: Binding(
+                get: { reminderState.isOn },
+                set: { isOn in Task { await setStudyReminders(isOn) } }
+            )
+        )
+    }
+
+    /// 켜는 것은 **사용자의 명시적 행동**이라 여기서만 시스템 권한을 물을 수 있다.
+    /// 거부 상태에서는 다시 묻지 않는다(서비스가 막는다) — 안내 문구로 설정 앱을 가리킨다.
+    private func setStudyReminders(_ isOn: Bool) async {
+        if isOn {
+            await environment.studyReminders.enable()
+        } else {
+            await environment.studyReminders.disable()
+        }
+        await environment.studyCalendarViewModel.reconcileReminders()
+    }
+
+    // MARK: 구독
+
+    private var subscriptionState: SubscriptionSettingsState {
+        .make(
+            plan: environment.currentPlan,
+            isEntitlementResolved: environment.isEntitlementResolved
+        )
+    }
+
+    @ViewBuilder
+    private var subscriptionRows: some View {
+        let state = subscriptionState
+        Text(state.planText)
+            .foregroundStyle(state.isResolved ? AppPalette.ink : AppPalette.secondaryInk)
+        if let title = state.actionTitle {
+            Button(title) {
+                switch state.action {
+                case .paywall: isPresentingPaywall = true
+                case .manage: Task { await manageSubscription() }
+                case .none: break
+                }
+            }
+        }
+    }
+
+    private func manageSubscription() async {
+        do {
+            try await environment.store.manageSubscriptions()
+            await environment.refreshCapabilities()
+        } catch {
+            alert = SetupAlert(
+                title: "구독 관리를 열 수 없어요",
+                message: error.localizedDescription
+            )
         }
     }
 

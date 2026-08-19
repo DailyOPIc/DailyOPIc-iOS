@@ -8,7 +8,8 @@ import SwiftData
 /// "8월 20일 일정"이 19일이나 21일 칸으로 넘어간다(`StudyDayPlanRecord`와 같은 이유).
 /// 시각도 절대 시각이 아니라 자정 이후 분(0~1439)으로 둔다 — 벽시계 19:00은 어디서 봐도 19:00이다.
 ///
-/// 이 기록은 이 기기에만 남는다. 서버로 보내지 않고 알림도 걸지 않는다(P3 범위).
+/// 이 기록은 이 기기에만 남는다. 서버로 보내지 않는다. 알림은 이 기기의 로컬 알림으로만
+/// 걸고(P9), 제목은 그 알림 문구에만 들어간다 — 로그·진단·서버 어디에도 남기지 않는다.
 @Model
 final class PlannerEventRecord {
     @Attribute(.unique) var id: UUID
@@ -16,6 +17,10 @@ final class PlannerEventRecord {
     var title: String
     /// 자정 이후 분. nil이면 "시간 없음" 일정이다.
     var timeMinutes: Int?
+    /// 일정 시작 몇 분 전에 알릴지. nil이면 "알림 없음"이고 새 일정의 기본값이다.
+    /// 옵셔널로 **추가만** 하므로 기존 저장소가 그대로 열린다(파괴적 마이그레이션 없음).
+    /// 무료로 강등돼도 이 값은 지우지 않는다 — 예약만 걷고 설정은 남긴다.
+    var reminderOffsetMinutes: Int?
     var createdAt: Date
     var updatedAt: Date
 
@@ -24,6 +29,7 @@ final class PlannerEventRecord {
         localDate: String,
         title: String,
         timeMinutes: Int? = nil,
+        reminderOffsetMinutes: Int? = nil,
         createdAt: Date = .now,
         updatedAt: Date = .now
     ) {
@@ -31,6 +37,10 @@ final class PlannerEventRecord {
         self.localDate = localDate
         self.title = title
         self.timeMinutes = timeMinutes
+        self.reminderOffsetMinutes = PlannerEventReminderPolicy.normalizedOffset(
+            reminderOffsetMinutes,
+            hasTime: timeMinutes != nil
+        )
         self.createdAt = createdAt
         self.updatedAt = updatedAt
     }

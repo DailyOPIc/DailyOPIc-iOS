@@ -312,8 +312,12 @@ struct StudyPlanSetupView: View {
 /// 플래너 설정. 온보딩과 달리 한 화면에서 바로 고친다.
 /// 목표 등급은 여기서도 기존 난이도 재선택 경로를 그대로 연다.
 ///
-/// 플래너 홈에서 설정을 걷어낸 뒤 갈 곳이 여기다. 학습 알림(P1)과 잠긴 자동화 기능도
+/// 플래너 홈에서 설정을 걷어낸 뒤 갈 곳이 여기다. 잠긴 자동화 기능도
 /// "오늘 뭘 할까"를 묻는 홈이 아니라 이 화면이 맡는다.
+///
+/// 학습 알림 on/off는 여기 **없다**. 앱 설정 화면이 그 스위치의 주인이다(P9).
+/// 토글이 두 곳에 있으면 어느 쪽이 진실인지 사용자도 코드도 알 수 없게 된다.
+/// 여기는 알림이 울릴 "공부 시간"만 정한다.
 struct PlannerSettingsView: View {
     let viewModel: StudyCalendarViewModel
     let onChangeTargetLevel: () -> Void
@@ -353,22 +357,12 @@ struct PlannerSettingsView: View {
                 )
                 groupHeader("학습 시간")
                 StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
-                // 학습 알림은 유료 기능이다(P4). 무료에게는 켜는 버튼 대신 잠긴 칸을 보여준다 —
-                // 켤 수 없는 기능에 "매일 21:00"이라고 말하지 않기 위해서다.
-                if viewModel.canUseStudyReminder {
-                    // 알림 시각은 저장된 공부 시간이다. 아직 저장하지 않은 draft를 알림 문구로 쓰면
-                    // 실제로 예약된 시각과 다른 말을 하게 된다.
-                    StudyReminderCard(
-                        service: viewModel.studyReminders,
-                        studyTime: viewModel.settings?.preferredStudyTime ?? draft.preferredStudyTime,
-                        onReconcile: { Task { await viewModel.reconcileStudyReminders() } }
-                    )
-                } else {
-                    lockedStudyReminderCard
-                }
+                // 토글이 아니라 안내다. 스위치는 앱 설정 화면 한 곳에만 있다.
+                Text("학습 알림은 설정에서 켜고 끌 수 있어요")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
                 #if DEBUG
                 // 실기기에서 알림이 안 올 때 원인을 좁히는 칸. Release에는 존재하지 않는다.
-                // 잠긴 사용자에게도 보여야 "무료라서 안 온다"를 확인할 수 있다.
                 StudyReminderDiagnosticsSection(viewModel: viewModel)
                 #endif
                 lockedFeatureCard
@@ -420,13 +414,6 @@ struct PlannerSettingsView: View {
             }
             .cardStyle()
         }
-    }
-
-    /// 무료 사용자가 보는 학습 알림. 기능을 숨기지 않고 잠긴 채로 보여준다.
-    /// 제목·설명·필요 플랜은 잠긴 기능 한 줄이 그대로 말해 주므로 머리글을 겹쳐 두지 않는다.
-    /// 여기서는 알림 권한을 묻지 않고 `StudyReminderService`도 건드리지 않는다.
-    private var lockedStudyReminderCard: some View {
-        lockedFeatureRow(.studyReminder).cardStyle()
     }
 
     /// 잠긴 기능 한 줄. 누르면(=의도적인 탭) 그때만 Paywall이 열린다.

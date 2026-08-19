@@ -65,7 +65,7 @@ struct StudyCalendarScreen: View {
                     .onAppear {
                         viewModel.freezeSchedule(snapshot)
                         // 알림 예약은 플래너를 새로 그릴 때 맞춘다. 이걸 위해 새 API를 부르지 않는다.
-                        Task { await viewModel.reconcileStudyReminders() }
+                        Task { await viewModel.reconcileReminders() }
                     }
                 } else {
                     StudyPlanSetupView(
@@ -116,7 +116,14 @@ struct StudyCalendarScreen: View {
                 ),
                 isStudyWeekday: settings.isStudyDay(date),
                 calendar: settings.calendar,
-                persistence: persistence
+                persistence: persistence,
+                reminders: viewModel.studyReminders,
+                canUseEventReminder: viewModel.canUseEventReminder,
+                onPlannerEventsChanged: {
+                    // 일정이 바뀌면 예약도 바뀐다. 저장/삭제 자리에서 직접 예약하지 않고
+                    // 언제나 같은 재조정 한 곳을 다시 돌린다.
+                    Task { await viewModel.reconcileEventReminders() }
+                }
             )
         }
     }

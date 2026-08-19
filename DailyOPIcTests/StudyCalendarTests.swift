@@ -34,6 +34,44 @@ enum StudyCalendarFixture {
     static func completions(_ entries: [String: Int]) -> [Date: Int] {
         entries.reduce(into: [:]) { result, entry in result[date(entry.key)] = entry.value }
     }
+
+    /// 서버 capabilities 스냅샷. 캘린더 게이팅과 알림 테스트가 같은 것을 쓴다.
+    /// 새 필드를 `nil`로 두면 그 필드를 모르는 구 서버가 된다.
+    static func capabilities(
+        plan: String?,
+        autoReplan: Bool? = nil,
+        evaluationAdaptive: Bool? = nil,
+        examBackplan: Bool? = nil,
+        studyReminder: Bool? = nil,
+        eventReminder: Bool? = nil
+    ) -> Capabilities {
+        Capabilities(
+            minimumSupportedAppVersion: "1.0.0",
+            questionGenerationV2: true,
+            mockSessionV2: true,
+            evaluationRubricV2: true,
+            practiceRefresh: true,
+            guideSchemaVersion: 1,
+            plan: plan,
+            quotaPolicy: Capabilities.QuotaPolicy(
+                dailyAnalysisFree: 1,
+                dailyRefreshRewards: 1,
+                mockSessionsPerDay: 1,
+                mockRewardGates: 3,
+                practiceDaily: 1,
+                practiceAdBonus: 1,
+                historyDays: 7,
+                analysisDepth: "summary",
+                reviewSet: false,
+                adsEnabled: true,
+                calendarAutoReplan: autoReplan,
+                calendarEvaluationAdaptive: evaluationAdaptive,
+                calendarExamBackplan: examBackplan,
+                calendarStudyReminder: studyReminder,
+                calendarEventReminder: eventReminder
+            )
+        )
+    }
 }
 
 /// 캘린더의 기본 계산 계약. 예측은 "권장 학습 계획을 끝내는 데 걸리는 기간"이지

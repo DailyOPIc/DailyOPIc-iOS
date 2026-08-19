@@ -70,7 +70,7 @@ struct DailyOPIcApp: App {
                             // 잘못 잡은 알림을 30일치 다시 써 버린다. 순서를 고정한다.
                             Task {
                                 await environment.refreshEntitlements()
-                                await environment.studyCalendarViewModel.reconcileStudyReminders()
+                                await environment.studyCalendarViewModel.reconcileReminders()
                             }
                         }
                     }
