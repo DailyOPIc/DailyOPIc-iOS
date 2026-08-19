@@ -3,13 +3,14 @@ import SwiftData
 import Testing
 @testable import DailyOPIc
 
-/// P3: 하루 상세의 개인 일정·메모는 이 기기에만 저장되고,
+/// P3 · P10: 하루 시트의 개인 일정은 이 기기에만 저장되고,
 /// 학습 기록은 그 저장과 무관하게 실제 학습에서만 나온다.
+/// 메모는 출시된 적 없이 P10에서 제거됐다 — 이 파일에 메모가 다시 나타나면 안 된다.
 @MainActor
 struct PlannerLocalEntryTests {
     private func makePersistence() throws -> PersistenceService {
         let container = try ModelContainer(
-            for: PlannerEventRecord.self, PlannerDayNoteRecord.self,
+            for: PlannerEventRecord.self,
             StudySetCompletionRecord.self, StudyDayPlanRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
@@ -153,71 +154,18 @@ struct PlannerLocalEntryTests {
         let key = LocalCalendarDate.text(from: moment, timeZone: seoul)
         #expect(key == "2026-08-20")
         try persistence.savePlannerEvent(localDate: key, title: "스터디", timeMinutes: 9 * 60)
-        try persistence.savePlannerNote(localDate: key, text: "오늘 IH 목표")
 
         // 뉴욕으로 옮겨도 같은 키로 읽는다. 저장된 값 자체가 문자열이라 흔들릴 여지가 없다.
         #expect(try persistence.plannerEvents(on: "2026-08-20").count == 1)
-        #expect(try persistence.plannerNote(on: "2026-08-20")?.text == "오늘 IH 목표")
         // 절대 시각으로 저장했다면 뉴욕에서 8월 19일이 됐을 순간이다.
         #expect(LocalCalendarDate.text(from: moment, timeZone: newYork) == "2026-08-19")
         #expect(try persistence.plannerEvents(on: "2026-08-19").isEmpty)
         // 벽시계 09:00도 그대로다(절대 시각이 아니라 분으로 저장한다).
         #expect(try persistence.plannerEvents(on: "2026-08-20").first?.time?.hour == 9)
     }
-
-    // MARK: J·K·L·M. 메모
-
-    @Test func memoIsSavedForItsDate() throws {
-        let persistence = try makePersistence()
-        #expect(try persistence.savePlannerNote(localDate: "2026-08-20", text: "롤플레이 연습하기"))
-        #expect(try persistence.plannerNote(on: "2026-08-20")?.text == "롤플레이 연습하기")
-        #expect(try persistence.plannerNote(on: "2026-08-21") == nil)
-    }
-
-    @Test func memoUpdateReplacesTheText() throws {
-        let persistence = try makePersistence()
-        try persistence.savePlannerNote(localDate: "2026-08-20", text: "첫 메모")
-        let createdAt = try #require(try persistence.plannerNote(on: "2026-08-20")?.createdAt)
-        try persistence.savePlannerNote(localDate: "2026-08-20", text: "고친 메모")
-
-        let note = try #require(try persistence.plannerNote(on: "2026-08-20"))
-        #expect(note.text == "고친 메모")
-        #expect(note.createdAt == createdAt) // 같은 기록을 고친다
-    }
-
-    @Test func whitespaceOnlyMemoIsTreatedAsNoMemo() throws {
-        let persistence = try makePersistence()
-        try persistence.savePlannerNote(localDate: "2026-08-20", text: "기억할 것")
-        #expect(try persistence.savePlannerNote(localDate: "2026-08-20", text: "   \n ") == false)
-        #expect(try persistence.plannerNote(on: "2026-08-20") == nil)
-        // 처음부터 공백만 적으면 아무것도 만들지 않는다.
-        #expect(try persistence.savePlannerNote(localDate: "2026-08-21", text: " ") == false)
-        #expect(try persistence.plannerNote(on: "2026-08-21") == nil)
-        // 앞뒤 공백은 털어서 저장한다.
-        try persistence.savePlannerNote(localDate: "2026-08-22", text: "  메모  ")
-        #expect(try persistence.plannerNote(on: "2026-08-22")?.text == "메모")
-    }
-
-    @Test func memoIsDeletedExplicitly() throws {
-        let persistence = try makePersistence()
-        try persistence.savePlannerNote(localDate: "2026-08-20", text: "지울 메모")
-        try persistence.deletePlannerNote(localDate: "2026-08-20")
-        #expect(try persistence.plannerNote(on: "2026-08-20") == nil)
-    }
-
-    /// 날짜당 메모는 하나뿐이다. 여러 번 저장해도 기록이 늘지 않는다.
-    @Test func onlyOneMemoExistsPerDate() throws {
-        let persistence = try makePersistence()
-        for text in ["하나", "둘", "셋"] {
-            try persistence.savePlannerNote(localDate: "2026-08-20", text: text)
-        }
-        #expect(try persistence.plannerNote(on: "2026-08-20")?.text == "셋")
-        try persistence.savePlannerNote(localDate: "2026-08-21", text: "다른 날")
-        #expect(try persistence.plannerNote(on: "2026-08-20")?.text == "셋")
-    }
 }
 
-/// 하루 상세가 말하는 학습 상태. 격자와 같은 계산에서 나오고, 사용자가 손으로 바꿀 수 없다.
+/// 하루 시트가 말하는 학습 상태. 격자와 같은 계산에서 나오고, 사용자가 손으로 바꿀 수 없다.
 @MainActor
 struct PlannerDayStudyStatusTests {
     private let settings = StudyCalendarFixture.settings() // 월~금, 하루 2세트
@@ -352,14 +300,14 @@ struct PlannerDayStudyStatusTests {
     }
 }
 
-/// 캘린더 격자와 하루 상세가 같은 날짜·같은 사실을 가리키는지.
+/// 캘린더 격자와 하루 시트가 같은 날짜·같은 사실을 가리키는지.
 @MainActor
-struct PlannerDayDetailIntegrationTests {
+struct PlannerDaySheetIntegrationTests {
     private let settings = StudyCalendarFixture.settings()
 
     private func makePersistence() throws -> PersistenceService {
         let container = try ModelContainer(
-            for: PlannerEventRecord.self, PlannerDayNoteRecord.self,
+            for: PlannerEventRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let service = PersistenceService()
@@ -374,7 +322,7 @@ struct PlannerDayDetailIntegrationTests {
         for offset in [0, 13, 19, 30] {
             let day = calendar.date(byAdding: .day, value: offset, to: monthStart)!
             let key = LocalCalendarDate.text(from: day, timeZone: settings.timeZone)
-            #expect(PlannerRoute.dayDetail(key) == PlannerRoute.dayDetail(key))
+            #expect(PlannerSelectedDate(key) == PlannerSelectedDate(key))
             #expect(LocalCalendarDate.date(from: key, timeZone: settings.timeZone) == day)
         }
         #expect(
@@ -386,7 +334,7 @@ struct PlannerDayDetailIntegrationTests {
     }
 
     /// 일요일 시작은 그대로다(P2 회귀 방지).
-    @Test func sundayFirstLayoutSurvivesDayDetail() {
+    @Test func sundayFirstLayoutSurvivesDaySheet() {
         #expect(StudyWeekday.displayOrder.map(\.shortLabel) == ["일", "월", "화", "수", "목", "금", "토"])
         #expect(
             StudyCalendarEngine.startOfWeek(
@@ -396,21 +344,17 @@ struct PlannerDayDetailIntegrationTests {
         )
     }
 
-    /// 개인 일정·메모가 있는 날에만 표시가 붙고, 학습 상태는 전혀 건드리지 않는다.
-    @Test func entryIndicatorsFollowStoredEntriesOnly() throws {
+    /// 개인 일정이 있는 날에만 표시가 붙고, 학습 상태는 전혀 건드리지 않는다.
+    @Test func entryIndicatorsFollowStoredEventsOnly() throws {
         let persistence = try makePersistence()
         try persistence.savePlannerEvent(localDate: "2026-08-20", title: "스터디")
-        try persistence.savePlannerNote(localDate: "2026-08-21", text: "메모")
 
         #expect(try !persistence.plannerEvents(on: "2026-08-20").isEmpty) // 일정 표시
-        #expect(try persistence.plannerNote(on: "2026-08-20") == nil)     // 메모 표시 없음
         #expect(try persistence.plannerEvents(on: "2026-08-21").isEmpty)  // 일정 표시 없음
-        #expect(try persistence.plannerNote(on: "2026-08-21") != nil)     // 메모 표시
         #expect(try persistence.plannerEvents(on: "2026-08-22").isEmpty)
-        #expect(try persistence.plannerNote(on: "2026-08-22") == nil)
     }
 
-    /// 일정·메모를 아무리 적어도 그날의 학습 상태와 고정된 배정량은 그대로다.
+    /// 일정을 아무리 적어도 그날의 학습 상태와 고정된 배정량은 그대로다.
     @Test func personalEntriesNeverChangeStudyTruth() throws {
         let persistence = try makePersistence()
         let frozen = ["2026-08-12": 2]
@@ -434,7 +378,6 @@ struct PlannerDayDetailIntegrationTests {
         }
         let before = day()
         try persistence.savePlannerEvent(localDate: "2026-08-12", title: "공부 다 했다고 치기")
-        try persistence.savePlannerNote(localDate: "2026-08-12", text: "완료!")
         let after = day()
 
         #expect(before.state == .partial)

@@ -7,7 +7,7 @@ import SwiftData
 struct StudyCalendarScreen: View {
     let viewModel: StudyCalendarViewModel
     let preferences: AppPreferences
-    /// 하루 상세의 개인 일정·메모 저장소. 화면이 SwiftData를 직접 만지지 않게 서비스로 받는다.
+    /// 하루 시트의 개인 일정 저장소. 화면이 SwiftData를 직접 만지지 않게 서비스로 받는다.
     let persistence: PersistenceService
     /// Daily 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
     let onStartDaily: () -> Void
@@ -17,6 +17,10 @@ struct StudyCalendarScreen: View {
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
     private var practiceRecords: [PracticeHistoryRecord]
     @Query private var dayPlanRecords: [StudyDayPlanRecord]
+
+    /// 지금 열려 있는 하루. 주간 스트립과 전체 캘린더가 **같은** 이 값 하나를 바꾸고,
+    /// 시트도 여기 한 곳에서만 뜬다 — 화면마다 시트를 달면 언젠가 두 개가 겹친다.
+    @State private var selectedDate: PlannerSelectedDate?
 
     /// 그날 배정됐던 학습량. 지난 날짜는 이 값으로만 판정하고 현재 설정으로 다시 계산하지 않는다.
     private var historicalTargets: [String: Int] {
@@ -58,7 +62,8 @@ struct StudyCalendarScreen: View {
                         targetLevel: viewModel.targetLevel,
                         planName: viewModel.plan.displayName,
                         isShowingCachedSettings: viewModel.isShowingCachedSettings,
-                        onStartDaily: onStartDaily
+                        onStartDaily: onStartDaily,
+                        onSelectDate: { selectedDate = PlannerSelectedDate($0) }
                     )
                     // 오늘까지의 배정 학습량을 고정해 둔다. 내일 설정을 바꿔도 오늘의 기록은
                     // 그대로 남는다.
@@ -77,6 +82,13 @@ struct StudyCalendarScreen: View {
             }
         }
         .navigationTitle("플래너")
+        // 플래너 뿌리에 붙인 시트 하나. 전체 캘린더로 밀고 들어간 상태에서도 같은 시트가 뜨고,
+        // 내리면 사용자는 보던 달·보던 자리에 그대로 남는다.
+        .sheet(item: $selectedDate) { selection in
+            daySheet(selection.id)
+                .presentationDetents([.medium, .large])
+                .presentationDragIndicator(.visible)
+        }
         .navigationDestination(for: PlannerRoute.self) { route in
             switch route {
             case .fullCalendar:
@@ -85,11 +97,10 @@ struct StudyCalendarScreen: View {
                         settings: viewModel.settings ?? .draft,
                         schedule: snapshot.schedule,
                         completions: completions,
-                        today: snapshot.today.date
+                        today: snapshot.today.date,
+                        onSelectDate: { selectedDate = PlannerSelectedDate($0) }
                     )
                 }
-            case let .dayDetail(localDate):
-                dayDetail(localDate)
             case .settings:
                 PlannerSettingsView(viewModel: viewModel) {
                     preferences.isPresentingLevelSelection = true
@@ -99,13 +110,13 @@ struct StudyCalendarScreen: View {
         .task { await viewModel.loadIfNeeded() }
     }
 
-    /// 하루 상세. 학습 상태는 격자와 **같은** 계산에서 뽑는다(두 번째 계산 경로를 만들지 않는다).
+    /// 하루 시트. 학습 상태는 격자와 **같은** 계산에서 뽑는다(두 번째 계산 경로를 만들지 않는다).
     @ViewBuilder
-    private func dayDetail(_ localDate: String) -> some View {
+    private func daySheet(_ localDate: String) -> some View {
         if let snapshot,
            let settings = viewModel.settings,
            let date = LocalCalendarDate.date(from: localDate, timeZone: settings.timeZone) {
-            PlannerDayDetailView(
+            PlannerDaySheet(
                 localDate: localDate,
                 day: StudyCalendarEngine.day(
                     date: date,
@@ -115,6 +126,7 @@ struct StudyCalendarScreen: View {
                     completions: completions
                 ),
                 isStudyWeekday: settings.isStudyDay(date),
+                isToday: settings.calendar.startOfDay(for: date) == snapshot.today.date,
                 calendar: settings.calendar,
                 persistence: persistence,
                 reminders: viewModel.studyReminders,

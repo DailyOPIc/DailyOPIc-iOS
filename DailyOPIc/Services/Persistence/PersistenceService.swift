@@ -161,7 +161,7 @@ final class PersistenceService {
         try context.save()
     }
 
-    // MARK: 플래너 개인 일정 · 메모 (이 기기에만 저장)
+    // MARK: 플래너 개인 일정 (이 기기에만 저장)
 
     /// 그날의 개인 일정. 정렬 규칙은 모델 한 곳에만 둔다.
     func plannerEvents(on localDate: String) throws -> [PlannerEventRecord] {
@@ -236,43 +236,6 @@ final class PersistenceService {
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
-    }
-
-    /// 그날의 메모. 날짜당 하나뿐이다.
-    func plannerNote(on localDate: String) throws -> PlannerDayNoteRecord? {
-        guard let context else { return nil }
-        var descriptor = FetchDescriptor<PlannerDayNoteRecord>(
-            predicate: #Predicate { $0.localDate == localDate }
-        )
-        descriptor.fetchLimit = 1
-        return try context.fetch(descriptor).first
-    }
-
-    /// 메모 저장. 공백만 남았으면 "메모 없음"으로 보고 기록을 지운다.
-    /// - Returns: 메모가 남았으면 true, 지웠으면 false.
-    @discardableResult
-    func savePlannerNote(localDate: String, text: String) throws -> Bool {
-        guard let context, !localDate.isEmpty else { return false }
-        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            try deletePlannerNote(localDate: localDate)
-            return false
-        }
-        if let existing = try plannerNote(on: localDate) {
-            guard existing.text != trimmed else { return true }
-            existing.text = trimmed
-            existing.updatedAt = .now
-        } else {
-            context.insert(PlannerDayNoteRecord(localDate: localDate, text: trimmed))
-        }
-        try context.save()
-        return true
-    }
-
-    func deletePlannerNote(localDate: String) throws {
-        guard let context, let record = try plannerNote(on: localDate) else { return }
-        context.delete(record)
-        try context.save()
     }
 
     /// "yyyy-MM-dd"는 사전순 비교가 곧 날짜순 비교라 문자열 하나로 잘라낼 수 있다.

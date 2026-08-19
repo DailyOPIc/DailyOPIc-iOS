@@ -137,6 +137,43 @@ struct StudyDay: Identifiable, Sendable {
     }
 }
 
+/// 캘린더 한 칸의 진하기 한 단계. **실제로 완료한 학습 횟수**만 재료로 쓴다 —
+/// 계획 대비 비율이 아니다(계획 10세트 중 1회와 계획 1세트 중 1회는 같은 진하기다).
+/// 색을 여섯 개 만들지 않고 브랜드 색 하나의 농도만 바꾼다.
+enum LearningActivityLevel: Int, Sendable, CaseIterable {
+    case zero
+    case one
+    case two
+    case three
+    case four
+    case fivePlus
+
+    /// 5회 이상은 모두 같은 최고 단계다. 하루에 10회를 해도 더 진해질 칸이 없다.
+    static func make(completedSets: Int) -> LearningActivityLevel {
+        LearningActivityLevel(rawValue: min(max(completedSets, 0), 5)) ?? .zero
+    }
+
+    /// 0회는 아예 칠하지 않는다. 학습하지 않은 날에 색이 남으면 "조금 했다"로 읽힌다.
+    var fillOpacity: Double {
+        switch self {
+        case .zero: 0
+        case .one: 0.14
+        case .two: 0.3
+        case .three: 0.5
+        case .four: 0.74
+        case .fivePlus: 1
+        }
+    }
+
+    /// 진한 칸 위의 날짜 숫자는 흰색이어야 읽힌다.
+    var needsLightNumber: Bool { self == .four || self == .fivePlus }
+
+    /// 색·단계를 말하지 않고 실제로 한 일만 읽어 준다("진한 보라색"도 "레벨 4"도 아니다).
+    static func accessibilityText(completedSets: Int) -> String {
+        completedSets > 0 ? "\(completedSets)회 학습" : "학습 기록 없음"
+    }
+}
+
 /// 날짜별 배정 학습량. 지난 날은 그날 고정된 값을, 오늘·미래는 지금 계산한 적응형 값을 준다.
 /// 지난 날을 현재 설정으로 다시 계산하지 않는 것이 이 타입의 유일한 목적이다.
 struct StudySchedule: Sendable {

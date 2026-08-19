@@ -99,16 +99,15 @@ struct LearningStreakTests {
         #expect(streak(["2026-08-13": 4, "2026-08-14": 7], today: "2026-08-14") == 2)
     }
 
-    /// J. 일정·메모는 학습이 아니다. 스트릭의 재료는 세트 완료 기록뿐이다.
-    @Test @MainActor func eventsAndNotesDoNotCountAsLearning() throws {
+    /// J. 개인 일정은 학습이 아니다. 스트릭의 재료는 세트 완료 기록뿐이다.
+    @Test @MainActor func eventsDoNotCountAsLearning() throws {
         let container = try ModelContainer(
-            for: PlannerEventRecord.self, PlannerDayNoteRecord.self, StudySetCompletionRecord.self,
+            for: PlannerEventRecord.self, StudySetCompletionRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let persistence = PersistenceService()
         persistence.configure(context: ModelContext(container))
         #expect(try persistence.savePlannerEvent(localDate: "2026-08-14", title: "스터디 모임"))
-        #expect(try persistence.savePlannerNote(localDate: "2026-08-14", text: "내일 3세트"))
 
         let counts = StudyCalendarEngine.completionCounts(
             completedAt: try persistence.studySetCompletionDates(),
@@ -458,8 +457,8 @@ struct FrozenRestDayTests {
         #expect(reopened.weekCompletedDays == 0)
     }
 
-    /// G·I. 하루 상세와 캘린더 칸이 같은 값을 읽는다(문구 출처가 하나다).
-    @Test func dayDetailAndCalendarShareTheFrozenZero() throws {
+    /// G·I. 하루 시트와 캘린더 칸이 같은 값을 읽는다(문구 출처가 하나다).
+    @Test func daySheetAndCalendarShareTheFrozenZero() throws {
         let persistence = try makePersistence()
         let settings = StudyCalendarFixture.settings(createdAt: "2026-08-10")
         let completions = ["2026-08-15": 2]

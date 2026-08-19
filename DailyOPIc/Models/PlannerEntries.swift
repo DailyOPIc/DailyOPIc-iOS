@@ -74,28 +74,6 @@ final class PlannerEventRecord {
     }
 }
 
-/// 날짜당 하나뿐인 개인 메모. 일정과 달리 여러 개를 두지 않는다.
-/// 평문만 담고, 서버로 보내지 않으며, AI가 읽지도 않는다.
-@Model
-final class PlannerDayNoteRecord {
-    @Attribute(.unique) var localDate: String
-    var text: String
-    var createdAt: Date
-    var updatedAt: Date
-
-    init(
-        localDate: String,
-        text: String,
-        createdAt: Date = .now,
-        updatedAt: Date = .now
-    ) {
-        self.localDate = localDate
-        self.text = text
-        self.createdAt = createdAt
-        self.updatedAt = updatedAt
-    }
-}
-
 /// 하루 상세가 보여줄 학습 상태. 캘린더 격자와 같은 판정(`StudyCalendarEngine.state`)을
 /// 옮겨 적기만 한다 — 두 번째 계산 경로를 만들면 지난 날짜가 화면마다 다른 말을 하게 된다.
 enum PlannerDayStudyStatus: String, Sendable, CaseIterable {
@@ -129,6 +107,27 @@ enum PlannerDayStudyStatus: String, Sendable, CaseIterable {
         case .scheduled: "학습 예정"
         case .rest: "휴식일"
         case .unplanned: "계획 없음"
+        }
+    }
+
+    /// 하루 시트가 읽어 줄 학습 한 줄. 배정이 있던 날은 분모를 그대로 쓰고,
+    /// 배정이 없던 날에 가짜 분모("1 / 0세트")를 만들지 않는다.
+    /// 재료는 격자와 같은 `StudyDay` 하나뿐이다 — 두 번째 계산 경로를 만들지 않는다.
+    func summaryText(day: StudyDay, isToday: Bool) -> String {
+        let prefix = isToday ? "오늘 " : ""
+        switch self {
+        case .completed, .partial:
+            return "\(prefix)\(day.completedSets) / \(day.targetSets)세트 학습"
+        case .scheduled:
+            return "학습 예정 · \(day.targetSets)세트"
+        case .missed:
+            return "학습 기록 없음 · 계획 \(day.targetSets)세트"
+        case .rest:
+            return day.completedSets > 0
+                ? "휴식일 · \(day.completedSets)회 학습"
+                : "휴식일 / 학습 기록 없음"
+        case .unplanned:
+            return day.completedSets > 0 ? "\(prefix)\(day.completedSets)회 학습" : "학습 기록 없음"
         }
     }
 

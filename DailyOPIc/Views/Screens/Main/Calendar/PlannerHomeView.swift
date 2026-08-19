@@ -2,17 +2,12 @@ import SwiftUI
 import SwiftData
 
 /// 플래너 탭 안의 이동 경로. 탭이 이미 갖고 있는 NavigationStack을 그대로 쓴다.
-enum PlannerRoute: Hashable {
+///
+/// 날짜는 여기 없다(P10). 하루를 열 때는 화면을 밀어내지 않고 `PlannerDaySheet`를 띄운다 —
+/// 날짜를 확인할 때마다 뒤로 가기를 눌러야 했던 것이 플래너에서 가장 지치는 동작이었다.
+enum PlannerRoute: Hashable, CaseIterable {
     case fullCalendar
-    /// 하루 상세. 값은 "yyyy-MM-dd"다 — Date로 실으면 기기 타임존이 바뀔 때 다른 날이 열린다.
-    case dayDetail(String)
     case settings
-
-    /// 하루 상세로 가는 유일한 경로 생성기. 주간 스트립과 전체 캘린더가 같은 함수를 써야
-    /// 같은 날짜에서 같은 화면이 열린다(키를 각자 만들면 언젠가 하루가 어긋난다).
-    static func dayDetail(for date: Date, timeZone: TimeZone) -> PlannerRoute {
-        .dayDetail(LocalCalendarDate.text(from: date, timeZone: timeZone))
-    }
 }
 
 /// 플래너 홈. 첫 화면에서 "오늘 뭘 해야 하지?"에 답하는 것이 이 화면의 전부다.
@@ -26,9 +21,11 @@ struct PlannerHomeView: View {
     /// 데일리 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
     let onStartDaily: () -> Void
 
+    /// 날짜를 누르면 알려만 준다. 시트는 플래너 뿌리 한 곳에서만 띄운다.
+    let onSelectDate: (String) -> Void
+
     /// 주간 스트립의 작은 표시용. 전체 캘린더와 같은 날에 같은 표시가 뜨게 한다.
     @Query private var events: [PlannerEventRecord]
-    @Query private var notes: [PlannerDayNoteRecord]
 
     var body: some View {
         ScrollView {
@@ -161,25 +158,25 @@ struct PlannerHomeView: View {
         .cardStyle()
     }
 
-    /// 일요일부터 시작하는 7칸. 두 번째 월간 캘린더가 되지 않도록 상태 기호만 얹고,
-    /// 누르면 전체 캘린더와 **같은** 하루 상세로 간다.
+    /// 일요일부터 시작하는 7칸. 전체 캘린더와 **같은** 칸(`StudyDayCell`)을 쓰고,
+    /// 누르면 **같은** 하루 시트를 연다.
     private var weekStrip: some View {
         let eventDates = Set(events.map(\.localDate))
-        let noteDates = Set(notes.map(\.localDate))
         return HStack(spacing: AppSpacing.xs) {
             ForEach(snapshot.weekDays) { day in
                 let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
-                NavigationLink(value: PlannerRoute.dayDetail(for: day.date, timeZone: settings.timeZone)) {
+                Button {
+                    onSelectDate(key)
+                } label: {
                     StudyDayCell(
                         day: day,
                         calendar: settings.calendar,
                         isToday: day.date == snapshot.today.date,
-                        hasEvent: eventDates.contains(key),
-                        hasNote: noteDates.contains(key)
+                        hasEvent: eventDates.contains(key)
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("하루 상세를 봅니다")
+                .accessibilityHint("하루 정보를 봅니다")
             }
         }
     }
@@ -288,80 +285,95 @@ struct PlannerHomeView: View {
     }
 }
 
-/// 하루 한 칸. 색만으로 상태를 구분하지 않도록 기호를 함께 그린다.
+/// 하루 한 칸. 주간 스트립과 월간 격자가 이 하나를 같이 쓴다.
+///
+/// 칸이 말하는 것은 **그날 실제로 학습한 횟수**뿐이다(P10). 계획 대비 달성률이 아니고,
+/// 완료·일부 완료 기호도 더는 그리지 않는다 — 계획 상태는 하루 시트와 오늘 카드가 맡는다.
 struct StudyDayCell: View {
     let day: StudyDay
     /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 요일·날짜가 하루 어긋날 수 있다.
     let calendar: Calendar
     var isToday = false
-    /// 개인 일정·메모가 있는지. 학습 상태와 다른 기호로, 훨씬 작게 그린다.
+    /// 개인 일정이 있는지. 학습량과 헷갈리지 않게 원 **바깥**에 아주 작게 찍는다.
     var hasEvent = false
-    var hasNote = false
+    /// 월간 격자에는 요일 머리글이 따로 있다. 칸마다 또 쓰면 격자가 시끄러워진다.
+    var showsWeekday = true
+
+    /// 오늘 테두리는 채우기와 겹치지 않게 한 겹 바깥에 그린다. 글자 크기를 키우면 같이 커진다.
+    @ScaledMetric(relativeTo: .footnote) private var fillDiameter: CGFloat = 28
+
+    private var level: LearningActivityLevel {
+        LearningActivityLevel.make(completedSets: day.completedSets)
+    }
 
     var body: some View {
         VStack(spacing: AppSpacing.xs) {
-            Text(StudyWeekday.from(date: day.date, calendar: calendar).shortLabel)
-                .font(AppTypography.caption)
-                .foregroundStyle(AppPalette.secondaryInk)
-            Image(systemName: symbolName)
-                .font(.system(size: 16))
-                .foregroundStyle(tint)
-            Text("\(calendar.component(.day, from: day.date))")
-                .font(AppTypography.footnote)
-            entryIndicators
+            if showsWeekday {
+                Text(StudyWeekday.from(date: day.date, calendar: calendar).shortLabel)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            activityCircle
+            eventIndicator
         }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, AppSpacing.sm)
-        .background(isToday ? AppPalette.primarySoft : Color.clear)
-        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .padding(.vertical, AppSpacing.xs)
+        .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
     }
 
-    /// 개인 일정·메모 표시. 학습 상태 기호(16pt)와 겹쳐 보이지 않게 아주 작게 둔다.
-    /// 색이 아니라 모양이 다르고, 읽어 주는 문장에도 따로 들어간다.
-    @ViewBuilder
-    private var entryIndicators: some View {
-        if hasEvent || hasNote {
-            HStack(spacing: 2) {
-                if hasEvent {
-                    Image(systemName: "circle.fill").font(.system(size: 5))
-                }
-                if hasNote {
-                    Image(systemName: "text.alignleft").font(.system(size: 7))
-                }
+    /// 날짜 숫자 + 학습량 채우기 + (오늘이면) 바깥 테두리.
+    /// 오늘을 채우기로 표시하면 "오늘"과 "많이 학습함"을 구분할 수 없게 된다.
+    private var activityCircle: some View {
+        ZStack {
+            Circle()
+                .fill(AppPalette.primary.opacity(level.fillOpacity))
+                .frame(width: fillDiameter, height: fillDiameter)
+            Text("\(calendar.component(.day, from: day.date))")
+                .font(AppTypography.footnote)
+                .foregroundStyle(level.needsLightNumber ? Color.white : AppPalette.ink)
+            if isToday {
+                Circle()
+                    .strokeBorder(AppPalette.primary, lineWidth: 2)
+                    .frame(width: fillDiameter + 8, height: fillDiameter + 8)
             }
-            .foregroundStyle(AppPalette.secondaryInk)
+        }
+        .frame(width: fillDiameter + 8, height: fillDiameter + 8)
+    }
+
+    /// 개인 일정 표시. 학습 진하기와 섞이지 않게 원 아래 작은 점 하나로만 둔다.
+    /// 자리는 일정이 없어도 비워 두어 칸 높이가 들쭉날쭉해지지 않게 한다.
+    private var eventIndicator: some View {
+        Circle()
+            .fill(hasEvent ? AppPalette.secondaryInk : Color.clear)
+            .frame(width: 4, height: 4)
             .accessibilityHidden(true)
-        }
     }
 
-    /// 오늘 여부는 배경색으로만 알리면 안 된다. 한 문장으로 조립해 읽어 준다.
-    /// 휴식일에 스스로 학습한 날은 "휴식"만 읽고 끝내지 않는다 — 실제로 한 일이 사라진다.
     private var accessibilityText: String {
-        let weekday = StudyWeekday.from(date: day.date, calendar: calendar).accessibilityLabel
-        let date = day.date.formatted(.dateTime.month().day())
+        StudyDayCell.accessibilityText(
+            date: day.date.formatted(.dateTime.month().day()),
+            weekday: StudyWeekday.from(date: day.date, calendar: calendar).accessibilityLabel,
+            isToday: isToday,
+            completedSets: day.completedSets,
+            hasEvent: hasEvent
+        )
+    }
+
+    /// 오늘 여부도, 학습량도 색으로만 알리면 안 된다. 한 문장으로 조립해 읽어 준다.
+    /// 읽어 주는 것은 실제로 한 일이다 — 색 이름도 단계 번호도 말하지 않는다.
+    /// (뷰를 그리지 않고도 확인할 수 있게 순수 함수로 둔다.)
+    static func accessibilityText(
+        date: String,
+        weekday: String,
+        isToday: Bool,
+        completedSets: Int,
+        hasEvent: Bool
+    ) -> String {
         let today = isToday ? "오늘, " : ""
-        let entries = [hasEvent ? "개인 일정 있음" : nil, hasNote ? "메모 있음" : nil]
-            .compactMap { $0 }
-            .map { ", \($0)" }
-            .joined()
-        return "\(date) \(weekday), \(today)\(day.studyAccessibilityText)\(entries)"
-    }
-
-    /// 휴식일 자율 학습은 "계획된 완료"로 위장하지 않되 아무 일도 없던 휴식일과는 구분한다.
-    /// 새 색 체계를 만들지 않고 기존 기호·색을 조합만 바꿔 쓴다.
-    private var symbolName: String {
-        day.hasUnscheduledLearning ? "moon.stars.fill" : day.state.symbolName
-    }
-
-    private var tint: Color {
-        if day.hasUnscheduledLearning { return AppPalette.primaryMid }
-        switch day.state {
-        case .completed: return AppPalette.primary
-        case .partial: return AppPalette.primaryMid
-        case .missed: return AppPalette.danger
-        case .planned, .rest: return AppPalette.secondaryInk
-        }
+        let event = hasEvent ? ", 개인 일정 있음" : ""
+        let learning = LearningActivityLevel.accessibilityText(completedSets: completedSets)
+        return "\(date) \(weekday), \(today)\(learning)\(event)"
     }
 }

@@ -13,7 +13,7 @@ import UserNotifications
 struct PlannerEventReminderModelTests {
     private func makePersistence() throws -> PersistenceService {
         let container = try ModelContainer(
-            for: PlannerEventRecord.self, PlannerDayNoteRecord.self,
+            for: PlannerEventRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let service = PersistenceService()
@@ -153,7 +153,7 @@ struct PlannerEventReminderPlanTests {
     /// A. 무료도 일정 CRUD는 그대로 쓴다. 잠기는 것은 알림 옵션뿐이다.
     @Test func freeKeepsEventCrudAndOnlyLosesTheReminder() throws {
         let container = try ModelContainer(
-            for: PlannerEventRecord.self, PlannerDayNoteRecord.self,
+            for: PlannerEventRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let persistence = PersistenceService()
@@ -495,7 +495,7 @@ struct PlannerEventReminderEntitlementChangeTests {
     /// C. 일정과 골라 둔 알림 설정은 지우지 않는다. 다시 결제하면 그대로 살아난다.
     @Test func downgradeKeepsEventDataAndReminderChoice() throws {
         let container = try ModelContainer(
-            for: PlannerEventRecord.self, PlannerDayNoteRecord.self,
+            for: PlannerEventRecord.self,
             configurations: ModelConfiguration(isStoredInMemoryOnly: true)
         )
         let persistence = PersistenceService()

@@ -2,7 +2,7 @@ import SwiftUI
 import SwiftData
 
 /// 전체 캘린더. 플래너 홈에서 밀어낸 월간 격자가 사는 곳이다.
-/// 날짜를 누르면 하루 상세(`PlannerDayDetailView`)로 간다.
+/// 날짜를 누르면 홈의 주간 스트립과 **같은** 하루 시트가 열린다 — 여기서도 화면을 밀어내지 않는다.
 struct PlannerFullCalendarView: View {
     let settings: StudyPlanSettings
     let schedule: StudySchedule
@@ -10,9 +10,11 @@ struct PlannerFullCalendarView: View {
     /// 학습 계획 타임존 기준의 오늘. 기기 시계로 다시 구하면 여행 중에 다른 칸이 오늘이 된다.
     let today: Date
 
-    /// 개인 일정·메모가 있는 날에만 작은 표시를 얹는다. 격자를 시끄럽게 만들지 않는다.
+    /// 날짜를 누르면 알려만 준다. 시트는 플래너 뿌리 한 곳에서만 띄운다.
+    let onSelectDate: (String) -> Void
+
+    /// 개인 일정이 있는 날에만 작은 표시를 얹는다. 격자를 시끄럽게 만들지 않는다.
     @Query private var events: [PlannerEventRecord]
-    @Query private var notes: [PlannerDayNoteRecord]
 
     @State private var monthOffset = 0
 
@@ -72,7 +74,6 @@ struct PlannerFullCalendarView: View {
     private var monthGrid: some View {
         // 날짜 칸마다 다시 만들면 한 달에 30번 도는 일이다. 격자를 그리기 전에 한 번만 만든다.
         let eventDates = Set(events.map(\.localDate))
-        let noteDates = Set(notes.map(\.localDate))
         let startOfToday = calendar.startOfDay(for: today)
         return LazyVGrid(
             columns: Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7),
@@ -90,17 +91,19 @@ struct PlannerFullCalendarView: View {
             }
             ForEach(days) { day in
                 let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
-                NavigationLink(value: PlannerRoute.dayDetail(for: day.date, timeZone: settings.timeZone)) {
+                Button {
+                    onSelectDate(key)
+                } label: {
                     StudyDayCell(
                         day: day,
                         calendar: calendar,
                         isToday: day.date == startOfToday,
                         hasEvent: eventDates.contains(key),
-                        hasNote: noteDates.contains(key)
+                        showsWeekday: false
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("하루 상세를 봅니다")
+                .accessibilityHint("하루 정보를 봅니다")
             }
         }
     }
@@ -113,16 +116,12 @@ struct PlannerFullCalendarView: View {
             .foregroundStyle(AppPalette.secondaryInk)
     }
 
+    /// 여섯 줄짜리 범례 대신 한 줄. 칸이 말하는 것이 하나뿐이라 설명도 하나면 된다.
     private var legend: some View {
-        // 색약 사용자를 위해 기호와 문구를 함께 설명한다.
-        HStack(spacing: AppSpacing.md) {
-            ForEach(StudyDayState.allCases, id: \.rawValue) { state in
-                Label(state.title, systemImage: state.symbolName)
-                    .font(AppTypography.caption)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .fixedSize(horizontal: false, vertical: true)
+        Text("학습 횟수가 많을수록 날짜가 진하게 표시돼요.")
+            .font(AppTypography.caption)
+            .foregroundStyle(AppPalette.secondaryInk)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }

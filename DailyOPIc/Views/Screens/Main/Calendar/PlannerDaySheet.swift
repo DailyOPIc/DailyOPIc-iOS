@@ -1,18 +1,29 @@
 import SwiftUI
 import SwiftData
 
-/// 하루 상세. 전체 캘린더에서 날짜를 누르면 여기로 온다.
+/// 시트를 여닫는 값. 날짜 정체성은 "yyyy-MM-dd" 문자열 그대로다 —
+/// Date로 실으면 기기 타임존이 바뀔 때 다른 날이 열린다.
+struct PlannerSelectedDate: Identifiable, Hashable {
+    let id: String
+
+    init(_ localDate: String) { id = localDate }
+}
+
+/// 하루 시트. 주간 스트립에서든 전체 캘린더에서든 날짜를 누르면 이것이 올라온다.
 ///
-/// 세 가지를 확실히 구분한다.
+/// 화면을 밀어내지 않는 것이 요점이다(P10). 확인하고 아래로 내리면 사용자는 보던 자리에
+/// 그대로 남는다 — 뒤로 가기를 눌러 달력으로 돌아올 필요가 없다.
+///
+/// 두 가지를 구분한다.
 /// - 학습 기록: DailyOPIc 학습으로만 생기는 사실. 여기서는 **읽기만** 한다.
 /// - 개인 일정: 사용자가 만든 일정. 이 기기에만 저장한다.
-/// - 메모: 날짜당 하나인 자유 메모. 이 기기에만 저장한다.
-struct PlannerDayDetailView: View {
-    /// 이 화면의 날짜 정체성. Date가 아니라 "yyyy-MM-dd"다(타임존이 바뀌어도 같은 날).
+struct PlannerDaySheet: View {
+    /// 이 시트의 날짜 정체성. Date가 아니라 "yyyy-MM-dd"다(타임존이 바뀌어도 같은 날).
     let localDate: String
     /// 격자와 같은 계산에서 나온 그날의 학습 상태. 여기서 다시 계산하지 않는다.
     let day: StudyDay
     let isStudyWeekday: Bool
+    let isToday: Bool
     /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 날짜·요일이 하루 어긋난다.
     let calendar: Calendar
     let persistence: PersistenceService
@@ -24,18 +35,14 @@ struct PlannerDayDetailView: View {
     let onPlannerEventsChanged: () -> Void
 
     @Query private var events: [PlannerEventRecord]
-    @Query private var notes: [PlannerDayNoteRecord]
 
     @State private var editingEvent: PlannerEventDraft?
-    /// nil이면 아직 저장된 메모를 읽기 전이다. 읽기 전에 빈 문자열로 덮어써서 지우면 안 된다.
-    @State private var memoText: String?
-    /// 메모 입력 중인지. 키보드를 내릴 방법이 이 화면에 하나는 있어야 한다.
-    @FocusState private var isEditingMemo: Bool
 
     init(
         localDate: String,
         day: StudyDay,
         isStudyWeekday: Bool,
+        isToday: Bool,
         calendar: Calendar,
         persistence: PersistenceService,
         reminders: StudyReminderService,
@@ -45,44 +52,31 @@ struct PlannerDayDetailView: View {
         self.localDate = localDate
         self.day = day
         self.isStudyWeekday = isStudyWeekday
+        self.isToday = isToday
         self.calendar = calendar
         self.persistence = persistence
         self.reminders = reminders
         self.canUseEventReminder = canUseEventReminder
         self.onPlannerEventsChanged = onPlannerEventsChanged
         _events = Query(filter: #Predicate<PlannerEventRecord> { $0.localDate == localDate })
-        _notes = Query(filter: #Predicate<PlannerDayNoteRecord> { $0.localDate == localDate })
     }
 
     private var sortedEvents: [PlannerEventRecord] { PlannerEventRecord.sorted(events) }
-    private var storedMemo: String { notes.first?.text ?? "" }
-    private var isMemoDirty: Bool {
-        guard let memoText else { return false }
-        return memoText.trimmingCharacters(in: .whitespacesAndNewlines) != storedMemo
-    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.xl) {
+            VStack(alignment: .leading, spacing: AppSpacing.lg) {
+                Text(titleText)
+                    .font(AppTypography.sectionTitle)
+                    .accessibilityAddTraits(.isHeader)
                 studySection
+                // P11: 그날 학습한 문제 목록이 여기, 학습과 개인 일정 사이에 들어온다.
                 eventSection
-                memoSection
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppSpacing.lg)
         }
-        // 메모를 쓰다 보면 키보드가 화면을 덮는다. 스크롤로도, 완료 버튼으로도 내릴 수 있게 둔다.
-        .scrollDismissesKeyboard(.interactively)
-        .toolbar {
-            ToolbarItemGroup(placement: .keyboard) {
-                Spacer()
-                Button("완료") { isEditingMemo = false }
-            }
-        }
-        .navigationTitle(titleText)
-        .navigationBarTitleDisplayMode(.inline)
-        .task { if memoText == nil { memoText = storedMemo } }
-        // 뒤로 나갈 때 한 번 저장한다. 타이핑 한 글자마다 저장하지 않는다.
-        .onDisappear { saveMemoIfNeeded() }
+        // 편집기는 시트 위의 시트다. 닫으면 이 시트로 돌아오고, 달력은 그대로 뒤에 남아 있다.
         .sheet(item: $editingEvent) { draft in
             PlannerEventEditor(
                 draft: draft,
@@ -121,17 +115,12 @@ struct PlannerDayDetailView: View {
     }
 
     private var studySection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("학습 기록")
-                .font(AppTypography.sectionTitle)
-            if let setsText {
-                Text(setsText)
-                    .font(AppTypography.title)
-                    .accessibilityLabel(setsAccessibilityText ?? setsText)
-            }
-            Label(status.title, systemImage: status.symbolName)
-                .font(AppTypography.callout)
-                .foregroundStyle(statusTint)
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text("학습")
+                .font(AppTypography.caption)
+                .foregroundStyle(AppPalette.secondaryInk)
+            Text(status.summaryText(day: day, isToday: isToday))
+                .font(AppTypography.body)
             // 손으로 체크할 수 없다는 사실을 한 줄로 밝힌다.
             Text("학습 기록은 실제 Daily 학습으로만 기록돼요.")
                 .font(AppTypography.footnote)
@@ -141,31 +130,13 @@ struct PlannerDayDetailView: View {
         .cardStyle()
     }
 
-    /// 배정이 없던 날에 가짜 목표를 만들어 붙이지 않는다("1 / 0세트"도, "1 / 1세트 완료"도 아니다).
-    /// 휴식일에 그냥 학습한 날은 한 일만 있는 그대로 말한다.
-    private var setsText: String? {
-        day.setsSummaryText.map { "Daily \($0)" }
-    }
-
-    private var setsAccessibilityText: String? {
-        guard day.targetSets > 0 else { return nil }
-        return "Daily \(day.targetSets)세트 중 \(day.completedSets)세트 완료"
-    }
-
-    private var statusTint: Color {
-        switch status {
-        case .completed: AppPalette.primary
-        case .partial: AppPalette.primaryMid
-        case .missed, .scheduled, .rest, .unplanned: AppPalette.secondaryInk
-        }
-    }
-
     // MARK: 개인 일정
 
     private var eventSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("개인 일정")
-                .font(AppTypography.sectionTitle)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppPalette.secondaryInk)
             if sortedEvents.isEmpty {
                 Text("아직 등록한 일정이 없어요.")
                     .font(AppTypography.footnote)
@@ -175,14 +146,14 @@ struct PlannerDayDetailView: View {
                     eventRow(event)
                 }
             }
-            Button("일정 추가", systemImage: "plus") {
+            Button("개인 일정 추가", systemImage: "plus") {
                 editingEvent = PlannerEventDraft(isNew: true)
             }
             .font(AppTypography.callout)
             .minimumTouchTarget()
-            .accessibilityLabel("일정 추가")
+            .accessibilityLabel("개인 일정 추가")
             .accessibilityHint("\(titleText)에 개인 일정을 추가합니다")
-            Text("일정과 메모는 이 기기에 저장돼요.")
+            Text("개인 일정은 이 기기에 저장돼요.")
                 .font(AppTypography.footnote)
                 .foregroundStyle(AppPalette.secondaryInk)
         }
@@ -227,48 +198,6 @@ struct PlannerDayDetailView: View {
             event.time.map { "\($0.displayText), \(event.title)" } ?? "시간 없음, \(event.title)"
         )
         .accessibilityHint("일정을 수정하거나 삭제합니다")
-    }
-
-    // MARK: 메모
-
-    private var memoSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("메모")
-                .font(AppTypography.sectionTitle)
-            TextEditor(
-                text: Binding(
-                    get: { memoText ?? storedMemo },
-                    set: { memoText = $0 }
-                )
-            )
-            .frame(minHeight: 120)
-            .font(AppTypography.body)
-            .focused($isEditingMemo)
-            .scrollContentBackground(.hidden)
-            .padding(AppSpacing.sm)
-            .background(AppPalette.surface)
-            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
-            .accessibilityLabel("메모")
-            if isMemoDirty {
-                // 저장 시점을 사용자가 알 수 있게 버튼을 둔다(뒤로 나가도 한 번 더 저장한다).
-                Button("메모 저장") { saveMemoIfNeeded() }
-                    .font(AppTypography.callout)
-                    .minimumTouchTarget()
-            } else if !storedMemo.isEmpty {
-                // 버튼이 사라진 것만으로는 저장됐는지 알 수 없다. 상태를 한 줄로 말해 준다.
-                Label("저장됨", systemImage: "checkmark.circle")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
-    /// 공백만 남았으면 메모를 지운다(= 메모 없음). 저장은 명시적 버튼과 화면 이탈에서만 한다.
-    private func saveMemoIfNeeded() {
-        guard let memoText, isMemoDirty else { return }
-        try? persistence.savePlannerNote(localDate: localDate, text: memoText)
     }
 }
 
