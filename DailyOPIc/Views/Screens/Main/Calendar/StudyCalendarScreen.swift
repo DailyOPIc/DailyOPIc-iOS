@@ -127,6 +127,7 @@ struct StudyCalendarScreen: View {
                 ),
                 isStudyWeekday: settings.isStudyDay(date),
                 isToday: settings.calendar.startOfDay(for: date) == snapshot.today.date,
+                isExamDay: settings.isExamDay(date),
                 calendar: settings.calendar,
                 persistence: persistence,
                 reminders: viewModel.studyReminders,

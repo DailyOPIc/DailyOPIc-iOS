@@ -172,6 +172,8 @@ struct PlannerHomeView: View {
                         day: day,
                         calendar: settings.calendar,
                         isToday: day.date == snapshot.today.date,
+                        // 시험일 판정은 설정 한 곳에서만 온다. 전체 캘린더도 같은 것을 묻는다.
+                        isExamDay: settings.isExamDay(day.date),
                         hasEvent: eventDates.contains(key)
                     )
                 }
@@ -294,6 +296,9 @@ struct StudyDayCell: View {
     /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 요일·날짜가 하루 어긋날 수 있다.
     let calendar: Calendar
     var isToday = false
+    /// 설정한 OPIc 시험일인지(P12). 학습량 채우기·오늘 테두리와 **별개 채널**이라
+    /// 별이 켜져도 히트맵 진하기는 그대로다.
+    var isExamDay = false
     /// 개인 일정이 있는지. 학습량과 헷갈리지 않게 원 **바깥**에 아주 작게 찍는다.
     var hasEvent = false
     /// 월간 격자에는 요일 머리글이 따로 있다. 칸마다 또 쓰면 격자가 시끄러워진다.
@@ -338,8 +343,26 @@ struct StudyDayCell: View {
                     .strokeBorder(AppPalette.primary, lineWidth: 2)
                     .frame(width: fillDiameter + 8, height: fillDiameter + 8)
             }
+            if isExamDay { examStar }
         }
         .frame(width: fillDiameter + 8, height: fillDiameter + 8)
+    }
+
+    /// 시험일 별. 칸을 덮지 않게 오른쪽 위 모서리에 작게 얹는다 —
+    /// 숫자와 학습량이 먼저 읽히고 별은 그다음이다.
+    /// 빨강은 실제 오류에만 쓴다. 시험이 있다는 사실은 오류가 아니다.
+    private var examStar: some View {
+        Image(systemName: "star.fill")
+            .font(.system(size: 9))
+            .foregroundStyle(AppPalette.primary)
+            .padding(1)
+            // 진한 학습량 채우기 위에 겹쳐도 별이 묻히지 않게 카드와 같은 바탕을 깐다.
+            .background(.background, in: Circle())
+            .frame(
+                width: fillDiameter + 8, height: fillDiameter + 8,
+                alignment: .topTrailing
+            )
+            .accessibilityHidden(true)
     }
 
     /// 개인 일정 표시. 학습 진하기와 섞이지 않게 원 아래 작은 점 하나로만 둔다.
@@ -356,24 +379,28 @@ struct StudyDayCell: View {
             date: day.date.formatted(.dateTime.month().day()),
             weekday: StudyWeekday.from(date: day.date, calendar: calendar).accessibilityLabel,
             isToday: isToday,
+            isExamDay: isExamDay,
             completedSets: day.completedSets,
             hasEvent: hasEvent
         )
     }
 
-    /// 오늘 여부도, 학습량도 색으로만 알리면 안 된다. 한 문장으로 조립해 읽어 준다.
+    /// 오늘 여부도, 학습량도, 시험일도 모양·색으로만 알리면 안 된다. 한 문장으로 조립해 읽어 준다.
     /// 읽어 주는 것은 실제로 한 일이다 — 색 이름도 단계 번호도 말하지 않는다.
+    /// 시험일은 "별표"가 아니라 "OPIc 시험일"로 읽는다. 별은 표현이고 의미가 아니다.
     /// (뷰를 그리지 않고도 확인할 수 있게 순수 함수로 둔다.)
     static func accessibilityText(
         date: String,
         weekday: String,
         isToday: Bool,
+        isExamDay: Bool = false,
         completedSets: Int,
         hasEvent: Bool
     ) -> String {
         let today = isToday ? "오늘, " : ""
+        let exam = isExamDay ? "OPIc 시험일, " : ""
         let event = hasEvent ? ", 개인 일정 있음" : ""
         let learning = LearningActivityLevel.accessibilityText(completedSets: completedSets)
-        return "\(date) \(weekday), \(today)\(learning)\(event)"
+        return "\(date) \(weekday), \(today)\(exam)\(learning)\(event)"
     }
 }

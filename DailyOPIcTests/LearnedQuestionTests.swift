@@ -480,7 +480,10 @@ struct LearnedQuestionPresentationTests {
 
     /// 학습한 문제 칸은 학습 요약과 개인 일정 **사이**에 있다.
     @Test func questionSectionSitsBetweenStudyAndEvents() throws {
-        #expect(PlannerDaySheetSection.allCases == [.study, .learnedQuestions, .personalEvents])
+        #expect(
+            PlannerDaySheetSection.allCases
+                == [.examDay, .study, .learnedQuestions, .personalEvents]
+        )
         let order = PlannerDaySheetSection.allCases
         let study = try #require(order.firstIndex(of: .study))
         let questions = try #require(order.firstIndex(of: .learnedQuestions))
@@ -495,9 +498,9 @@ struct LearnedQuestionPresentationTests {
         #expect(PlannerRoute.allCases.count == 2)
     }
 
-    /// 메모는 돌아오지 않았다. 시트의 칸은 셋뿐이고 자유 입력 칸은 없다.
+    /// 메모는 돌아오지 않았다. 칸은 P12에서 시험일 안내 하나만 늘었고 자유 입력 칸은 없다.
     @Test func noMemoSectionReturns() {
-        #expect(PlannerDaySheetSection.allCases.count == 3)
+        #expect(PlannerDaySheetSection.allCases.count == 4)
         #expect(
             Schema.dailyOPIc.entities.map(\.name).contains("PlannerDayNoteRecord") == false
         )

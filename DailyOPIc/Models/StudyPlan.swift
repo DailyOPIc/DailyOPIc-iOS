@@ -189,6 +189,19 @@ struct StudyPlanSettings: Codable, Equatable, Sendable {
         studyWeekdays.contains(StudyWeekday.from(date: date, calendar: calendar))
     }
 
+    /// 시험일의 정체성(P12). 절대 시각이 아니라 학습 계획 타임존의 달력 날짜다 —
+    /// 기기 타임존이 바뀌어도 별이 옆 칸으로 넘어가면 안 된다.
+    var examLocalDate: String? {
+        examDate.map { LocalCalendarDate.text(from: $0, timeZone: timeZone) }
+    }
+
+    /// 주간 스트립·전체 캘린더·하루 시트가 **모두** 이 하나만 묻는다.
+    /// 시험일 비교를 화면마다 다시 쓰면 같은 날에 별이 켜졌다 꺼졌다 한다.
+    func isExamDay(_ date: Date) -> Bool {
+        guard let examLocalDate else { return false }
+        return examLocalDate == LocalCalendarDate.text(from: date, timeZone: timeZone)
+    }
+
     // 서버 계약: examDate는 "yyyy-MM-dd", preferredStudyTime은 "HH:mm",
     // studyWeekdays는 정렬된 ISO 요일 배열. 두 필드 모두 절대 시각이 아니라
     // 사용자의 로컬 값이므로 Date/ISO8601로 실어 보내면 타임존만큼 밀린다.

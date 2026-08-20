@@ -12,6 +12,9 @@ struct PlannerSelectedDate: Identifiable, Hashable {
 /// 하루 시트의 칸 순서. 순서가 화면 안에 흩어져 있으면 나중에 칸을 하나 끼워 넣을 때
 /// 어디에 넣어야 하는지 코드가 말해 주지 못한다. 여기 한 줄이 그 답이다.
 enum PlannerDaySheetSection: Int, CaseIterable, Sendable {
+    /// 시험일에만 나타난다(P12). 그날의 첫 번째 맥락은 학습 기록이 아니라 시험이라
+    /// 학습 요약보다 **위**에 둔다.
+    case examDay
     case study
     /// P10에서 비워 둔 자리. P11에서 실제 학습한 문제가 들어왔다.
     case learnedQuestions
@@ -33,6 +36,8 @@ struct PlannerDaySheet: View {
     let day: StudyDay
     let isStudyWeekday: Bool
     let isToday: Bool
+    /// 설정한 OPIc 시험일인지(P12). 캘린더 별과 **같은** 판정(`StudyPlanSettings.isExamDay`)에서 온다.
+    let isExamDay: Bool
     /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 날짜·요일이 하루 어긋난다.
     let calendar: Calendar
     let persistence: PersistenceService
@@ -55,6 +60,7 @@ struct PlannerDaySheet: View {
         day: StudyDay,
         isStudyWeekday: Bool,
         isToday: Bool,
+        isExamDay: Bool,
         calendar: Calendar,
         persistence: PersistenceService,
         reminders: StudyReminderService,
@@ -65,6 +71,7 @@ struct PlannerDaySheet: View {
         self.day = day
         self.isStudyWeekday = isStudyWeekday
         self.isToday = isToday
+        self.isExamDay = isExamDay
         self.calendar = calendar
         self.persistence = persistence
         self.reminders = reminders
@@ -129,9 +136,98 @@ struct PlannerDaySheet: View {
     @ViewBuilder
     private func view(for section: PlannerDaySheetSection) -> some View {
         switch section {
+        case .examDay: examDaySection
         case .study: studySection
         case .learnedQuestions: learnedQuestionSection
         case .personalEvents: eventSection
+        }
+    }
+
+    // MARK: OPIc 시험일 (P12 · 정적 안내)
+
+    /// 설정한 시험일에만 나타난다. 담는 것은 정적 안내뿐이라 저장도 네트워크도 없다.
+    ///
+    /// 지난 시험일에도 같은 내용이 그대로 뜬다 — 그래서 "곧 시험이에요" 같은
+    /// 남은 날짜 표현을 쓰지 않는다. D-day는 플래너 홈이 이미 말한다.
+    @ViewBuilder
+    private var examDaySection: some View {
+        if isExamDay {
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
+                Label(OPIcExamDayGuide.sectionTitle, systemImage: "star.fill")
+                    .font(AppTypography.sectionTitle)
+                    .accessibilityAddTraits(.isHeader)
+                officialRuleGroup
+                tipGroup
+                Text(OPIcExamDayGuide.footer)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                // 사용자가 직접 누를 때만 열린다. 체크리스트 자체는 이 링크 없이도 다 읽힌다.
+                Link(OPIcExamDayGuide.officialLinkTitle, destination: OPIcExamDayGuide.officialLink)
+                    .font(AppTypography.callout)
+                    .minimumTouchTarget()
+                    .accessibilityHint("사파리에서 OPIc 공식 안내를 엽니다")
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+    }
+
+    /// 공식 규정. DailyOPIc 권장과 섞이지 않도록 제목을 따로 달고 체크 기호로만 쓴다.
+    private var officialRuleGroup: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text(OPIcExamDayGuide.officialTitle)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppPalette.secondaryInk)
+            ForEach(OPIcExamDayGuide.officialRules) { rule in
+                HStack(alignment: .top, spacing: AppSpacing.sm) {
+                    Image(systemName: rule.symbol)
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.primary)
+                        .frame(width: 20)
+                        .accessibilityHidden(true)
+                    VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                        Text(rule.title)
+                            .font(AppTypography.body)
+                        Text(rule.detail)
+                            .font(AppTypography.footnote)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+            }
+            // 신분증 표를 다 펼치면 정작 볼 것이 안 보인다. 접어 두고 필요할 때만 편다.
+            DisclosureGroup(OPIcExamDayGuide.acceptedIDTitle) {
+                Text(OPIcExamDayGuide.acceptedIDExamples)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .font(AppTypography.footnote)
+        }
+    }
+
+    /// DailyOPIc 권장. 공식 규정처럼 보이면 안 되므로 제목·기호·문장을 모두 다르게 둔다.
+    private var tipGroup: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text(OPIcExamDayGuide.tipsTitle)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppPalette.secondaryInk)
+            ForEach(OPIcExamDayGuide.dailyOPIcTips, id: \.self) { tip in
+                HStack(alignment: .top, spacing: AppSpacing.sm) {
+                    Text("•")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                        .accessibilityHidden(true)
+                    Text(tip)
+                        .font(AppTypography.footnote)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+            }
         }
     }
 

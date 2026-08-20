@@ -2613,6 +2613,7 @@ TestFlight와 판별 불가(unknown)는 요청하지 않는다. 테스트는 배
 | `LearnedQuestion` · `LearnedQuestionSection` (P11) | 순수 값·순수 함수. 시각 문자열(`19:12`)과 VoiceOver 문장을 여기서 만든다 |
 | `PlannerLearnedQuestionRecord` (P11.1) | 로컬 SwiftData 사본. 문제 문장·시각·분류만. 366일 |
 | `PersistenceService` (P11.1) | 쓰기(`savePractice`와 같은 저장) · 백필 · 366일 정리 · 하루치 조회 · `deleteAllHistory` |
+| `StudyPlanSettings.isExamDay` · `OPIcExamDayGuide` (P12) | 순수 판정 하나 + 정적 콘텐츠 하나. 저장도 조회도 없다 (§34.11.1) |
 
 `PersistenceService`는 `MainTabView` → `StudyCalendarScreen` 인자 하나로 내려온다.
 새 리포지토리 추상화를 만들지 않는다.
@@ -2688,6 +2689,102 @@ Dynamic Type을 키우면 원도 같이 자란다.
 `"19시 12분, 집에서 보내는 휴일에 대해 말해주세요."`. 기록 ID·세트 ID·문제 번호는
 접근성에 노출하지 않는다. 문제 문장은 최대 4줄까지 늘어나고(`fixedSize`) 시트가 스크롤한다 —
 무엇을 물었는지 알아볼 수 없을 만큼 잘라내지 않는다.
+
+---
+
+## 34.11.1 OPIc 시험일 — 별 · 시험 당일 안내 (P12)
+
+제품 규칙은 PRODUCT.md §22.11이 진실이다. 여기서는 계층과 판정만 다룬다.
+
+**시험일 진실은 하나다.** `StudyPlanSettings.examDate`뿐이다. 두 번째 설정도,
+시험일용 `PlannerEventRecord`도 만들지 않는다. 화면은 파생값 두 개만 묻는다.
+
+```swift
+extension StudyPlanSettings {
+    var examLocalDate: String?            // "yyyy-MM-dd" · 계획 타임존
+    func isExamDay(_ date: Date) -> Bool  // 주간 스트립 · 전체 캘린더 · 하루 시트가 같이 쓴다
+}
+```
+
+날짜 정체성은 절대 시각이 아니라 **학습 계획 타임존의 달력 날짜**다(§34.5와 같은 이유).
+`Date` 비교로 두면 기기 타임존이 바뀔 때 별이 하루 옆으로 밀린다.
+비교는 순수 로컬 계산이라 칸마다 저장소를 조회하지 않는다 — 캘린더는 한 달에 30번
+그려지므로 여기에 쿼리가 들어가면 안 된다.
+
+시험일이 파생값이라 **정리 작업이 필요 없다.** 설정에서 날짜를 바꾸면 옛 별은 그냥
+사라지고 새 날짜에 켜진다. 지워야 할 로컬 레코드가 없다.
+
+**칸의 채널 분리.** `StudyDayCell`이 그리는 네 가지는 서로 독립이다(P10 언어를 깨지 않는다).
+
+| 채널 | 재료 | P12에서 바뀐 것 |
+|---|---|---|
+| 날짜 숫자 | `day.date` | 없음 |
+| 채우기 진하기 | `LearningActivityLevel.make(completedSets:)` | 없음 |
+| 바깥 테두리 | `isToday` | 없음 |
+| **별(★)** | **`isExamDay`** | **추가** |
+| 아래 작은 점 | `hasEvent` | 없음 |
+
+별은 `star.fill` 9pt를 오른쪽 위 모서리에 얹고 바탕을 한 겹 깐다 —
+진한 학습량 채우기 위에서도 묻히지 않게 하되, 숫자와 히트맵이 먼저 읽히도록
+장식은 이만큼에서 멈춘다. 빨강·깜빡임·애니메이션·큰 배지는 쓰지 않는다.
+시험이 있다는 사실은 오류가 아니므로 오류 색을 빌려 오지 않는다.
+
+**접근성.** 별은 `accessibilityHidden`이고 뜻은 문장으로 들어간다.
+`StudyDayCell.accessibilityText(date:weekday:isToday:isExamDay:completedSets:hasEvent:)`
+한 곳에서 조립한다 — `"8월 25일 화요일, 오늘, OPIc 시험일, 3회 학습, 개인 일정 있음"`.
+"별표"라고 읽지 않는다. 모양은 표현이고 뜻은 "OPIc 시험일"이다.
+`isExamDay`에 기본값을 둬서 P10 시절 호출부와 문장이 그대로 유지된다.
+
+**시트 계층.** `PlannerDaySheetSection`에 `.examDay`를 **맨 앞**에 넣었다.
+
+```
+날짜 → ★ OPIc 시험일 → 학습 요약 → 학습한 문제 → 개인 일정
+```
+
+그 날짜의 첫 맥락이 학습 기록이 아니라 시험이라서다. 시험일이 아니면 이 칸은
+`EmptyView()`라 P11 시트와 완전히 같다. 새 화면도 `PlannerRoute`도 늘지 않았다
+(시트는 여전히 플래너 뿌리에 하나).
+
+**콘텐츠 계층.** 문자열을 SwiftUI에 흩지 않고 `OPIcExamDayGuide` 한 곳에 모았다.
+
+```swift
+struct ExamGuideItem { let title: String; let detail: String; let symbol: String }
+
+enum OPIcExamDayGuide {
+    static let officialRules: [ExamGuideItem]   // 공식 규정 요약
+    static let acceptedIDExamples: String       // 접어 둔 신분증 예시
+    static let dailyOPIcTips: [String]          // DailyOPIc 권장
+    static let footer, officialLink             // 재확인 안내 + 공식 링크
+}
+```
+
+정적·로컬·오프라인이다. Remote Config도 백엔드도 OpenAI도 런타임 크롤링도 쓰지 않는다.
+저장 모델을 추가하지 않았다 — 체크 상태를 남기지 않으므로 스키마는 P11.1 그대로 7개다.
+
+**공식 vs 권장.** 두 목록을 타입이 아니라 **목록으로** 가른다(`officialRules` / `dailyOPIcTips`).
+화면에서도 제목("공식 확인사항" / "DailyOPIc 시험 당일 팁")·기호(SF Symbol / •)·문체를
+모두 다르게 둔다. 권장이 규정처럼 보이는 것이 이 기능에서 가장 큰 사고다.
+테스트가 팁에서 점수 약속("합격", "보장", "고득점"…)과 공식 참칭("공식 규정", "ACTFL")을
+막고, 규정과 충돌하는 조언("메모지를 챙…", "문제를 메모하…")도 함께 막는다.
+
+**규정 출처 (2026-08-20 확인).** 규정은 바뀔 수 있고 앱은 이를 자동으로 받아오지 않는다.
+
+| 출처 | URL |
+|---|---|
+| 수험자 가이드 | `https://www.opic.or.kr/opics/servlet/controller.opic.site.guide.GuideServlet?p_process=move-exam-guide` |
+| 시험관리규정 | `https://www.opic.or.kr/opics/servlet/controller.opic.site.applyinfor.ActflTestRuleServlet?p_process=move-actfl_test_rule` |
+
+공식 출처에 의존하는 사용자 문장: 규정 신분증(모바일 신분증 조건 · 사본/캡처 불가 ·
+훼손 시 거부) · 입실 시간(시작 10분 전 1차 신분 확인 · 지각 시 응시 불가, 당일 연기·환불 불가) ·
+제한 물품(필기도구 책상 위 소지 자체가 규정 위반 · 전자기기 벨·진동 · 참고 자료 소지만으로도
+부정행위) · 문제 메모·녹음 금지(저작권 침해) · 장비 이상(감독관 즉시 고지) ·
+응시 유형별 인정 신분증 차이.
+
+식음료는 규정 조문에 항목으로 열거돼 있지 않아 "시험장·감독관 안내에 따라 정리"로 적었다.
+감독자 공지가 규정에 준하는 효력을 갖는다는 조항에 기대는 문장이라 단정적으로 쓰지 않았다.
+
+**알림 없음.** P12는 알림을 하나도 추가하지 않는다. P9의 "시험일에는 일반 학습 알림을
+건너뛴다"도 그대로다. 시험 당일에 앱이 먼저 말을 거는 것보다 플래너 카드로 충분하다.
 
 ---
 
@@ -2812,7 +2909,10 @@ View에 없다"를 격자까지 확장한 것이다.
 | 학습한 문제 366일 보관 | **P11.1에서 구현됨** | 가벼운 사본 `PlannerLearnedQuestionRecord` · 추가만 하는 스키마 변경 (§34.11) |
 | 분석 기록(전사·평가) 보관 연장 | 하지 않음 | 최근 50개 유지 · 플래너 때문에 무거운 기록을 늘리지 않는다 (§34.11) |
 | 학습한 문제의 서버 동기화 · 기기 간 공유 | 미구현 | 로컬 전용 (§34.11) |
-| 시험 당일 별 표시 · 체크리스트 · 팁 | 미구현 | P12 (§34.11) |
+| 시험 당일 별 표시 · 체크리스트 · 팁 | **P12에서 구현됨** | `StudyPlanSettings.isExamDay` 하나로 판정 · 정적 `OPIcExamDayGuide` (§34.11.1) |
+| 시험일 알림 | 미구현 | P12에서 의도적으로 넣지 않음 · P9의 "시험일 학습 알림 제외"도 그대로 (§34.11.1) |
+| 체크리스트 체크 상태 저장 | 하지 않음 | 안내 카드이지 할 일 관리가 아니다 · 새 모델 없음 (§34.11.1) |
+| 공식 규정 원격 업데이트 · 런타임 크롤링 | 미구현 | 앱에 내장된 정적 콘텐츠 · 카드가 재확인을 안내한다 (§34.11.1) |
 | 개인 일정 서버 동기화 | 미구현 | 로컬 SwiftData 전용 · 기기를 바꾸면 남지 않는다 (§34.11) |
 | Apple 캘린더(EventKit) 연동 | 미구현 | 개인 일정은 플래너 안에서만 산다 (§34.11) |
 | 취약점 복습 세트 자동 편성 | 미구현 | G8 범위 · 플래너는 세트 수만 배분한다 (§34.4) |

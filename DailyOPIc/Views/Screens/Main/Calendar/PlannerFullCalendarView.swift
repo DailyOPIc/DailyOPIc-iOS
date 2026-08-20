@@ -98,6 +98,7 @@ struct PlannerFullCalendarView: View {
                         day: day,
                         calendar: calendar,
                         isToday: day.date == startOfToday,
+                        isExamDay: settings.isExamDay(day.date),
                         hasEvent: eventDates.contains(key),
                         showsWeekday: false
                     )
