@@ -9,7 +9,7 @@ struct ProgressScreen: View {
         var id: Self { self }
     }
     let preferences: AppPreferences
-    @Environment(\.modelContext) private var modelContext
+    let persistence: PersistenceService
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
     private var practiceRecords: [PracticeHistoryRecord]
     @Query(sort: \MockHistoryRecord.createdAt, order: .reverse)
@@ -210,11 +210,10 @@ struct ProgressScreen: View {
         return (practice + mock).sorted { $0.date > $1.date }
     }
 
+    /// 삭제 목록은 `PersistenceService`에 한 곳으로 둔다 — 플래너의 문제 사본이
+    /// 여기서 빠지면 사용자가 지운 문제 문장이 하루 시트에 남는다.
     private func deleteAll() {
-        try? modelContext.delete(model: PracticeHistoryRecord.self)
-        try? modelContext.delete(model: MockHistoryRecord.self)
-        try? modelContext.delete(model: MockDraftRecord.self)
-        try? modelContext.save()
+        try? persistence.deleteAllHistory()
     }
 }
 

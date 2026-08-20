@@ -34,7 +34,7 @@ struct MainTabView: View {
             .tag(2)
 
             NavigationStack {
-                ProgressScreen(preferences: environment.preferences)
+                ProgressScreen(preferences: environment.preferences, persistence: environment.persistence)
             }
             .tabItem { Label("통계", systemImage: "chart.bar.fill") }
             .tag(3)

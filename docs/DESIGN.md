@@ -2498,7 +2498,7 @@ DEBUG 빌드와 영수증 파일명(`sandboxReceipt` = TestFlight/샌드박스)�
 TestFlight와 판별 불가(unknown)는 요청하지 않는다. 테스트는 배포 경로와 요청 동작을 모두
 주입해 **실제 네이티브 창을 띄우지 않는다**.
 
-## 34.11 하루 시트 · 개인 일정 · 학습량 히트맵 (P3 · 시트/히트맵 P10)
+## 34.11 하루 시트 · 학습한 문제 · 개인 일정 · 학습량 히트맵 (P3 · 시트/히트맵 P10 · 학습한 문제 P11 · 저장 P11.1)
 
 제품 규칙은 PRODUCT.md §22가 진실이다. 여기서는 화면과 계층만 다룬다.
 
@@ -2524,9 +2524,76 @@ TestFlight와 판별 불가(unknown)는 요청하지 않는다. 테스트는 배
 제목은 `"8월 20일 목요일"`을 직접 조립한다(`dateComponents` + `StudyWeekday.accessibilityLabel`).
 로케일 포맷터를 쓰면 계획 타임존과 기기 타임존이 어긋날 때 하루가 밀린다.
 
-**구성.** 위에서부터 ① 날짜 ② 학습 한 줄(읽기 전용) ③ 개인 일정.
-② 와 ③ 사이는 P11의 "학습한 문제" 자리다 — 지금은 주석 한 줄뿐이고
-가짜 자리표시 UI도, 가짜 문제 문자열도, 새 저장소도 넣지 않았다.
+**구성.** 위에서부터 ① 날짜 ② 학습 한 줄(읽기 전용) ③ 학습한 문제 ④ 개인 일정.
+순서는 뷰에 흩어진 코드 순서가 아니라 값 하나다 — `PlannerDaySheetSection`
+(`study` · `learnedQuestions` · `personalEvents`)을 `body`가 `ForEach`로 돌린다.
+화면을 그리지 않고 "문제 칸이 학습 요약과 일정 **사이**에 있다"를 테스트하기 위해서다.
+
+**학습한 문제 (P11 · 저장 P11.1).** P11은 `PracticeHistoryRecord`를 날짜로 잘라 보여줬다.
+그 자체는 맞았지만 **보관 창이 어긋난다** — 분석 기록은 최근 50개(`trimPracticeHistory`),
+플래너 이력은 366일(`trimStudyCompletions`). 하루 3세트면 2~3주 만에 "3회 학습"만 남고
+무슨 문제였는지가 사라진다. 그렇다고 전사·평가 덩어리를 1년 들고 있는 것은
+저장·프라이버시 양쪽에서 손해다.
+
+그래서 P11.1은 **문제 문장만 남기는 가벼운 사본** 하나를 추가했다.
+
+```swift
+@Model final class PlannerLearnedQuestionRecord {
+    @Attribute(.unique) var sourcePracticeHistoryID: UUID   // 원본 분석 기록 ID
+    var learnedAt: Date
+    var prompt: String        // 사용자가 본 그 문장
+    var kindLabel: String
+}
+```
+
+| 결정 | 이유 |
+|---|---|
+| 전사·평가·점수·등급·식별자 **미저장** | 플래너가 답할 질문은 "그날 무슨 문제를 풀었지?" 하나뿐이다. 나머지를 1년 들고 있을 이유가 없다 |
+| 풍부한 기록 50개 정책 **유지** | 늘리려면 전사·평가까지 함께 늘어난다. 필요한 것만 길게 남기는 쪽을 골랐다 |
+| 사본 보관 = **366일** | 완료 기록과 같은 창. 창이 어긋나면 P11.1이 없앤 그 불일치가 그대로 돌아온다 |
+| 키 = `sourcePracticeHistoryID` (unique) | 한 번의 성공 = 한 줄. 백필을 몇 번 돌려도 결과가 같다 |
+| (분 + 문장) 접기 **삭제** | 같은 분에 같은 문제를 두 번 성공한 것은 진짜 두 번이다. P11의 추정은 사실을 지웠다 |
+| `localDate` 문자열을 **저장하지 않음** | 히트맵·연속 학습이 `completedAt`을 **읽는 시점에** 계획 타임존으로 자르는 것과 같은 규칙. 문제만 날짜를 굳혀 두면 계획 타임존을 바꾼 뒤 칸과 시트가 서로 다른 날을 가리킨다 |
+| 날짜 경계 = `StudyPlanSettings.timeZone` | 기기 타임존도 UTC도 아니다. 여행해도 히트맵 칸과 같은 날을 보여 준다 |
+| 표시 문장 = `question.prompt` | `QuestionCard`가 띄운 바로 그 문자열. 주제·ID에서 다시 만들지 않으므로 없던 문제를 지어낼 수 없다 |
+| 분류 라벨 = `questionStyle?.label ?? examSection.label` | 문제 카드와 **같은 식**. 내부 코드값은 노출하지 않는다 |
+
+**쓰기는 한 곳뿐이다.** `PersistenceService.savePractice(...)`가 분석 기록과 사본을
+**같은 `context.save()`** 에 함께 넣는다. 실패·중도 이탈·모의고사·개인 일정은 이 경로에
+오지 못한다. 문제 문장을 못 읽으면(디코딩 실패) 사본을 만들지 않는다 — 무슨 문제였는지
+모르는 줄은 없느니만 못하다.
+
+**백필.** `backfillLearnedQuestions(now:)`는 남아 있는 `PracticeHistoryRecord`(최대 50개)의
+문제 문장을 사본으로 옮긴다. 로컬 · 네트워크 없음 · 원본 ID가 유니크라 몇 번 돌려도
+같은 결과다. 호출 지점은 `AppRootView`의 `configure(context:)` 바로 뒤 한 곳이고,
+캘린더 칸이나 시트 렌더에서는 부르지 않는다. **없는 과거는 만들지 않는다** — 이미 잘려
+나간 학습은 완료 기록만 남아 있으므로 그날은 계속 `unavailable`이다.
+
+**읽기.** `learnedQuestions(on:timeZone:)`은 이제 사본만 `learnedAt` 범위로 조회한다.
+제목 한 줄을 보여주자고 전사·평가 blob을 디코딩하지 않는다. 선택한 날짜 하루치만 읽고,
+캘린더 칸은 이 조회를 하지 않는다.
+
+세트 하나에 문제가 여럿이므로 **줄 수 ≠ 완료 세트 수**다. 히트맵·연속 학습·주간 진행·
+알림 취소·토큰 집계는 여전히 `StudySetCompletionRecord`만 본다 — 사본은 **표시 전용**이다.
+
+로딩과 빈 상태를 구분하려고 시트 상태는 `[LearnedQuestion]?`이고(`nil` = 아직 안 읽음),
+`.task(id: localDate)`가 채운다. 그리는 상태는 순수 함수
+`LearnedQuestionSection.make(questions:completedSets:)` → `hidden` / `questions` / `unavailable`
+하나로 정한다(뷰 없이 테스트).
+
+**삭제.** 기록 탭의 `전체 삭제`는 이제 `PersistenceService.deleteAllHistory()` 한 곳이고,
+분석 기록·모의고사·초안과 **함께 사본도 지운다**. 사용자가 지운 문제 문장이 플래너에
+남아 있으면 안 된다. 완료 기록(`StudySetCompletionRecord`)은 기존 정책대로 남으므로
+달력의 학습량은 그대로이고, 그날 시트는 `unavailable`로 돌아간다. 개별 기록 삭제 UI는
+존재하지 않는다(전체 삭제뿐) — 생긴다면 같은 원칙으로 사본도 함께 지워야 한다.
+
+**없는 날.** `unavailable`은 원인을 특정하지 않는 한 문장으로만 말한다
+("이전 버전"이라고 단정하면 366일을 넘긴 경우·전체 삭제한 경우에 거짓말이 된다).
+완료 수가 0이면 아무것도 그리지 않는다.
+
+문제 문장은 **로컬 UI에만** 쓴다. 로그·`AppTelemetry`·알림 진단·백엔드 요청·RevenueCat
+속성 어디에도 넣지 않고, 답변·전사·오디오의 사본도 만들지 않는다.
+읽기는 전부 로컬이라 네트워크가 없어도 열린다.
 
 **학습 상태는 두 번 계산하지 않는다.** `StudyCalendarScreen`이 격자와 **같은**
 `StudyCalendarEngine.day(...)` 호출로 `StudyDay`를 만들어 넘기고, 시트는
@@ -2543,13 +2610,18 @@ TestFlight와 판별 불가(unknown)는 요청하지 않는다. 테스트는 배
 | `PlannerEventRecord` | 로컬 SwiftData 모델. 키는 `localDate` 문자열, 시각은 `timeMinutes`(자정 이후 분), 알림은 `reminderOffsetMinutes: Int?` |
 | `PersistenceService` | 쓰기 전담 — 저장·수정·삭제, 제목 트림/빈 값 거부 |
 | `PlannerDaySheet` · `PlannerFullCalendarView` | `@Query`로 읽기만 한다(기존 `StudyCalendarScreen` 관례 그대로) |
+| `LearnedQuestion` · `LearnedQuestionSection` (P11) | 순수 값·순수 함수. 시각 문자열(`19:12`)과 VoiceOver 문장을 여기서 만든다 |
+| `PlannerLearnedQuestionRecord` (P11.1) | 로컬 SwiftData 사본. 문제 문장·시각·분류만. 366일 |
+| `PersistenceService` (P11.1) | 쓰기(`savePractice`와 같은 저장) · 백필 · 366일 정리 · 하루치 조회 · `deleteAllHistory` |
 
 `PersistenceService`는 `MainTabView` → `StudyCalendarScreen` 인자 하나로 내려온다.
 새 리포지토리 추상화를 만들지 않는다.
 
 앱의 `Schema`는 `Schema.dailyOPIc` 한 곳에 있다(P10). 앱과 테스트가 같은 목록을 보게
 하려고 뽑아낸 것이고, 목록이 통째로 assertion에 걸려 있다. 기존 모델을 하나라도
-빠뜨리면 그 모델의 저장 데이터가 사라진다.
+빠뜨리면 그 모델의 저장 데이터가 사라진다. P11.1의 `PlannerLearnedQuestionRecord`는
+**추가만** 하는 변경이라(기존 모델 유지 · 필드 변경 없음 · 출시된 적 없는 새 엔티티)
+마이그레이션 장치가 필요 없다. 테스트 컨테이너도 이 스키마 그대로 연다.
 
 **메모 제거 (P10).** `PlannerDayNoteRecord`와 `plannerNote` / `savePlannerNote` /
 `deletePlannerNote`는 전부 삭제됐다. 이 모델은 **출시된 적이 없어**(P3 이후 어떤
@@ -2612,6 +2684,10 @@ Dynamic Type을 키우면 원도 같이 자란다.
 문장 조립은 `StudyDayCell.accessibilityText(...)` 정적 함수라 뷰 없이 테스트한다.
 버튼 힌트는 두 화면 모두 "하루 정보를 봅니다"이고, 칸은 `minHeight: 44`를 지킨다.
 일정 행은 "시간 없음, 스터디 모임"처럼 시각을 먼저 읽는다.
+학습한 문제 행도 `children: .ignore` + 한 문장이다 —
+`"19시 12분, 집에서 보내는 휴일에 대해 말해주세요."`. 기록 ID·세트 ID·문제 번호는
+접근성에 노출하지 않는다. 문제 문장은 최대 4줄까지 늘어나고(`fixedSize`) 시트가 스크롤한다 —
+무엇을 물었는지 알아볼 수 없을 만큼 잘라내지 않는다.
 
 ---
 
@@ -2732,7 +2808,10 @@ View에 없다"를 격자까지 확장한 것이다.
 | 날짜 탭 → 화면 밀어내기 | **P10에서 폐기** | `PlannerRoute.dayDetail` 삭제 · 뿌리의 시트 하나 (§34.11) |
 | 하루 자유 메모 | **P10에서 폐기** | 출시된 적 없음 · 모델까지 제거, 마이그레이션 없음 (§34.11) |
 | 캘린더 칸의 완료/일부 완료 기호 | **P10에서 폐기** | 학습 횟수 히트맵으로 대체 (§34.11) |
-| 그날 학습한 **문제** 목록 | 미구현 | P11 · 시트에 자리만 비워 뒀다 (§34.11) |
+| 그날 학습한 **문제** 목록 | **P11에서 구현됨** | 시간순 · 정확한 원문 · 로컬 전용 (§34.11) |
+| 학습한 문제 366일 보관 | **P11.1에서 구현됨** | 가벼운 사본 `PlannerLearnedQuestionRecord` · 추가만 하는 스키마 변경 (§34.11) |
+| 분석 기록(전사·평가) 보관 연장 | 하지 않음 | 최근 50개 유지 · 플래너 때문에 무거운 기록을 늘리지 않는다 (§34.11) |
+| 학습한 문제의 서버 동기화 · 기기 간 공유 | 미구현 | 로컬 전용 (§34.11) |
 | 시험 당일 별 표시 · 체크리스트 · 팁 | 미구현 | P12 (§34.11) |
 | 개인 일정 서버 동기화 | 미구현 | 로컬 SwiftData 전용 · 기기를 바꾸면 남지 않는다 (§34.11) |
 | Apple 캘린더(EventKit) 연동 | 미구현 | 개인 일정은 플래너 안에서만 산다 (§34.11) |

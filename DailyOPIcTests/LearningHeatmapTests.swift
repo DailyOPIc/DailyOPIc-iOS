@@ -263,6 +263,8 @@ struct PersistenceSchemaTests {
             "StudySetCompletionRecord",
             "StudyDayPlanRecord",
             "PlannerEventRecord",
+            // P11.1 — 그날 학습한 문제의 가벼운 사본. 추가만 했고 뺀 것은 없다.
+            "PlannerLearnedQuestionRecord",
         ])
     }
 

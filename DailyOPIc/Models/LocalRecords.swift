@@ -83,6 +83,47 @@ final class StudySetCompletionRecord {
     }
 }
 
+/// 그날 어떤 문제를 학습했는지만 남기는 **가벼운 사본**(P11.1).
+///
+/// 왜 따로 두나: 풍부한 분석 기록(`PracticeHistoryRecord`)은 최근 50개만 남는데
+/// 플래너의 학습 이력은 366일이다. 50개를 넘긴 순간 "3회 학습"만 남고 무슨 문제를
+/// 풀었는지가 사라진다. 그렇다고 답변·전사·평가까지 1년을 들고 있을 이유는 없다 —
+/// 그래서 **문제 문장과 시각만** 떼어 플래너 이력과 같은 기간 보관한다.
+///
+/// 여기 없는 것: 전사 · 답변 · 오디오 · 평가 · 점수 · 예상 등급 · 사용자 식별자 · 토큰/결제 정보.
+/// 표시 전용이다 — 히트맵·연속 학습·토큰 집계는 여전히 `StudySetCompletionRecord`만 본다.
+@Model
+final class PlannerLearnedQuestionRecord {
+    /// 원본 분석 기록의 ID. 유니크라 같은 학습이 두 줄이 되지 않고,
+    /// 백필을 몇 번 돌려도 결과가 같다.
+    @Attribute(.unique) var sourcePracticeHistoryID: UUID
+    var learnedAt: Date
+    /// 사용자가 실제로 본 문제 문장 그대로. 나중에 다시 만들어 내지 않는다.
+    var prompt: String
+    var kindLabel: String
+
+    init(sourcePracticeHistoryID: UUID, learnedAt: Date, prompt: String, kindLabel: String) {
+        self.sourcePracticeHistoryID = sourcePracticeHistoryID
+        self.learnedAt = learnedAt
+        self.prompt = prompt
+        self.kindLabel = kindLabel
+    }
+}
+
+extension PlannerLearnedQuestionRecord {
+    /// 분석 기록 하나에서 뜨는 사본 하나. 문제 문장을 못 읽으면 만들지 않는다.
+    convenience init?(record: PracticeHistoryRecord) {
+        guard let question = record.question else { return nil }
+        self.init(
+            sourcePracticeHistoryID: record.id,
+            learnedAt: record.createdAt,
+            prompt: question.prompt,
+            // 문제 카드가 사용자에게 보여 준 분류와 같은 식이다.
+            kindLabel: question.questionStyle?.label ?? question.examSection.label
+        )
+    }
+}
+
 /// 그날 실제로 배정됐던 학습량. 지난 날의 상태(완료/일부 완료/놓침)를 나중 설정으로
 /// 다시 계산하지 않기 위해 필요하다. 강도를 꾸준히→집중으로 바꿔도 어제의 "1 / 1 완료"가
 /// "1 / 3 일부 완료"로 바뀌면 안 된다.

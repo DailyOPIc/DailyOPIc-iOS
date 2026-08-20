@@ -20,15 +20,20 @@ final class PersistenceService {
         evaluation: PracticeEvaluation
     ) throws {
         guard let context else { return }
-        context.insert(
-            try PracticeHistoryRecord(
-                targetLevel: targetLevel,
-                question: question,
-                transcript: transcript,
-                evaluation: evaluation
-            )
+        let record = try PracticeHistoryRecord(
+            targetLevel: targetLevel,
+            question: question,
+            transcript: transcript,
+            evaluation: evaluation
         )
+        context.insert(record)
+        // 플래너용 가벼운 사본(P11.1)을 **같은 저장**에 함께 넣는다. 분석 성공 말고
+        // 사본이 생기는 경로는 없다 — 실패·중도 이탈·모의고사는 여기 오지 못한다.
+        if let learned = PlannerLearnedQuestionRecord(record: record) {
+            context.insert(learned)
+        }
         try trimPracticeHistory(context: context)
+        try trimLearnedQuestions(context: context, now: record.createdAt)
         try context.save()
     }
 
@@ -123,6 +128,66 @@ final class PersistenceService {
         )
         descriptor.fetchLimit = 1
         return try context.fetch(descriptor).first
+    }
+
+    /// 그날 학습한 문제(P11 · 저장소 P11.1). 재료는 가벼운 사본
+    /// `PlannerLearnedQuestionRecord`다 — 문제 제목을 보여주자고 전사·평가 덩어리를
+    /// 읽지 않는다.
+    ///
+    /// 날짜 경계는 **학습 계획 타임존**이다 — 히트맵이 완료 기록을 세는 변환과 같아서
+    /// 칸의 "3회 학습"과 시트의 문제 목록이 서로 다른 날을 가리킬 수 없다.
+    /// 하루치만 읽는다. 캘린더 칸마다 부르는 곳은 없고, 시트가 열릴 때 한 번 부른다.
+    func learnedQuestions(on localDate: String, timeZone: TimeZone) throws -> [LearnedQuestion] {
+        guard let context else { return [] }
+        let calendar = LocalCalendarDate.calendar(timeZone: timeZone)
+        guard let start = LocalCalendarDate.date(from: localDate, timeZone: timeZone),
+              let end = calendar.date(byAdding: .day, value: 1, to: start)
+        else { return [] }
+        let records = try context.fetch(
+            FetchDescriptor<PlannerLearnedQuestionRecord>(
+                predicate: #Predicate { $0.learnedAt >= start && $0.learnedAt < end },
+                sortBy: [SortDescriptor(\.learnedAt)]
+            )
+        )
+        return LearnedQuestion.timeline(
+            records.map { LearnedQuestion(record: $0, calendar: calendar) }
+        )
+    }
+
+    /// 이 빌드를 처음 연 사용자에게도 남아 있는 분석 기록(최대 50개)의 문제 문장을
+    /// 사본으로 옮긴다. 로컬 전용 · 네트워크 없음 · 없는 과거를 지어내지 않는다.
+    /// 원본 ID가 유니크라 몇 번을 돌려도 결과가 같다.
+    /// - Returns: 이번에 새로 만든 사본 수.
+    @discardableResult
+    func backfillLearnedQuestions(now: Date = .now) throws -> Int {
+        guard let context else { return 0 }
+        let existing = Set(
+            try context.fetch(FetchDescriptor<PlannerLearnedQuestionRecord>())
+                .map(\.sourcePracticeHistoryID)
+        )
+        var inserted = 0
+        for record in try context.fetch(FetchDescriptor<PracticeHistoryRecord>())
+        where !existing.contains(record.id) {
+            guard let learned = PlannerLearnedQuestionRecord(record: record) else { continue }
+            context.insert(learned)
+            inserted += 1
+        }
+        try trimLearnedQuestions(context: context, now: now)
+        guard inserted > 0 else { return 0 }
+        try context.save()
+        return inserted
+    }
+
+    /// 기록 탭의 "전체 삭제". 문제 사본도 함께 지운다 — 사용자가 지운 문제 문장이
+    /// 플래너에 몰래 남아 있으면 안 된다. 완료 기록(달력의 학습량)은 기존 정책대로
+    /// 그대로 두고, 그날 시트는 "문제 내용은 저장돼 있지 않아요"로 돌아간다.
+    func deleteAllHistory() throws {
+        guard let context else { return }
+        try context.delete(model: PracticeHistoryRecord.self)
+        try context.delete(model: MockHistoryRecord.self)
+        try context.delete(model: MockDraftRecord.self)
+        try context.delete(model: PlannerLearnedQuestionRecord.self)
+        try context.save()
     }
 
     func studyDayPlans() throws -> [StudyDayPlanRecord] {
@@ -257,6 +322,18 @@ final class PersistenceService {
         try context.delete(
             model: StudySetCompletionRecord.self,
             where: #Predicate { $0.completedAt < cutoff }
+        )
+    }
+
+    /// 완료 기록과 **같은 366일** 창을 쓴다. 달력이 보여주는 기간과 문제 사본이
+    /// 남는 기간이 어긋나면 P11.1이 없앤 그 불일치가 그대로 돌아온다.
+    private func trimLearnedQuestions(context: ModelContext, now: Date) throws {
+        guard let cutoff = Calendar.current.date(byAdding: .day, value: -366, to: now) else {
+            return
+        }
+        try context.delete(
+            model: PlannerLearnedQuestionRecord.self,
+            where: #Predicate { $0.learnedAt < cutoff }
         )
     }
 

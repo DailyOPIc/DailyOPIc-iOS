@@ -74,6 +74,91 @@ final class PlannerEventRecord {
     }
 }
 
+/// 하루 시트의 "학습한 문제" 한 줄(P11 · 저장소 P11.1).
+///
+/// 재료는 가벼운 사본 `PlannerLearnedQuestionRecord` 하나다 —
+/// 답변·전사·오디오·점수·피드백은 담지 않는다.
+/// 문제 문구는 사용자가 문제 카드에서 본 그 문장(`GeneratedQuestion.prompt`)을 그대로 쓴다.
+/// 나중에 주제나 ID로 다시 만들어 내지 않는다 — 서버의 문제 내용은 바뀔 수 있고,
+/// 지난 학습을 보려고 네트워크를 켜야 할 이유도 없다.
+struct LearnedQuestion: Identifiable, Hashable, Sendable {
+    /// 원본 분석 기록의 ID. 줄의 정체성이자 중복 방지 키이고,
+    /// 화면에도 접근성에도 노출하지 않는다.
+    let id: UUID
+    /// 정렬용 실제 시각. 화면에는 분까지만 쓴다.
+    let learnedAt: Date
+    /// 학습 계획 타임존 기준 자정 이후 분(0~1439).
+    let minuteOfDay: Int
+    let prompt: String
+    /// 문제 카드에서 봤던 것과 같은 분류("롤플레이" · "돌발 주제"…).
+    let kindLabel: String
+
+    /// "19:12". 로케일 포매터를 쓰지 않는 이유는 하루 시트의 날짜·요일과 같다 —
+    /// 기기 설정이 아니라 학습 계획 타임존이 진실이다.
+    var timeText: String {
+        String(format: "%02d:%02d", minuteOfDay / 60, minuteOfDay % 60)
+    }
+
+    /// "19시 12분, 집에서 보내는 휴일에 대해 말해주세요." 내부 ID는 읽지 않는다.
+    var accessibilityText: String {
+        "\(minuteOfDay / 60)시 \(minuteOfDay % 60)분, \(prompt)"
+    }
+
+    /// 그날의 학습 흐름을 재구성한다 — **오래된 것이 먼저**다.
+    ///
+    /// 중복은 여기서 걸러내지 않는다. 원본 기록 ID가 저장소에서 유니크라 같은 학습이
+    /// 두 줄이 될 수 없고, 반대로 **같은 분에 같은 문제를 두 번 성공한 것은 진짜 두 번**이라
+    /// 접으면 사실을 지우게 된다(P11.1에서 (분+문장) 추정을 걷어냈다).
+    /// 시각이 같으면 ID로 순서를 고정해 다시 그릴 때마다 줄이 뒤바뀌지 않게 한다.
+    static func timeline(_ items: [LearnedQuestion]) -> [LearnedQuestion] {
+        items.sorted {
+            $0.learnedAt == $1.learnedAt
+                ? $0.id.uuidString < $1.id.uuidString
+                : $0.learnedAt < $1.learnedAt
+        }
+    }
+}
+
+extension LearnedQuestion {
+    /// 사본 한 줄을 화면 값으로. 시각만 학습 계획 타임존의 벽시계로 바꾼다.
+    init(record: PlannerLearnedQuestionRecord, calendar: Calendar) {
+        let parts = calendar.dateComponents([.hour, .minute], from: record.learnedAt)
+        id = record.sourcePracticeHistoryID
+        learnedAt = record.learnedAt
+        minuteOfDay = (parts.hour ?? 0) * 60 + (parts.minute ?? 0)
+        prompt = record.prompt
+        kindLabel = record.kindLabel
+    }
+}
+
+/// "학습한 문제" 칸이 지금 무엇을 말해야 하는지(P11).
+///
+/// 세 갈래뿐이라 뷰가 조건을 다시 조립하지 않는다. 특히 "학습은 있었는데 문제가 없다"와
+/// "그날 학습 자체가 없다"를 섞지 않는 것이 요점이다 — 전자만 설명이 필요하다.
+enum LearnedQuestionSection: Equatable, Sendable {
+    /// 아직 읽는 중이거나, 그날 학습 자체가 없었다. 칸을 아예 그리지 않는다.
+    case hidden
+    case questions([LearnedQuestion])
+    /// 학습한 것은 분명한데 문제 내용이 남아 있지 않다. 문제를 지어내지 않고 그대로 말한다.
+    case unavailable
+
+    static let title = "학습한 문제"
+    static let unavailableTitle = "이전 학습 기록"
+    /// 원인을 특정하지 않는다 — 구버전 학습일 수도, 보관 한도를 넘겼을 수도,
+    /// 사용자가 기록을 지웠을 수도 있다. 셋 다 사실은 하나다: 남아 있지 않다.
+    static let unavailableDetail = "이 날의 학습 기록은 남아 있지만, 문제 내용은 저장돼 있지 않아요."
+
+    /// - Parameters:
+    ///   - questions: nil이면 아직 읽기 전이다. 빈 배열("없다")과 구분해야
+    ///     시트가 열리는 순간 설명 문구가 깜빡이지 않는다.
+    ///   - completedSets: 그날의 실제 완료 세트 수. 히트맵·연속 학습과 **같은** 값이다.
+    static func make(questions: [LearnedQuestion]?, completedSets: Int) -> LearnedQuestionSection {
+        guard let questions else { return .hidden }
+        if !questions.isEmpty { return .questions(LearnedQuestion.timeline(questions)) }
+        return completedSets > 0 ? .unavailable : .hidden
+    }
+}
+
 /// 하루 상세가 보여줄 학습 상태. 캘린더 격자와 같은 판정(`StudyCalendarEngine.state`)을
 /// 옮겨 적기만 한다 — 두 번째 계산 경로를 만들면 지난 날짜가 화면마다 다른 말을 하게 된다.
 enum PlannerDayStudyStatus: String, Sendable, CaseIterable {

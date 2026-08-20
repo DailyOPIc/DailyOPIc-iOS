@@ -9,6 +9,15 @@ struct PlannerSelectedDate: Identifiable, Hashable {
     init(_ localDate: String) { id = localDate }
 }
 
+/// 하루 시트의 칸 순서. 순서가 화면 안에 흩어져 있으면 나중에 칸을 하나 끼워 넣을 때
+/// 어디에 넣어야 하는지 코드가 말해 주지 못한다. 여기 한 줄이 그 답이다.
+enum PlannerDaySheetSection: Int, CaseIterable, Sendable {
+    case study
+    /// P10에서 비워 둔 자리. P11에서 실제 학습한 문제가 들어왔다.
+    case learnedQuestions
+    case personalEvents
+}
+
 /// 하루 시트. 주간 스트립에서든 전체 캘린더에서든 날짜를 누르면 이것이 올라온다.
 ///
 /// 화면을 밀어내지 않는 것이 요점이다(P10). 확인하고 아래로 내리면 사용자는 보던 자리에
@@ -37,6 +46,9 @@ struct PlannerDaySheet: View {
     @Query private var events: [PlannerEventRecord]
 
     @State private var editingEvent: PlannerEventDraft?
+    /// nil = 아직 읽기 전. 빈 배열("그날 문제 기록이 없다")과 구분해야
+    /// 시트가 열리는 순간 "이전 학습 기록" 문구가 깜빡이지 않는다.
+    @State private var learnedQuestions: [LearnedQuestion]?
 
     init(
         localDate: String,
@@ -69,12 +81,18 @@ struct PlannerDaySheet: View {
                 Text(titleText)
                     .font(AppTypography.sectionTitle)
                     .accessibilityAddTraits(.isHeader)
-                studySection
-                // P11: 그날 학습한 문제 목록이 여기, 학습과 개인 일정 사이에 들어온다.
-                eventSection
+                ForEach(PlannerDaySheetSection.allCases, id: \.rawValue) { section in
+                    view(for: section)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .padding(AppSpacing.lg)
+        }
+        // 문제 목록은 시트가 열릴 때 하루치만 읽는다. 캘린더 칸은 이 조회를 하지 않는다.
+        .task(id: localDate) {
+            learnedQuestions = (
+                try? persistence.learnedQuestions(on: localDate, timeZone: calendar.timeZone)
+            ) ?? []
         }
         // 편집기는 시트 위의 시트다. 닫으면 이 시트로 돌아오고, 달력은 그대로 뒤에 남아 있다.
         .sheet(item: $editingEvent) { draft in
@@ -83,7 +101,7 @@ struct PlannerDaySheet: View {
                 reminders: reminders,
                 canUseEventReminder: canUseEventReminder,
                 onSave: { saved in
-                    try? persistence.savePlannerEvent(
+                    _ = try? persistence.savePlannerEvent(
                         id: saved.isNew ? nil : saved.id,
                         localDate: localDate,
                         title: saved.title,
@@ -108,6 +126,15 @@ struct PlannerDaySheet: View {
         return "\(parts.month ?? 0)월 \(parts.day ?? 0)일 \(weekday)"
     }
 
+    @ViewBuilder
+    private func view(for section: PlannerDaySheetSection) -> some View {
+        switch section {
+        case .study: studySection
+        case .learnedQuestions: learnedQuestionSection
+        case .personalEvents: eventSection
+        }
+    }
+
     // MARK: 학습 기록 (읽기 전용)
 
     private var status: PlannerDayStudyStatus {
@@ -128,6 +155,70 @@ struct PlannerDaySheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+
+    // MARK: 학습한 문제 (P11 · 읽기 전용)
+
+    /// 그날 실제로 학습한 문제. 여기서 다시 채점하거나 답변을 보여주지 않는다 —
+    /// "그날 어떤 문제를 학습했는지"에만 답한다. 결과 화면은 기록 탭에 이미 있다.
+    @ViewBuilder
+    private var learnedQuestionSection: some View {
+        switch LearnedQuestionSection.make(
+            questions: learnedQuestions,
+            completedSets: day.completedSets
+        ) {
+        case .hidden:
+            EmptyView()
+        case let .questions(questions):
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text(LearnedQuestionSection.title)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                ForEach(questions) { question in
+                    learnedQuestionRow(question)
+                }
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        case .unavailable:
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text(LearnedQuestionSection.unavailableTitle)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                // 남아 있지 않은 문제를 지어내지 않는다. 없다는 사실만 말한다.
+                Text(LearnedQuestionSection.unavailableDetail)
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
+        }
+    }
+
+    /// 시각 + 문제. 누를 것이 없는 읽기 전용 줄이라 버튼으로 만들지 않는다.
+    /// 문제가 길어도 무슨 문제였는지 알 수 있어야 해서 네 줄까지 편다.
+    private func learnedQuestionRow(_ question: LearnedQuestion) -> some View {
+        HStack(alignment: .top, spacing: AppSpacing.md) {
+            Text(question.timeText)
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+                .frame(width: 72, alignment: .leading)
+            VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                Text(question.prompt)
+                    .font(AppTypography.body)
+                    .lineLimit(4)
+                    .multilineTextAlignment(.leading)
+                    .fixedSize(horizontal: false, vertical: true)
+                Text(question.kindLabel)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            Spacer(minLength: 0)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(question.accessibilityText)
     }
 
     // MARK: 개인 일정
