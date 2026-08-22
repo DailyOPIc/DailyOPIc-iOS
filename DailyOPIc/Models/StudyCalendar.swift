@@ -22,6 +22,14 @@ enum StudyPlanEstimatorConfig {
     static let fallbackDailyCapacity: [PlanEntitlement: Int] = [
         .free: 1, .basic: 3, .plus: 10, .pro: 20
     ]
+    /// capabilities를 못 받았을 때 쓰는 플랜별 광고 보너스 토큰 수
+    /// (서버 `quotaPolicy.practiceAdBonus`의 오프라인 폴백). 무료만 1개다.
+    static let fallbackAdBonus: [PlanEntitlement: Int] = [
+        .free: 1, .basic: 0, .plus: 0, .pro: 0
+    ]
+    /// 계획한 세트 1개를 **완료**까지 끌고 가는 데 드는 최소 데일리 토큰.
+    /// 세트 획득 1 + AI 분석 1(P13). 플래너 어디에도 이 숫자를 다시 적지 않는다.
+    static let minimumTokensPerCompletedDailySet = 2
     /// 시험일이 촉박할 때 하루 목표를 기본값 위로 얼마나 더 올릴 수 있는지(세트).
     /// 토큰이 많다고 그만큼 숙제를 낼 수 있는 것은 아니다.
     static let adaptiveBuffer = 2
@@ -34,13 +42,35 @@ enum StudyPlanEstimator {
     /// 걸리는 예상 기간"이라는 사실을 화면에서 항상 함께 밝힌다.
     static let disclaimer = "최근 학습 정보와 설정한 학습량을 바탕으로 계산한 예상치이며, 실제 OPIc 등급 달성을 보장하지 않아요."
 
-    /// 하루 Daily 토큰 한도. 서버 capabilities가 진실이고, 없을 때만 플랜 표로 폴백한다.
-    /// 광고 보너스는 매일 보장되지 않으므로 권장 학습량에 넣지 않는다.
-    static func dailyCapacity(capabilities: Capabilities?, plan: PlanEntitlement) -> Int {
-        if let practiceDaily = capabilities?.quotaPolicy.practiceDaily, practiceDaily > 0 {
-            return practiceDaily
+    /// 하루에 쓸 수 있는 데일리 토큰 지갑. 서버 capabilities가 진실이고, 없을 때만 플랜 표로
+    /// 폴백한다. 광고 보너스를 더하는 이유: 무료 플랜은 기존 리워드 흐름으로 1개를 더 얻을 수
+    /// 있고, 그게 없으면 무료는 하루 한 세트도 계획할 수 없다. **보너스는 자동으로 주어지지
+    /// 않는다** — 플래너는 상한을 계산할 뿐, 광고를 대신 틀지 않는다.
+    static func dailyTokenWallet(capabilities: Capabilities?, plan: PlanEntitlement) -> Int {
+        let policy = capabilities?.quotaPolicy
+        let base: Int
+        if let practiceDaily = policy?.practiceDaily, practiceDaily > 0 {
+            base = practiceDaily
+        } else {
+            base = StudyPlanEstimatorConfig.fallbackDailyCapacity[plan] ?? 1
         }
-        return StudyPlanEstimatorConfig.fallbackDailyCapacity[plan] ?? 1
+        // 구 서버는 practiceAdBonus를 모른다. 그때만 플랜 표로 폴백한다.
+        let bonus = policy?.practiceAdBonus ?? StudyPlanEstimatorConfig.fallbackAdBonus[plan] ?? 0
+        return max(0, base) + max(0, bonus)
+    }
+
+    /// 토큰 지갑 → 최소한 완료까지 갈 수 있는 세트 수(P13.1).
+    /// 남는 홀수 토큰 1개는 이미 받은 세트의 추가 분석에 쓸 수 있지만, 획득과 분석이 **둘 다**
+    /// 필요한 세트를 하나 더 계획할 근거는 되지 못한다.
+    static func completedSetCapacity(tokens: Int) -> Int {
+        max(0, tokens) / StudyPlanEstimatorConfig.minimumTokensPerCompletedDailySet
+    }
+
+    /// 플래너가 하루에 배정할 수 있는 **세트 수** 상한. 토큰 수가 아니다.
+    /// P13 이전에는 이 둘이 같았다(토큰 1개 = 세트 1개). 이제는 분석도 토큰을 쓰므로
+    /// 토큰 수를 그대로 세트 수로 쓰면 살 수 없는 숙제를 내게 된다.
+    static func dailyCapacity(capabilities: Capabilities?, plan: PlanEntitlement) -> Int {
+        completedSetCapacity(tokens: dailyTokenWallet(capabilities: capabilities, plan: plan))
     }
 
     /// 목표까지 남은 등급 단계. 최근 등급을 모르면 보수적으로 가정한다.
@@ -59,14 +89,19 @@ enum StudyPlanEstimator {
         )
     }
 
+    /// `dailyCapacity`는 **세트 수** 상한이다(`dailyCapacity(capabilities:plan:)`).
+    /// 토큰이 한 세트도 완주시킬 수 없으면 숙제를 만들지 않는다 — 0을 1로 올리지 않는다.
     static func effectiveDailyTarget(intensity: StudyIntensity, dailyCapacity: Int) -> Int {
-        max(1, min(intensity.desiredDailySets, dailyCapacity))
+        guard dailyCapacity > 0 else { return 0 }
+        return max(1, min(intensity.desiredDailySets, dailyCapacity))
     }
 
     /// 시험이 촉박할 때 planner가 하루에 낼 수 있는 최대 학습량.
     /// 플랜 토큰이 20개여도 20세트를 숙제로 내지 않는다는 뜻이다.
+    /// 여기서도 `dailyCapacity`는 토큰이 아니라 세트 수 상한이다.
     static func adaptiveDailyCeiling(baseDailyTarget: Int, dailyCapacity: Int) -> Int {
-        max(
+        guard dailyCapacity > 0 else { return 0 }
+        return max(
             1,
             min(
                 dailyCapacity,

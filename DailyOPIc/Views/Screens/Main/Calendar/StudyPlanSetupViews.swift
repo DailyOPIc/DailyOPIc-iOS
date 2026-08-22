@@ -149,8 +149,9 @@ enum StudyPlanSetupSection {
                 if intensity.desiredDailySets > dailyCapacity {
                     // 잠금이 아니라 설명이다. 여기서 페이월을 열지 않는다.
                     Text(
-                        "현재 \(planName) 플랜은 하루 Daily 토큰이 \(dailyCapacity)개예요. "
-                        + "오늘의 권장 학습량은 \(dailyCapacity)세트로 맞춰 드릴게요."
+                        "현재 \(planName) 플랜은 하루 \(dailyCapacity)세트까지 계획할 수 있어요. "
+                        + "Daily 토큰은 새 문제 세트와 AI 분석에 각각 사용돼요. "
+                        + "권장 학습량은 \(dailyCapacity)세트로 맞춰 드릴게요."
                     )
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)

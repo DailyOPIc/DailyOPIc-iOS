@@ -216,6 +216,7 @@ struct PracticeScreen: View {
                     submitTitle: viewModel.phase == .analyzing ? "분석 중" : "분석하기",
                     submitIcon: "sparkles",
                     isSubmitting: viewModel.phase == .analyzing,
+                    tokenCost: 1,
                     submit: { Task { await viewModel.analyzePendingRecording() } },
                     reRecord: { viewModel.discardPendingRecording() }
                 )

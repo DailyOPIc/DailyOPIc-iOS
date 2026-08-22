@@ -259,6 +259,18 @@ struct PlannerEventReminderSchedulingTests {
         StudyCalendarFixture.date(text).addingTimeInterval(TimeInterval(hour * 3600 + minute * 60))
     }
 
+    /// 예약된 요청이 실제로 가리키는 순간. `UNCalendarNotificationTrigger.nextTriggerDate()`는
+    /// **진짜 지금**을 기준으로 계산되므로, 픽스처 날짜가 과거가 되는 날 nil이 되어 테스트가
+    /// 날짜 폭탄이 된다. 예약 계산은 이미 `now`를 주입받는 순수 함수이니 테스트도 고정 시계만
+    /// 본다 — iOS가 읽을 DateComponents를 같은 달력으로 되풀어 검증한다.
+    private func firingInstant(of request: LocalNotificationRequest?) -> Date? {
+        guard let components = request?.dateComponents else { return nil }
+        // 트리거가 우리가 만든 컴포넌트를 그대로 들고 가는지도 같이 확인한다.
+        let trigger = request?.notificationRequest.trigger as? UNCalendarNotificationTrigger
+        #expect(trigger?.dateComponents == components)
+        return LocalCalendarDate.calendar(timeZone: components.timeZone ?? zone).date(from: components)
+    }
+
     /// A~D. 일정 시각 / 10 · 30 · 60분 전이 실제 발화 시각으로 이어진다.
     @Test func everyAllowedOffsetFiresAtTheIntendedInstant() {
         let expected: [Int: Date] = [
@@ -273,8 +285,7 @@ struct PlannerEventReminderSchedulingTests {
                 for: event(offset: offset), timeZone: zone
             ) == fire, "\(offset)")
             // 우리가 만든 DateComponents를 iOS가 같은 순간으로 읽는지 확인한다.
-            let trigger = request?.notificationRequest.trigger as? UNCalendarNotificationTrigger
-            #expect(trigger?.nextTriggerDate() == fire, "\(offset)")
+            #expect(firingInstant(of: request) == fire, "\(offset)")
         }
     }
 
@@ -282,12 +293,11 @@ struct PlannerEventReminderSchedulingTests {
     @Test func offsetCrossesMidnightCorrectly() {
         let midnightEvent = event(localDate: "2026-08-21", timeMinutes: 30, offset: 60)
         let request = requests([midnightEvent]).first
-        let trigger = request?.notificationRequest.trigger as? UNCalendarNotificationTrigger
 
         #expect(request?.dateComponents.day == 20)
         #expect(request?.dateComponents.hour == 23)
         #expect(request?.dateComponents.minute == 30)
-        #expect(trigger?.nextTriggerDate() == wallClock("2026-08-20", 23, 30))
+        #expect(firingInstant(of: request) == wallClock("2026-08-20", 23, 30))
     }
 
     /// E. 알림은 학습 계획 타임존의 벽시계 시각이다.
@@ -301,9 +311,9 @@ struct PlannerEventReminderSchedulingTests {
         #expect(request?.dateComponents.timeZone == newYork)
         #expect(request?.dateComponents.hour == 18)
         #expect(request?.dateComponents.minute == 30)
-        // 같은 벽시계 18:30이지만 서울과는 다른 절대 시각이다.
-        #expect((request?.notificationRequest.trigger as? UNCalendarNotificationTrigger)?
-            .nextTriggerDate() != wallClock("2026-08-20", 18, 30))
+        // 같은 벽시계 18:30이지만 서울과는 다른 절대 시각이다(그날 서울 -09:00, 뉴욕 -04:00).
+        #expect(firingInstant(of: request)
+            == wallClock("2026-08-20", 18, 30).addingTimeInterval(13 * 3600))
     }
 
     /// F. 이미 지난 알림은 예약하지 않는다. 알림 없음·시간 없음과 이유를 구분한다.
@@ -352,8 +362,16 @@ struct PlannerEventReminderSchedulingTests {
 
         let pending = await harness.service.pendingEventSnapshot()
         #expect(pending.count == 1)
-        #expect(pending.nextTriggerDate == wallClock("2026-08-20", 18, 0))
         #expect(pending.nextLocalDate == id.uuidString)
+        // 교체된 예약이 **새 시각**을 들고 있는지는 저장된 트리거로 본다.
+        // (`pending.nextTriggerDate`는 실제 지금을 기준으로 계산돼 픽스처 날짜에 묶을 수 없다.)
+        let stored = harness.center.pending.first {
+            $0.identifier == PlannerEventReminderPolicy.identifier(eventID: id)
+        }
+        let components = (stored?.trigger as? UNCalendarNotificationTrigger)?.dateComponents
+        #expect(components?.hour == 18)
+        #expect(components?.minute == 0)
+        #expect(components?.day == 20)
     }
 
     /// H. 일정을 지우면 그 일정의 예약만 사라진다.

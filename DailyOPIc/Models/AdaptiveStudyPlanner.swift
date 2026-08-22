@@ -106,7 +106,14 @@ enum AdaptiveStudyPlanner {
             maximumBeforeExam: Int? = nil,
             shortfall: Int? = nil
         ) -> AdaptiveStudyPlan {
-            AdaptiveStudyPlan(
+            // 마지막 관문(P13.1). 기본·압축·시험 역산·부족 — 어떤 경로로 왔든 여기를 지난다.
+            // 토큰이 살 수 없는 배정량은 밖으로 나가지 않는다: 0 <= targetSets <= ceiling.
+            let capped = days.compactMap { day -> StudyDayPlan? in
+                let target = min(day.targetSets, ceiling)
+                guard target > 0 else { return nil }
+                return StudyDayPlan(date: day.date, targetSets: target)
+            }
+            return AdaptiveStudyPlan(
                 mode: mode,
                 totalRecommendedSets: total,
                 completedSets: completed,
@@ -115,8 +122,8 @@ enum AdaptiveStudyPlanner {
                 adaptiveDailyCeiling: ceiling,
                 dailyCapacity: dailyCapacity,
                 desiredDailySets: settings.intensity.desiredDailySets,
-                upcomingDays: days,
-                estimatedCompletionDate: days.last?.date,
+                upcomingDays: capped,
+                estimatedCompletionDate: capped.last?.date,
                 examDate: exam,
                 maximumSetsPossibleBeforeExam: maximumBeforeExam,
                 shortfallSets: shortfall,

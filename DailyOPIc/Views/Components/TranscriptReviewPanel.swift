@@ -7,6 +7,8 @@ struct TranscriptReviewPanel: View {
     let submitTitle: String
     let submitIcon: String
     let isSubmitting: Bool
+    /// 이 제출이 소모하는 데일리 토큰 수. 과금이 없는 제출(모의고사 답변)은 nil.
+    var tokenCost: Int? = nil
     let submit: () -> Void
     let reRecord: () -> Void
 
@@ -22,6 +24,19 @@ struct TranscriptReviewPanel: View {
                 .frame(maxWidth: .infinity, alignment: .leading)
 
             AnswerPanel(finalText: transcript, partialText: "", isRecording: false)
+
+            // 토큰이 나가는 순간을 누르기 전에 알려 준다. 결과 화면이 아니라 여기다.
+            if let tokenCost {
+                HStack(spacing: AppSpacing.xs) {
+                    DailyTokenIcon(size: 18)
+                    Text("데일리 토큰 \(tokenCost)개를 사용해요.")
+                        .font(AppTypography.callout)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel("데일리 토큰 \(tokenCost)개를 사용해요")
+            }
 
             PrimaryButton(
                 title: submitTitle,

@@ -39,6 +39,8 @@ enum StudyCalendarFixture {
     /// 새 필드를 `nil`로 두면 그 필드를 모르는 구 서버가 된다.
     static func capabilities(
         plan: String?,
+        practiceDaily: Int? = 1,
+        practiceAdBonus: Int? = 1,
         autoReplan: Bool? = nil,
         evaluationAdaptive: Bool? = nil,
         examBackplan: Bool? = nil,
@@ -58,8 +60,8 @@ enum StudyCalendarFixture {
                 dailyRefreshRewards: 1,
                 mockSessionsPerDay: 1,
                 mockRewardGates: 3,
-                practiceDaily: 1,
-                practiceAdBonus: 1,
+                practiceDaily: practiceDaily,
+                practiceAdBonus: practiceAdBonus,
                 historyDays: 7,
                 analysisDepth: "summary",
                 reviewSet: false,
@@ -118,11 +120,14 @@ struct StudyCalendarTests {
         #expect(StudyIntensity.focused.desiredDailySets == 3)
     }
 
-    /// 무료 플랜은 하루 토큰이 1개다. "집중"을 골라도 오늘 목표는 1세트다.
+    /// 무료 플랜은 하루 1세트까지만 계획할 수 있다. "집중"을 골라도 오늘 목표는 1세트다.
+    /// 여기서 `dailyCapacity`는 토큰이 아니라 **세트 수** 상한이다(P13.1).
     @Test func effectiveTargetIsCappedByDailyTokenCapacity() {
         #expect(StudyPlanEstimator.effectiveDailyTarget(intensity: .focused, dailyCapacity: 1) == 1)
         #expect(StudyPlanEstimator.effectiveDailyTarget(intensity: .focused, dailyCapacity: 3) == 3)
         #expect(StudyPlanEstimator.effectiveDailyTarget(intensity: .light, dailyCapacity: 20) == 1)
+        // 토큰이 한 세트도 완주시키지 못하면 숙제를 만들지 않는다.
+        #expect(StudyPlanEstimator.effectiveDailyTarget(intensity: .focused, dailyCapacity: 0) == 0)
     }
 
     /// 프로의 20토큰은 한도지 숙제가 아니다. 권장량은 강도에서만 나온다.
@@ -141,8 +146,16 @@ struct StudyCalendarTests {
     }
 
     @Test func dailyCapacityPrefersServerCapabilitiesOverThePlanTable() {
+        // capabilities가 없으면 플랜 표로 폴백한다. 무료 1+광고 1 = 2토큰 → 1세트.
+        #expect(StudyPlanEstimator.dailyTokenWallet(capabilities: nil, plan: .free) == 2)
         #expect(StudyPlanEstimator.dailyCapacity(capabilities: nil, plan: .free) == 1)
-        #expect(StudyPlanEstimator.dailyCapacity(capabilities: nil, plan: .pro) == 20)
+        // 프로는 20토큰이지만 계획 가능한 세트는 10개다(세트 1 + 분석 1).
+        #expect(StudyPlanEstimator.dailyTokenWallet(capabilities: nil, plan: .pro) == 20)
+        #expect(StudyPlanEstimator.dailyCapacity(capabilities: nil, plan: .pro) == 10)
+        // 서버가 말하면 서버가 이긴다. 픽스처는 practiceDaily 1 + practiceAdBonus 1이다.
+        let server = StudyCalendarFixture.capabilities(plan: "pro")
+        #expect(StudyPlanEstimator.dailyTokenWallet(capabilities: server, plan: .pro) == 2)
+        #expect(StudyPlanEstimator.dailyCapacity(capabilities: server, plan: .pro) == 1)
     }
 
     // MARK: 권장 학습량

@@ -290,9 +290,14 @@ final class PracticeViewModel {
         phase = .idle
     }
 
-    private func evaluatePendingRecording() async throws {
+    private func evaluatePendingRecording(retryAfterUnlock: Bool = true) async throws {
         guard let pendingRecording, let questionSet, let question = currentQuestion else { return }
-        // 토큰 모델: 토큰은 세트를 받을 때 소모되고, 세트 내 평가는 무제한. 여기서 쿼터 확인하지 않음.
+        // 토큰 모델(P13): AI 분석 1회 = 데일리 토큰 1개. 새 세트를 받을 때와 같은 지갑이다.
+        // 여기 확인은 UX용일 뿐이고 실제 차감·거절 권한은 서버에 있다(경합은 서버가 이긴다).
+        if dailyTokenCount == 0 {
+            let unlocked = await recoverAnalysisToken()
+            guard unlocked else { return }
+        }
         phase = .analyzing
         operationKind = .speechAnalysis
         let operationID = evaluationOperationID ?? UUID()
@@ -338,13 +343,49 @@ final class PracticeViewModel {
             phase = .idle
             operationState = .idle
             throw CancellationError()
+        } catch let error as APIClientError where error.isPracticeQuotaExhausted {
+            // 서버가 토큰 부족으로 거절했다(사전 확인과 경합하면 서버가 이긴다).
+            // 결과를 지어내지 않고, 일반 서버 오류로도 취급하지 않는다.
+            phase = .idle
+            operationState = .idle
+            usage = try? await api.usage()
+            if retryAfterUnlock, await recoverAnalysisToken() {
+                // 같은 사용자 조작이므로 operationID(멱등 키)를 그대로 재사용한다.
+                try await evaluatePendingRecording(retryAfterUnlock: false)
+            }
         } catch {
             phase = .idle
             operationState = .recoverableFailure(
                 operationId: operationID,
                 message: error.localizedDescription
             )
+            // 실패한 분석은 서버가 토큰을 되돌린다. 그 잔액이 화면에 다시 보이게 한다.
+            usage = try? await api.usage()
             throw error
+        }
+    }
+
+    /// 분석 토큰이 없을 때의 복구. 새 세트가 쓰는 것과 같은 UX다:
+    /// 무료는 광고 보너스로 1개 확보, 유료는 상위 플랜 안내. 자동 결제는 하지 않는다.
+    /// 토큰을 실제로 확보했을 때만 true.
+    private func recoverAnalysisToken() async -> Bool {
+        guard !environment.currentPlan.isPaid else {
+            presentPaywall(from: .tokenExhausted)
+            return false
+        }
+        do {
+            try await unlockPracticeCredits()  // 광고 → 보너스 토큰(usage 갱신 포함)
+            return (dailyTokenCount ?? 0) > 0
+        } catch is CancellationError {
+            return false
+        } catch let error as APIClientError
+            where error.isPracticeQuotaExhausted || error.isRewardQuotaExhausted {
+            // 광고 보너스까지 소진. 답변은 그대로 두고 상위 플랜 안내로 넘긴다.
+            presentPaywall(from: .tokenExhausted)
+            return false
+        } catch {
+            errorMessage = error.localizedDescription
+            return false
         }
     }
 

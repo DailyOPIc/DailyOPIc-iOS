@@ -116,7 +116,8 @@ struct PlannerHomeView: View {
                         "오늘 \(snapshot.today.targetSets)세트 중 \(snapshot.today.completedSets)세트 완료"
                     )
                 if plan.isCappedByPlan {
-                    Text("오늘 권장 \(snapshot.today.targetSets)세트 · 현재 \(planName) 플랜 최대 \(plan.dailyCapacity)토큰")
+                    // 토큰 계산은 여기 적지 않는다. 비용은 새 세트·AI 분석 버튼에서 이미 말한다.
+                    Text("오늘 권장 \(snapshot.today.targetSets)세트 · 현재 \(planName) 플랜은 하루 \(plan.dailyCapacity)세트까지 계획해요")
                         .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
