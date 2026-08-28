@@ -1049,7 +1049,7 @@ chore(speech): drop published state with no consumers
 | 플랜 판정의 **최종 권위** | **BE** (`/v1/capabilities`) | `plans.py`가 단일 진실 소스 |
 | 플랜 판정의 **즉시성** | iOS (RevenueCat 로컬) | 구매 직후 반응성. 불일치 시 서버로 수렴 |
 | 쿼터 차감 | **BE** (`reserve_practice`) | 클라이언트는 잔량을 표시만 |
-| 세트 내 무제한 평가 | **BE** (`reserve_request`) | 클라이언트가 이 사실을 **문구로** 전달 |
+| ~~세트 내 무제한 평가~~ (P13 폐기) | **BE** (`reserve_practice`) | 분석 1회 = 토큰 1개. 클라이언트가 **누르기 전에** 비용을 고지 |
 | 리워드 검증 | **BE** (SSV + nonce) | 클라이언트는 nonce 운반만 |
 | 세션 stage | **BE** | 클라이언트는 stage → 화면 매핑만 |
 | 답변 품질 버킷(A/B/C) | **BE** (P5d) | 임계값을 클라이언트에 두면 버전마다 갈린다 |

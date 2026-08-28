@@ -1,13 +1,47 @@
 import SwiftUI
 import SwiftData
+import UserNotifications
 
-final class AppDelegate: NSObject, UIApplicationDelegate {
+final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
         _ application: UIApplication,
         didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil
     ) -> Bool {
         FirebaseBootstrap.configure()
+        // delegate가 없으면 iOS는 앱이 떠 있는 동안 도착한 로컬 알림을 그냥 버린다.
+        // 학습 알림은 사용자가 정한 공부 시간에 울리므로 앱을 켜 둔 채 맞는 일이 흔하다.
+        // 알림을 새로 요청하지는 않는다(권한 요청은 여전히 캘린더의 명시적 CTA에서만).
+        UNUserNotificationCenter.current().delegate = self
         return true
+    }
+
+    func userNotificationCenter(
+        _ center: UNUserNotificationCenter,
+        willPresent notification: UNNotification,
+        withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void
+    ) {
+        completionHandler(
+            StudyReminderPresentation.options(for: notification.request.identifier)
+        )
+    }
+}
+
+extension Schema {
+    /// 앱이 여는 저장소의 모델 목록. 여기 하나만 진실이라 테스트도 같은 목록을 읽는다.
+    /// 모델을 추가만 하고 기존 것은 그대로 둔다 — 하나라도 빠뜨리면 그 모델의 저장
+    /// 데이터가 통째로 사라진다.
+    static var dailyOPIc: Schema {
+        Schema([
+            PracticeHistoryRecord.self,
+            MockHistoryRecord.self,
+            MockDraftRecord.self,
+            StudySetCompletionRecord.self,
+            StudyDayPlanRecord.self,
+            // 플래너 개인 일정(P3). 메모는 출시된 적이 없어 P10에서 통째로 걷어냈다.
+            PlannerEventRecord.self,
+            // 그날 학습한 문제의 가벼운 사본(P11.1). 추가만 하는 모델이라 마이그레이션이 없다.
+            PlannerLearnedQuestionRecord.self
+        ])
     }
 }
 
@@ -21,13 +55,7 @@ struct DailyOPIcApp: App {
     private let persistenceStartupError: String?
 
     init() {
-        let schema = Schema([
-            PracticeHistoryRecord.self,
-            MockHistoryRecord.self,
-            MockDraftRecord.self,
-            StudySetCompletionRecord.self,
-            StudyDayPlanRecord.self
-        ])
+        let schema = Schema.dailyOPIc
         let configuration = ModelConfiguration(schema: schema, isStoredInMemoryOnly: false)
         do {
             modelContainer = try ModelContainer(for: schema, configurations: [configuration])
@@ -46,9 +74,13 @@ struct DailyOPIcApp: App {
                     .onChange(of: scenePhase) { _, phase in
                         // 포그라운드 복귀 시 구독 상태(해지/갱신/만료)를 즉시 최신화.
                         if phase == .active {
-                            Task { await environment.refreshEntitlements() }
                             // 날짜가 바뀌었거나 설정에서 알림 권한을 바꿨을 수 있다.
-                            Task { await environment.studyCalendarViewModel.reconcileStudyReminders() }
+                            // 엔타이틀먼트보다 먼저 재조정하면 하루 학습량을 무료 기준으로
+                            // 잘못 잡은 알림을 30일치 다시 써 버린다. 순서를 고정한다.
+                            Task {
+                                await environment.refreshEntitlements()
+                                await environment.studyCalendarViewModel.reconcileReminders()
+                            }
                         }
                     }
             } else {

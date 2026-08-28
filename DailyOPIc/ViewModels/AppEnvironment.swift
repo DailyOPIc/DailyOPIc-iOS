@@ -48,6 +48,17 @@ final class AppEnvironment {
         return PlanEntitlement(from: capabilities?.plan)
     }
 
+    /// 플랜을 **실제로 확인했는가**. `currentPlan`은 확인 전에도 기본값 `.free`를 말하므로
+    /// "무료다"와 "아직 모른다"를 이 값으로 구분한다.
+    ///
+    /// 앱이 켜지는 순간 `scenePhase == .active` 재조정은 `initialize()`(인증 → capabilities →
+    /// RevenueCat 설정)와 나란히 달린다. 그때 무료로 단정하면 유료 사용자의 학습 알림이
+    /// 강등으로 처리돼 예약이 전부 지워졌다(P7 근본 원인).
+    var isEntitlementResolved: Bool {
+        if store.isConfigured, store.hasResolvedEntitlement { return true }
+        return capabilities != nil
+    }
+
     /// 광고 노출 여부. 유료 플랜/무플랜 서버 정책을 따른다(기본 노출).
     var showsAds: Bool {
         capabilities?.quotaPolicy.adsEnabled ?? !currentPlan.isPaid

@@ -25,15 +25,16 @@ struct MainTabView: View {
                 StudyCalendarScreen(
                     viewModel: environment.studyCalendarViewModel,
                     preferences: environment.preferences,
-                    // 캘린더는 학습 화면을 따로 만들지 않고 기존 데일리 탭으로 보낸다.
+                    persistence: environment.persistence,
+                    // 플래너는 학습 화면을 따로 만들지 않고 기존 데일리 탭으로 보낸다.
                     onStartDaily: { selectedTab = 0 }
                 )
             }
-            .tabItem { Label("캘린더", systemImage: "calendar") }
+            .tabItem { Label("플래너", systemImage: "calendar") }
             .tag(2)
 
             NavigationStack {
-                ProgressScreen(preferences: environment.preferences)
+                ProgressScreen(preferences: environment.preferences, persistence: environment.persistence)
             }
             .tabItem { Label("통계", systemImage: "chart.bar.fill") }
             .tag(3)

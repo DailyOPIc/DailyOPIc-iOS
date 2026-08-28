@@ -116,16 +116,16 @@ struct PaywallView: View {
     private var dailyTokenExplainer: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xs) {
             HStack(spacing: AppSpacing.xs) {
-                Image(systemName: "bolt.fill")
+                DailyTokenIcon(size: 28)
                 Text("데일리 토큰")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.primary)
             }
-            .font(AppTypography.caption)
-            .foregroundStyle(AppPalette.primary)
 
-            Text("토큰 1개로 새로운 Daily 문제 세트 1개를 시작할 수 있어요.")
+            Text("새로운 Daily 문제 세트를 받을 때 토큰 1개, AI 분석 1회에 토큰 1개를 써요.")
                 .font(AppTypography.body)
                 .foregroundStyle(AppPalette.ink)
-            Text("한 번 시작한 세트의 답변과 채점에는 추가 토큰이 들지 않아요. 모의고사는 토큰과 별개로 플랜별 횟수만큼 응시해요.")
+            Text("녹음과 다시 녹음, 이미 받은 결과를 다시 보는 것은 토큰을 쓰지 않아요. 모의고사는 토큰과 별개로 플랜별 횟수만큼 응시해요.")
                 .font(AppTypography.footnote)
                 .foregroundStyle(AppPalette.secondaryInk)
         }

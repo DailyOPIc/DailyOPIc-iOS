@@ -340,6 +340,13 @@ struct Capabilities: Codable, Sendable {
         let calendarAutoReplan: Bool?
         let calendarEvaluationAdaptive: Bool?
         let calendarExamBackplan: Bool?
+        /// 매일 학습 알림. **P9부터 전 플랜 공통이라 앱은 이 값으로 잠그지 않는다.**
+        /// 구 서버가 무료에 false를 내려보내도 학습 알림은 열려 있어야 한다.
+        /// 그래도 디코딩은 유지한다 — 진단에서 서버가 뭐라고 했는지 볼 수 있어야 한다.
+        let calendarStudyReminder: Bool?
+        /// 개인 일정 알림(P9). 새 유료 경계다. 이 필드를 모르는 구 서버가 있을 수 있어
+        /// 옵셔널이고, 없으면 플랜 폴백 표를 쓴다.
+        let calendarEventReminder: Bool?
     }
 
     let minimumSupportedAppVersion: String

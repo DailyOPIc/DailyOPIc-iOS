@@ -6,8 +6,7 @@ struct DailyTokenBadge: View {
 
     var body: some View {
         HStack(spacing: AppSpacing.xs) {
-            Image(systemName: "bolt.fill")
-                .font(.footnote.weight(.bold))
+            DailyTokenIcon(size: 20)
             Text("데일리 토큰")
                 .font(AppTypography.caption)
             Text(count.map(String.init) ?? "—")

@@ -29,6 +29,9 @@ struct AppRootView: View {
         .tint(AppPalette.primary)
         .task {
             environment.persistence.configure(context: modelContext)
+            // 이 빌드를 처음 열 때 남아 있던 분석 기록(최대 50개)의 문제 문장을
+            // 플래너 사본으로 옮긴다. 로컬 · 한 번이면 끝 · 다시 돌아도 결과가 같다.
+            _ = try? environment.persistence.backfillLearnedQuestions()
             if case .launching = environment.launchState {
                 await environment.initialize()
             }

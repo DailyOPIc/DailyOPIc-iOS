@@ -29,11 +29,13 @@ struct DailyRefreshDialog: View {
                     Text(showsDifficulty ? "난이도 재설정" : "새 문제 받기")
                         .font(.title3.bold())
                         .foregroundStyle(AppPalette.ink)
-                    Text("토큰 1개를 사용해 새로운 문제 세트를 받아요.")
-                        .font(AppTypography.body)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                        .multilineTextAlignment(.center)
-                        .fixedSize(horizontal: false, vertical: true)
+                    HStack(spacing: AppSpacing.xs) {
+                        DailyTokenIcon(size: 20)
+                        Text("토큰 1개를 사용해 새로운 문제 세트를 받아요.")
+                            .font(AppTypography.body)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
                 }
 
                 if let progressMessage {

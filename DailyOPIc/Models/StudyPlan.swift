@@ -57,6 +57,15 @@ enum StudyWeekday: Int, Codable, CaseIterable, Identifiable, Sendable, Comparabl
     /// VoiceOver는 "월"을 요일로 읽지 못한다.
     var accessibilityLabel: String { "\(shortLabel)요일" }
 
+    /// 화면에 늘어놓는 순서(일~토). **표시 순서일 뿐** 저장·전송 값은 ISO 그대로다(월=1 … 일=7).
+    static let displayOrder: [StudyWeekday] = [
+        .sunday, .monday, .tuesday, .wednesday, .thursday, .friday, .saturday
+    ]
+
+    /// 일요일 시작 격자에서 이 요일이 놓일 열(일=0 … 토=6).
+    /// 주간 스트립·월간 격자·요일 선택이 전부 이 값 하나로 자리를 잡는다.
+    var displayColumn: Int { rawValue % 7 }
+
     static func from(date: Date, calendar: Calendar = .current) -> StudyWeekday {
         // Calendar.weekday: 일=1 … 토=7 → ISO: 월=1 … 일=7
         let iso = (calendar.component(.weekday, from: date) + 5) % 7 + 1
@@ -178,6 +187,19 @@ struct StudyPlanSettings: Codable, Equatable, Sendable {
 
     func isStudyDay(_ date: Date) -> Bool {
         studyWeekdays.contains(StudyWeekday.from(date: date, calendar: calendar))
+    }
+
+    /// 시험일의 정체성(P12). 절대 시각이 아니라 학습 계획 타임존의 달력 날짜다 —
+    /// 기기 타임존이 바뀌어도 별이 옆 칸으로 넘어가면 안 된다.
+    var examLocalDate: String? {
+        examDate.map { LocalCalendarDate.text(from: $0, timeZone: timeZone) }
+    }
+
+    /// 주간 스트립·전체 캘린더·하루 시트가 **모두** 이 하나만 묻는다.
+    /// 시험일 비교를 화면마다 다시 쓰면 같은 날에 별이 켜졌다 꺼졌다 한다.
+    func isExamDay(_ date: Date) -> Bool {
+        guard let examLocalDate else { return false }
+        return examLocalDate == LocalCalendarDate.text(from: date, timeZone: timeZone)
     }
 
     // 서버 계약: examDate는 "yyyy-MM-dd", preferredStudyTime은 "HH:mm",

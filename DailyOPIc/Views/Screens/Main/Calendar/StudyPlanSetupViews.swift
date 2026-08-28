@@ -94,8 +94,9 @@ enum StudyPlanSetupSection {
                 Text("언제 공부할 수 있나요?")
                     .font(AppTypography.cardTitle)
                 // 작은 아이폰에서도 7칸이 잘리지 않도록 고정 크기 대신 균등 분할.
+                // 순서만 일~토다. 저장되는 값은 ISO(월=1 … 일=7) 그대로다.
                 HStack(spacing: AppSpacing.xs) {
-                    ForEach(StudyWeekday.allCases) { weekday in
+                    ForEach(StudyWeekday.displayOrder) { weekday in
                         chip(weekday)
                     }
                 }
@@ -148,8 +149,9 @@ enum StudyPlanSetupSection {
                 if intensity.desiredDailySets > dailyCapacity {
                     // 잠금이 아니라 설명이다. 여기서 페이월을 열지 않는다.
                     Text(
-                        "현재 \(planName) 플랜은 하루 Daily 토큰이 \(dailyCapacity)개예요. "
-                        + "오늘의 권장 학습량은 \(dailyCapacity)세트로 맞춰 드릴게요."
+                        "현재 \(planName) 플랜은 하루 \(dailyCapacity)세트까지 계획할 수 있어요. "
+                        + "Daily 토큰은 새 문제 세트와 AI 분석에 각각 사용돼요. "
+                        + "권장 학습량은 \(dailyCapacity)세트로 맞춰 드릴게요."
                     )
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
@@ -308,13 +310,22 @@ struct StudyPlanSetupView: View {
     }
 }
 
-/// 학습 계획 수정. 온보딩과 달리 한 화면에서 바로 고친다.
+/// 플래너 설정. 온보딩과 달리 한 화면에서 바로 고친다.
 /// 목표 등급은 여기서도 기존 난이도 재선택 경로를 그대로 연다.
-struct StudyPlanEditView: View {
+///
+/// 플래너 홈에서 설정을 걷어낸 뒤 갈 곳이 여기다. 잠긴 자동화 기능도
+/// "오늘 뭘 할까"를 묻는 홈이 아니라 이 화면이 맡는다.
+///
+/// 학습 알림 on/off는 여기 **없다**. 앱 설정 화면이 그 스위치의 주인이다(P9).
+/// 토글이 두 곳에 있으면 어느 쪽이 진실인지 사용자도 코드도 알 수 없게 된다.
+/// 여기는 알림이 울릴 "공부 시간"만 정한다.
+struct PlannerSettingsView: View {
     let viewModel: StudyCalendarViewModel
     let onChangeTargetLevel: () -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var draft: StudyPlanSettings
+    /// 잠긴 기능을 **직접 눌렀을 때만** Paywall이 열린다. 화면 진입으로는 열지 않는다.
+    @State private var paywallFeature: CalendarLockedFeature?
 
     init(
         viewModel: StudyCalendarViewModel,
@@ -326,52 +337,117 @@ struct StudyPlanEditView: View {
     }
 
     var body: some View {
-        NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                    StudyPlanSetupSection.TargetLevel(
-                        targetLevel: viewModel.targetLevel,
-                        onChange: onChangeTargetLevel
-                    )
-                    StudyPlanSetupSection.ExamDate(
-                        examDate: $draft.examDate,
-                        calendar: draft.calendar
-                    )
-                    StudyPlanSetupSection.Weekdays(weekdays: $draft.studyWeekdays)
-                    StudyPlanSetupSection.Intensity(
-                        intensity: $draft.intensity,
-                        dailyCapacity: viewModel.dailyCapacity,
-                        planName: viewModel.plan.displayName
-                    )
-                    StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
-                    // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
-                    Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.xl) {
+                // 무엇을 고치러 왔는지 바로 찾도록 세 묶음으로 나눈다:
+                // 학습 목표 · 학습 시간 · 플래너 기능.
+                groupHeader("학습 목표")
+                StudyPlanSetupSection.TargetLevel(
+                    targetLevel: viewModel.targetLevel,
+                    onChange: onChangeTargetLevel
+                )
+                StudyPlanSetupSection.ExamDate(
+                    examDate: $draft.examDate,
+                    calendar: draft.calendar
+                )
+                StudyPlanSetupSection.Weekdays(weekdays: $draft.studyWeekdays)
+                StudyPlanSetupSection.Intensity(
+                    intensity: $draft.intensity,
+                    dailyCapacity: viewModel.dailyCapacity,
+                    planName: viewModel.plan.displayName
+                )
+                groupHeader("학습 시간")
+                StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
+                // 토글이 아니라 안내다. 스위치는 앱 설정 화면 한 곳에만 있다.
+                Text("학습 알림은 설정에서 켜고 끌 수 있어요")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                #if DEBUG
+                // 실기기에서 알림이 안 올 때 원인을 좁히는 칸. Release에는 존재하지 않는다.
+                StudyReminderDiagnosticsSection(viewModel: viewModel)
+                #endif
+                lockedFeatureCard
+                // 설정을 바꿔도 이미 완료한 학습 기록은 그대로다.
+                Text("설정을 바꾸면 남은 학습량을 앞으로의 일정에 다시 나눠요. 지금까지의 학습 기록은 그대로 남아요.")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                if let message = viewModel.saveErrorMessage {
+                    Text(message)
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.dangerInk)
+                }
+                PrimaryButton(
+                    title: "저장",
+                    isLoading: viewModel.isSaving,
+                    isDisabled: draft.studyWeekdays.isEmpty
+                ) {
+                    Task {
+                        if await viewModel.save(draft) { dismiss() }
+                    }
+                }
+            }
+            .padding(AppSpacing.lg)
+        }
+        .navigationTitle("플래너 설정")
+        .navigationBarTitleDisplayMode(.inline)
+        .sheet(item: $paywallFeature) { _ in PaywallView(source: .calendarLocked) }
+    }
+
+    /// 묶음 머리글. 카드를 하나 더 두지 않고 한 줄로만 구분한다.
+    private func groupHeader(_ title: String) -> some View {
+        Text(title)
+            .font(AppTypography.caption)
+            .foregroundStyle(AppPalette.secondaryInk)
+            .accessibilityAddTraits(.isHeader)
+    }
+
+    /// 잠긴 자동화 기능. 한 칸에 모아 두고, 여기를 **직접 누를 때만** Paywall이 열린다.
+    @ViewBuilder
+    private var lockedFeatureCard: some View {
+        let lockedFeatures = viewModel.lockedFeatures
+        if !lockedFeatures.isEmpty {
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("플래너 기능")
+                    .font(AppTypography.sectionTitle)
+                ForEach(lockedFeatures, id: \.rawValue) { feature in
+                    lockedFeatureRow(feature)
+                }
+            }
+            .cardStyle()
+        }
+    }
+
+    /// 잠긴 기능 한 줄. 누르면(=의도적인 탭) 그때만 Paywall이 열린다.
+    private func lockedFeatureRow(_ feature: CalendarLockedFeature) -> some View {
+        Button {
+            AppTelemetry.calendarFeatureLockedTap(
+                feature: feature,
+                plan: viewModel.plan
+            )
+            paywallFeature = feature
+        } label: {
+            HStack(alignment: .top, spacing: AppSpacing.sm) {
+                Image(systemName: "lock.fill")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                VStack(alignment: .leading, spacing: AppSpacing.xs) {
+                    Text(feature.title)
+                        .font(AppTypography.callout)
+                    Text(feature.detail)
                         .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
-                    if let message = viewModel.saveErrorMessage {
-                        Text(message)
-                            .font(AppTypography.footnote)
-                            .foregroundStyle(AppPalette.dangerInk)
-                    }
-                    PrimaryButton(
-                        title: "저장",
-                        isLoading: viewModel.isSaving,
-                        isDisabled: draft.studyWeekdays.isEmpty
-                    ) {
-                        Task {
-                            if await viewModel.save(draft) { dismiss() }
-                        }
-                    }
+                        .multilineTextAlignment(.leading)
                 }
-                .padding(AppSpacing.lg)
+                Spacer(minLength: 0)
+                Text(feature.requirementText)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
             }
-            .navigationTitle("학습 설정 수정")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("닫기") { dismiss() }
-                }
-            }
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+        .accessibilityLabel(feature.accessibilityLabel)
+        .accessibilityHint(feature.detail)
     }
 }

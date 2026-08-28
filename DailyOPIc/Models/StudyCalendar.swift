@@ -22,6 +22,14 @@ enum StudyPlanEstimatorConfig {
     static let fallbackDailyCapacity: [PlanEntitlement: Int] = [
         .free: 1, .basic: 3, .plus: 10, .pro: 20
     ]
+    /// capabilities를 못 받았을 때 쓰는 플랜별 광고 보너스 토큰 수
+    /// (서버 `quotaPolicy.practiceAdBonus`의 오프라인 폴백). 무료만 1개다.
+    static let fallbackAdBonus: [PlanEntitlement: Int] = [
+        .free: 1, .basic: 0, .plus: 0, .pro: 0
+    ]
+    /// 계획한 세트 1개를 **완료**까지 끌고 가는 데 드는 최소 데일리 토큰.
+    /// 세트 획득 1 + AI 분석 1(P13). 플래너 어디에도 이 숫자를 다시 적지 않는다.
+    static let minimumTokensPerCompletedDailySet = 2
     /// 시험일이 촉박할 때 하루 목표를 기본값 위로 얼마나 더 올릴 수 있는지(세트).
     /// 토큰이 많다고 그만큼 숙제를 낼 수 있는 것은 아니다.
     static let adaptiveBuffer = 2
@@ -34,13 +42,35 @@ enum StudyPlanEstimator {
     /// 걸리는 예상 기간"이라는 사실을 화면에서 항상 함께 밝힌다.
     static let disclaimer = "최근 학습 정보와 설정한 학습량을 바탕으로 계산한 예상치이며, 실제 OPIc 등급 달성을 보장하지 않아요."
 
-    /// 하루 Daily 토큰 한도. 서버 capabilities가 진실이고, 없을 때만 플랜 표로 폴백한다.
-    /// 광고 보너스는 매일 보장되지 않으므로 권장 학습량에 넣지 않는다.
-    static func dailyCapacity(capabilities: Capabilities?, plan: PlanEntitlement) -> Int {
-        if let practiceDaily = capabilities?.quotaPolicy.practiceDaily, practiceDaily > 0 {
-            return practiceDaily
+    /// 하루에 쓸 수 있는 데일리 토큰 지갑. 서버 capabilities가 진실이고, 없을 때만 플랜 표로
+    /// 폴백한다. 광고 보너스를 더하는 이유: 무료 플랜은 기존 리워드 흐름으로 1개를 더 얻을 수
+    /// 있고, 그게 없으면 무료는 하루 한 세트도 계획할 수 없다. **보너스는 자동으로 주어지지
+    /// 않는다** — 플래너는 상한을 계산할 뿐, 광고를 대신 틀지 않는다.
+    static func dailyTokenWallet(capabilities: Capabilities?, plan: PlanEntitlement) -> Int {
+        let policy = capabilities?.quotaPolicy
+        let base: Int
+        if let practiceDaily = policy?.practiceDaily, practiceDaily > 0 {
+            base = practiceDaily
+        } else {
+            base = StudyPlanEstimatorConfig.fallbackDailyCapacity[plan] ?? 1
         }
-        return StudyPlanEstimatorConfig.fallbackDailyCapacity[plan] ?? 1
+        // 구 서버는 practiceAdBonus를 모른다. 그때만 플랜 표로 폴백한다.
+        let bonus = policy?.practiceAdBonus ?? StudyPlanEstimatorConfig.fallbackAdBonus[plan] ?? 0
+        return max(0, base) + max(0, bonus)
+    }
+
+    /// 토큰 지갑 → 최소한 완료까지 갈 수 있는 세트 수(P13.1).
+    /// 남는 홀수 토큰 1개는 이미 받은 세트의 추가 분석에 쓸 수 있지만, 획득과 분석이 **둘 다**
+    /// 필요한 세트를 하나 더 계획할 근거는 되지 못한다.
+    static func completedSetCapacity(tokens: Int) -> Int {
+        max(0, tokens) / StudyPlanEstimatorConfig.minimumTokensPerCompletedDailySet
+    }
+
+    /// 플래너가 하루에 배정할 수 있는 **세트 수** 상한. 토큰 수가 아니다.
+    /// P13 이전에는 이 둘이 같았다(토큰 1개 = 세트 1개). 이제는 분석도 토큰을 쓰므로
+    /// 토큰 수를 그대로 세트 수로 쓰면 살 수 없는 숙제를 내게 된다.
+    static func dailyCapacity(capabilities: Capabilities?, plan: PlanEntitlement) -> Int {
+        completedSetCapacity(tokens: dailyTokenWallet(capabilities: capabilities, plan: plan))
     }
 
     /// 목표까지 남은 등급 단계. 최근 등급을 모르면 보수적으로 가정한다.
@@ -59,14 +89,19 @@ enum StudyPlanEstimator {
         )
     }
 
+    /// `dailyCapacity`는 **세트 수** 상한이다(`dailyCapacity(capabilities:plan:)`).
+    /// 토큰이 한 세트도 완주시킬 수 없으면 숙제를 만들지 않는다 — 0을 1로 올리지 않는다.
     static func effectiveDailyTarget(intensity: StudyIntensity, dailyCapacity: Int) -> Int {
-        max(1, min(intensity.desiredDailySets, dailyCapacity))
+        guard dailyCapacity > 0 else { return 0 }
+        return max(1, min(intensity.desiredDailySets, dailyCapacity))
     }
 
     /// 시험이 촉박할 때 planner가 하루에 낼 수 있는 최대 학습량.
     /// 플랜 토큰이 20개여도 20세트를 숙제로 내지 않는다는 뜻이다.
+    /// 여기서도 `dailyCapacity`는 토큰이 아니라 세트 수 상한이다.
     static func adaptiveDailyCeiling(baseDailyTarget: Int, dailyCapacity: Int) -> Int {
-        max(
+        guard dailyCapacity > 0 else { return 0 }
+        return max(
             1,
             min(
                 dailyCapacity,
@@ -115,6 +150,63 @@ struct StudyDay: Identifiable, Sendable {
 
     var id: Date { date }
     var isScheduled: Bool { state != .rest }
+
+    /// 실제로 학습이 있었던 날. 배정량을 다 채웠는지와 무관하다(연속 학습의 기준).
+    var hasLearning: Bool { completedSets > 0 }
+
+    /// 계획에 없던 날(휴식일·계획 종료일)인데 스스로 학습한 날.
+    /// 계획은 그대로 휴식일이고 실제 활동만 그 위에 얹는다 — 배정량을 만들지 않는다.
+    var hasUnscheduledLearning: Bool { targetSets == 0 && completedSets > 0 }
+
+    /// 화면이 읽어 줄 학습량 한 조각. 배정이 없던 날에 가짜 분모("1 / 0세트")를 만들지 않고,
+    /// 배정이 없었으니 "완료"라고도 하지 않는다. 아무 일도 없던 휴식일은 할 말이 없다(nil).
+    var setsSummaryText: String? {
+        if targetSets > 0 { return "\(completedSets) / \(targetSets)세트" }
+        return hasUnscheduledLearning ? "\(completedSets)세트 학습" : nil
+    }
+
+    /// 한 칸을 소리로 읽을 때의 학습 부분. 주간 스트립과 월간 격자가 같은 문장을 쓴다.
+    /// 휴식일에 스스로 학습한 날을 "휴식"만 읽고 끝내면 실제로 한 일이 사라진다.
+    var studyAccessibilityText: String {
+        [state.title, setsSummaryText].compactMap { $0 }.joined(separator: ", ")
+    }
+}
+
+/// 캘린더 한 칸의 진하기 한 단계. **실제로 완료한 학습 횟수**만 재료로 쓴다 —
+/// 계획 대비 비율이 아니다(계획 10세트 중 1회와 계획 1세트 중 1회는 같은 진하기다).
+/// 색을 여섯 개 만들지 않고 브랜드 색 하나의 농도만 바꾼다.
+enum LearningActivityLevel: Int, Sendable, CaseIterable {
+    case zero
+    case one
+    case two
+    case three
+    case four
+    case fivePlus
+
+    /// 5회 이상은 모두 같은 최고 단계다. 하루에 10회를 해도 더 진해질 칸이 없다.
+    static func make(completedSets: Int) -> LearningActivityLevel {
+        LearningActivityLevel(rawValue: min(max(completedSets, 0), 5)) ?? .zero
+    }
+
+    /// 0회는 아예 칠하지 않는다. 학습하지 않은 날에 색이 남으면 "조금 했다"로 읽힌다.
+    var fillOpacity: Double {
+        switch self {
+        case .zero: 0
+        case .one: 0.14
+        case .two: 0.3
+        case .three: 0.5
+        case .four: 0.74
+        case .fivePlus: 1
+        }
+    }
+
+    /// 진한 칸 위의 날짜 숫자는 흰색이어야 읽힌다.
+    var needsLightNumber: Bool { self == .four || self == .fivePlus }
+
+    /// 색·단계를 말하지 않고 실제로 한 일만 읽어 준다("진한 보라색"도 "레벨 4"도 아니다).
+    static func accessibilityText(completedSets: Int) -> String {
+        completedSets > 0 ? "\(completedSets)회 학습" : "학습 기록 없음"
+    }
 }
 
 /// 날짜별 배정 학습량. 지난 날은 그날 고정된 값을, 오늘·미래는 지금 계산한 적응형 값을 준다.
@@ -224,32 +316,6 @@ enum StudyCalendarEngine {
         }
     }
 
-    /// 연속 학습일. 휴식일은 끊지 않고, 그날 배정량에 못 미친 지난 학습일은 끊는다.
-    /// 아직 끝나지 않은 오늘은 끊지 않는다(미완료여도 어제까지의 기록을 유지).
-    static func streak(
-        today: Date,
-        settings: StudyPlanSettings,
-        schedule: StudySchedule,
-        completions: [Date: Int]
-    ) -> Int {
-        let calendar = settings.calendar
-        var day = calendar.startOfDay(for: today)
-        var streak = 0
-        for offset in 0..<StudyPlanEstimatorConfig.maximumForecastDays {
-            let target = schedule.targetSets(for: day)
-            if target > 0 {
-                if (completions[day] ?? 0) >= target {
-                    streak += 1
-                } else if offset > 0 {
-                    break
-                }
-            }
-            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
-            day = previous
-        }
-        return streak
-    }
-
     /// 이번 주 요약. "이번 주 3 / 5일 완료"의 두 숫자.
     static func weekSummary(
         days: [StudyDay]
@@ -268,12 +334,50 @@ enum StudyCalendarEngine {
         }
     }
 
-    /// 그 주의 월요일. 주간 스트립은 사용자 지역 설정과 무관하게 월~일로 고정한다
-    /// (공부 요일 선택 화면과 순서를 맞추기 위해).
+    /// 그 주의 일요일. 주간 스트립은 사용자 지역 설정과 무관하게 일~토로 고정한다
+    /// (월간 격자·공부 요일 선택 화면과 순서를 맞추기 위해). 저장되는 요일 값은 ISO 그대로다.
     static func startOfWeek(for date: Date, calendar: Calendar) -> Date {
         let day = calendar.startOfDay(for: date)
-        let offset = StudyWeekday.from(date: day, calendar: calendar).rawValue - 1
+        let offset = StudyWeekday.from(date: day, calendar: calendar).displayColumn
         return calendar.date(byAdding: .day, value: -offset, to: day) ?? day
+    }
+}
+
+/// 연속 학습일. **계획 달성률이 아니라 실제 학습 활동**을 센다.
+///
+/// - 하루에 1세트라도 실제 학습(`StudySetCompletionRecord`)이 있으면 그날은 학습한 날이다.
+///   배정 3세트 중 1세트만 했어도 연속은 이어진다.
+/// - 휴식일에 스스로 학습해도 학습한 날이다(계획은 그대로 휴식일이다).
+/// - 같은 날 몇 세트를 하든 하루는 하루다.
+///
+/// 계획 이행률(`weekSummary`)과 섞지 않는다. 그쪽은 "계획대로 했는가", 이쪽은 "학습을 이어가는가"다.
+enum LearningStreak {
+    /// 실제 학습이 있었던 로컬 날짜들. 완료 수 0인 날은 학습한 날이 아니다.
+    static func learningDays(from completions: [Date: Int]) -> Set<Date> {
+        Set(completions.filter { $0.value > 0 }.keys)
+    }
+
+    /// 오늘까지 며칠 연속으로 학습했는가.
+    ///
+    /// 오늘은 아직 끝나지 않았으므로 기록이 없어도 끊지 않는다 — 아침 9시에 어제까지의
+    /// "3일 연속"이 0일로 보이면 안 된다. 오늘이 기록 없이 지나가고 다음 로컬 날짜가
+    /// 시작되면 그때 끊긴다.
+    ///
+    /// - Parameter calendar: 학습 계획 타임존의 달력. 기기 타임존(UTC 포함)으로 자르면
+    ///   여행 중에 하루가 둘로 갈라지거나 사라진다.
+    static func current(learningDays: Set<Date>, today: Date, calendar: Calendar) -> Int {
+        var day = calendar.startOfDay(for: today)
+        var streak = 0
+        for offset in 0..<StudyPlanEstimatorConfig.maximumForecastDays {
+            if learningDays.contains(day) {
+                streak += 1
+            } else if offset > 0 {
+                break
+            }
+            guard let previous = calendar.date(byAdding: .day, value: -1, to: day) else { break }
+            day = previous
+        }
+        return streak
     }
 }
 
@@ -283,7 +387,10 @@ struct StudyCalendarSnapshot: Sendable {
     let schedule: StudySchedule
     let today: StudyDay
     let weekDays: [StudyDay]
+    /// 실제 학습이 며칠 연속됐는가(`LearningStreak`). 계획 이행률과 다른 지표다.
     let streak: Int
+    /// 계획 이행률의 분자. 배정된 학습일 중 배정량을 다 채운 날 수다.
+    /// 휴식일 자율 학습은 여기 들어오지 않는다 — 계획에 없던 날이기 때문이다.
     let weekCompletedDays: Int
     let weekScheduledDays: Int
     /// 시험일까지 남은 일수(오늘=0). 시험일이 없으면 nil.
@@ -341,11 +448,10 @@ struct StudyCalendarSnapshot: Sendable {
                 completions: completions
             ),
             weekDays: weekDays,
-            streak: StudyCalendarEngine.streak(
+            streak: LearningStreak.current(
+                learningDays: LearningStreak.learningDays(from: completions),
                 today: startOfToday,
-                settings: settings,
-                schedule: schedule,
-                completions: completions
+                calendar: calendar
             ),
             weekCompletedDays: summary.completed,
             weekScheduledDays: summary.scheduled,
@@ -361,12 +467,13 @@ struct StudyCalendarSnapshot: Sendable {
 
     /// 지난 날짜까지 포함해 고정해 둘 배정 학습량("yyyy-MM-dd" → 세트).
     /// 기록이 없는 지난 학습일은 지금 아는 정보(기본 학습량)로 한 번 채우고, 그 뒤로는
-    /// 이 값이 바뀌지 않는다. 오늘은 현재 적응형 배정량으로 갱신된다.
+    /// 이 값이 바뀌지 않는다. 휴식일은 0으로 함께 고정한다(P8.1).
+    /// 오늘은 현재 적응형 배정량으로 갱신된다.
     func targetsToFreeze(settings: StudyPlanSettings, today: Date) -> [String: Int] {
         let startOfToday = settings.calendar.startOfDay(for: today)
         let timeZone = settings.timeZone
         // 화면에 되살려 보여준 값을 그대로 고정한다(같은 함수를 쓴다).
-        var targets = AdaptiveStudyPlanner.historicalTargets(
+        var targets = AdaptiveStudyPlanner.targetsToFreeze(
             settings: settings,
             baseDailyTarget: plan.baseDailyTarget,
             today: startOfToday
