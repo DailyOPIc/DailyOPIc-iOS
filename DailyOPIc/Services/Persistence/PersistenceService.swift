@@ -352,6 +352,34 @@ final class PersistenceService {
         try context.save()
     }
 
+    // MARK: AI 맞춤 단어장 (P14.2 · 이 기기에만 저장)
+
+    /// 만든 세트 전부, 최신이 먼저. 세트를 다시 여는 것은 공짜다 — 저장된 항목을
+    /// 읽을 뿐 서버도 AI도 부르지 않는다.
+    func vocabularyGeneratedSets() throws -> [VocabularyGeneratedSetRecord] {
+        guard let context else { return [] }
+        return try context.fetch(
+            FetchDescriptor<VocabularyGeneratedSetRecord>(
+                sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+            )
+        )
+    }
+
+    /// 받은 세트를 저장한다. 같은 `setId`가 이미 있으면 덮어쓰지 않고 그냥 둔다 —
+    /// 같은 조작을 재시도해 서버가 같은 세트를 다시 준 경우이고, 그때 학습 기록이
+    /// 붙어 있는 항목을 새 항목으로 바꿔칠 이유가 없다.
+    func saveVocabularyGeneratedSet(_ set: VocabularyGeneratedSet) throws {
+        guard let context else { return }
+        let setID = set.setId
+        var descriptor = FetchDescriptor<VocabularyGeneratedSetRecord>(
+            predicate: #Predicate { $0.setID == setID }
+        )
+        descriptor.fetchLimit = 1
+        guard try context.fetch(descriptor).isEmpty else { return }
+        context.insert(try VocabularyGeneratedSetRecord(set: set))
+        try context.save()
+    }
+
     private func insertVocabularyState(
         entryID: String,
         context: ModelContext

@@ -238,3 +238,37 @@ final class VocabularyStateRecord {
     func wasStudied(on today: String) -> Bool { lastStudiedLocalDate == today }
 }
 
+
+/// AI가 만들어 준 단어장 한 세트(P14.2). **이 기기에만** 저장한다.
+///
+/// UserDefaults가 아니라 SwiftData인 이유: 세트는 사용자가 만들 때마다 늘어나고
+/// 상한이 없다. 30개짜리 배열이 계속 쌓이는 것을 앱 설정 파일에 넣지 않는다.
+///
+/// 항목 30개는 JSON 한 덩어리로 넣는다(`MockDraftRecord`가 쓰는 방식 그대로).
+/// 항목 하나하나를 관계형으로 쪼갤 이유가 없다 — 세트 단위로만 읽고 쓴다.
+/// 항목별 학습 상태는 여기가 아니라 `VocabularyStateRecord`에 남는다. 시드든
+/// AI든 복습 알고리즘은 하나다.
+@Model
+final class VocabularyGeneratedSetRecord {
+    /// 서버가 준 세트 id. 유니크라 같은 조작을 재시도해 같은 세트가 다시 와도
+    /// 두 줄이 되지 않는다.
+    @Attribute(.unique) var setID: String
+    var topicRaw: String
+    var targetLevelRaw: String
+    var createdAt: Date
+    var entriesData: Data
+
+    init(set: VocabularyGeneratedSet) throws {
+        setID = set.setId
+        topicRaw = set.topic.rawValue
+        targetLevelRaw = set.targetLevel.rawValue
+        createdAt = set.createdAt
+        entriesData = try JSONCoding.encoder.encode(set.entries)
+    }
+
+    var topic: VocabularyTopic? { VocabularyTopic(rawValue: topicRaw) }
+    var targetLevel: OPIcLevel? { OPIcLevel(rawValue: targetLevelRaw) }
+    var entries: [VocabularyEntry] {
+        (try? JSONCoding.decoder.decode([VocabularyEntry].self, from: entriesData)) ?? []
+    }
+}

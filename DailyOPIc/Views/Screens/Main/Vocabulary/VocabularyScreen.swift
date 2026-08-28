@@ -8,19 +8,34 @@ enum VocabularyRoute: Hashable {
     case topic(VocabularyTopic)
     case saved
     case mastered
+    /// AI 맞춤 단어장(P14.2). 여는 것도 학습하는 것도 토큰을 쓰지 않는다.
+    case generatedSets
+    case generatedSet(setID: String)
+    case generatedStudy(setID: String)
 }
 
 /// 단어장 홈. "오늘 뭘 외우지?"에 답하는 것이 이 화면의 전부다.
 /// 통계는 여기 두지 않는다 — 통계 탭이 이미 그 일을 한다.
 ///
-/// 이 화면과 그 아래 모든 화면은 **네트워크도 AI도 부르지 않는다.** 단어 데이터는
-/// 앱에 담긴 시드(`VocabularyCatalog`)이고, 내 상태는 이 기기의 SwiftData다.
+/// 무료 영역(오늘의 단어 · 오늘 복습 · 주제별 · 검색 · 내 단어)은 **네트워크도 AI도
+/// 부르지 않는다.** 단어 데이터는 앱에 담긴 시드(`VocabularyCatalog`)와 이미 받아 둔
+/// AI 세트이고, 내 상태는 이 기기의 SwiftData다.
+///
+/// 토큰이 나가는 곳은 "AI 맞춤 단어장" 하나뿐이고, 거기서도 **만들 때 1개**다.
+/// 이미 만든 세트를 다시 여는 것은 공짜다.
 struct VocabularyScreen: View {
     let preferences: AppPreferences
     let persistence: PersistenceService
 
+    @Environment(AppEnvironment.self) private var environment
     @Query private var states: [VocabularyStateRecord]
+    @Query(sort: \VocabularyGeneratedSetRecord.createdAt, order: .reverse)
+    private var generatedSets: [VocabularyGeneratedSetRecord]
     @State private var query = ""
+    @State private var isPresentingGeneration = false
+    /// 첫 탭 전까지는 만들지 않는다. 단어장을 구경만 하는 사용자에게 네트워크
+    /// 클라이언트를 붙들 이유가 없다.
+    @State private var generation: VocabularyGenerationViewModel?
 
     /// 하루 경계는 학습 계획 타임존을 따른다 — 플래너의 "오늘"과 단어장의 "오늘"이
     /// 다른 날을 가리키면 안 된다.
@@ -31,12 +46,19 @@ struct VocabularyScreen: View {
         Dictionary(states.map { ($0.entryID, $0) }, uniquingKeysWith: { first, _ in first })
     }
 
+    /// 이 기기가 아는 단어 전부 = 번들 시드 + 이미 받아 둔 AI 세트.
+    /// 저장·익힘·복습·검색은 전부 이 목록에서 항목을 되찾는다 — AI로 만든 단어라고
+    /// 내 단어 목록에서 빠지지 않는다.
+    private var allEntries: [VocabularyEntry] {
+        VocabularyCatalog.all + generatedSets.flatMap(\.entries)
+    }
+
     /// 오늘의 새 단어. 배정이 없거나 어제 것이면 화면이 뜰 때 다시 배정한다.
     private var todayEntries: [VocabularyEntry] {
         guard let set = preferences.vocabularyDailySet, set.covers(todayLocalDate) else {
             return []
         }
-        return VocabularyCatalog.entries(ids: set.entryIDs)
+        return VocabularyCatalog.entries(ids: set.entryIDs, in: allEntries)
     }
 
     /// 오늘 한 번이라도 답한 항목 수. "3 / 10"의 분자다.
@@ -57,25 +79,29 @@ struct VocabularyScreen: View {
             states: stateByID,
             today: todayLocalDate
         )
-        return VocabularyCatalog.entries(ids: remaining)
+        return VocabularyCatalog.entries(ids: remaining, in: allEntries)
     }
 
     /// 복습할 차례가 된 항목. 예정일이 오늘이거나 지난 것만 — 미래 일정과 아직 배우지
     /// 않은 단어는 들어오지 않는다. 익힘의 30일 유지 복습은 들어온다.
     private var dueEntries: [VocabularyEntry] {
         let dueIDs = VocabularyDailyProgress.dueIDs(states: states, today: todayLocalDate)
-        return VocabularyCatalog.entries(ids: dueIDs)
+        return VocabularyCatalog.entries(ids: dueIDs, in: allEntries)
     }
 
     private var savedEntries: [VocabularyEntry] {
-        VocabularyCatalog.entries(ids: states.filter(\.isSaved).map(\.entryID))
+        VocabularyCatalog.entries(ids: states.filter(\.isSaved).map(\.entryID), in: allEntries)
     }
 
     private var masteredEntries: [VocabularyEntry] {
-        VocabularyCatalog.entries(ids: states.filter { $0.status == .mastered }.map(\.entryID))
+        VocabularyCatalog.entries(
+            ids: states.filter { $0.status == .mastered }.map(\.entryID),
+            in: allEntries
+        )
     }
 
-    private var searchResults: [VocabularyEntry] { VocabularyCatalog.search(query) }
+    /// 검색도 AI 세트를 포함한다. 화면을 하나 더 만들지 않는다.
+    private var searchResults: [VocabularyEntry] { VocabularyCatalog.search(query, in: allEntries) }
 
     var body: some View {
         ScrollView {
@@ -95,6 +121,16 @@ struct VocabularyScreen: View {
             )
         }
         .onAppear(perform: assignTodayIfNeeded)
+        .sheet(isPresented: $isPresentingGeneration) {
+            if let generation {
+                VocabularyGenerationSheet(
+                    viewModel: generation,
+                    targetLevel: preferences.targetLevel ?? .IM2,
+                    // 이미 가진 표현만 제외 힌트로 보낸다. 시드 전체를 보내지 않는다.
+                    existingTerms: generatedSets.flatMap { $0.entries.map(\.term) }
+                )
+            }
+        }
     }
 
     // MARK: 홈
@@ -105,6 +141,7 @@ struct VocabularyScreen: View {
             todayCard
             reviewCard
             topicsSection
+            aiVocabularySection
             myWordsSection
         }
         .padding(AppSpacing.lg)
@@ -212,6 +249,61 @@ struct VocabularyScreen: View {
                     .accessibilityLabel("\(topic.label) 단어 \(count)개")
                 }
             }
+        }
+    }
+
+    /// 유일하게 토큰이 나가는 자리. 무료 영역보다 아래에 둔다 — 단어장 전체가
+    /// 유료처럼 보이면 안 된다.
+    private var aiVocabularySection: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("AI 맞춤 단어장")
+                .font(AppTypography.sectionTitle)
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text("목표 \(preferences.targetLevel?.rawValue ?? "IM2")에 맞춰 30개를 만들어요.")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .fixedSize(horizontal: false, vertical: true)
+                // 누르기 전에 비용을 말한다. 화폐는 데일리 토큰 하나뿐이다.
+                HStack(spacing: AppSpacing.xs) {
+                    DailyTokenIcon(size: 18)
+                    Text("\(VocabularyGenerationViewModel.tokenCost)")
+                        .font(AppTypography.callout)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+                .accessibilityElement(children: .combine)
+                .accessibilityLabel(
+                    "데일리 토큰 \(VocabularyGenerationViewModel.tokenCost)개를 사용해요"
+                )
+                PrimaryButton(title: "맞춤 단어 만들기") {
+                    if generation == nil {
+                        generation = VocabularyGenerationViewModel(environment: environment)
+                    }
+                    isPresentingGeneration = true
+                }
+                if !generatedSets.isEmpty {
+                    // 이미 만든 세트를 다시 보는 것은 무료다.
+                    NavigationLink(value: VocabularyRoute.generatedSets) {
+                        HStack(spacing: AppSpacing.sm) {
+                            Text("AI 단어장")
+                                .font(AppTypography.body)
+                                .foregroundStyle(AppPalette.ink)
+                            Spacer(minLength: 0)
+                            Text("\(generatedSets.count)개")
+                                .font(AppTypography.footnote)
+                                .foregroundStyle(AppPalette.secondaryInk)
+                            Image(systemName: "chevron.right")
+                                .font(.footnote)
+                                .foregroundStyle(AppPalette.secondaryInk)
+                        }
+                        .padding(.vertical, AppSpacing.sm)
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .minimumTouchTarget()
+                    .accessibilityLabel("AI 단어장 \(generatedSets.count)개")
+                }
+            }
+            .cardStyle()
         }
     }
 
@@ -327,7 +419,25 @@ struct VocabularyScreen: View {
                 entries: masteredEntries,
                 states: stateByID
             )
+        case .generatedSets:
+            VocabularyGeneratedSetListView(sets: generatedSets)
+        case let .generatedSet(setID):
+            if let record = generatedSet(setID) {
+                VocabularyGeneratedSetDetailView(record: record, states: stateByID)
+            }
+        case let .generatedStudy(setID):
+            // AI 항목도 같은 학습 카드·같은 복습 엔진을 쓴다(별도 알고리즘 없음).
+            VocabularyStudyView(
+                kind: .aiSet,
+                entries: generatedSet(setID)?.entries ?? [],
+                persistence: persistence,
+                timeZone: timeZone
+            )
         }
+    }
+
+    private func generatedSet(_ setID: String) -> VocabularyGeneratedSetRecord? {
+        generatedSets.first { $0.setID == setID }
     }
 
     // MARK: 오늘의 배정

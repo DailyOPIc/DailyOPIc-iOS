@@ -42,7 +42,9 @@ extension Schema {
             // 그날 학습한 문제의 가벼운 사본(P11.1). 추가만 하는 모델이라 마이그레이션이 없다.
             PlannerLearnedQuestionRecord.self,
             // 단어장 항목별 내 상태(P14). 마찬가지로 추가만 한다.
-            VocabularyStateRecord.self
+            VocabularyStateRecord.self,
+            // AI 맞춤 단어장 세트(P14.2). 상한 없이 늘어나므로 설정이 아니라 여기다.
+            VocabularyGeneratedSetRecord.self
         ])
     }
 }

@@ -5,6 +5,7 @@ enum AsyncOperationKind: String, Sendable {
     case speechAnalysis
     case mockResult
     case difficultyAdjustment
+    case vocabularyGeneration
     case dataLoading
     case retry
 
@@ -14,6 +15,7 @@ enum AsyncOperationKind: String, Sendable {
         case .speechAnalysis: "답변을 분석하고 있어요"
         case .mockResult: "모의고사 결과를 만들고 있어요"
         case .difficultyAdjustment: "난이도를 조정하고 있어요"
+        case .vocabularyGeneration: "맞춤 단어를 만들고 있어요"
         case .dataLoading: "학습 정보를 불러오고 있어요"
         case .retry: "처리 상태를 확인하고 있어요"
         }

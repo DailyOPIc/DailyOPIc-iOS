@@ -267,6 +267,8 @@ struct PersistenceSchemaTests {
             "PlannerLearnedQuestionRecord",
             // P14 — 단어장 항목별 내 상태. 마찬가지로 추가만 했다.
             "VocabularyStateRecord",
+            // P14.2 — AI가 만들어 준 단어장 세트. 역시 추가만 했다.
+            "VocabularyGeneratedSetRecord",
         ])
     }
 

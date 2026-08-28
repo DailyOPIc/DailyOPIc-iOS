@@ -1,14 +1,17 @@
 import SwiftUI
 
 /// 학습 세션의 종류. 오늘의 단어와 복습은 진행도도 마무리 문구도 섞이지 않는다.
+/// AI 맞춤 세트도 같은 카드·같은 복습 엔진을 쓴다 — 다른 건 제목뿐이다.
 enum VocabularyStudyKind {
     case newWords
     case review
+    case aiSet
 
     var title: String {
         switch self {
         case .newWords: "오늘의 단어"
         case .review: "오늘 복습"
+        case .aiSet: "AI 맞춤 단어"
         }
     }
 
@@ -16,6 +19,7 @@ enum VocabularyStudyKind {
         switch self {
         case .newWords: "오늘의 단어 완료"
         case .review: "오늘 복습 완료"
+        case .aiSet: "AI 맞춤 단어 완료"
         }
     }
 
@@ -23,6 +27,7 @@ enum VocabularyStudyKind {
         switch self {
         case .newWords: "\(count)개의 단어와 표현을 학습했어요."
         case .review: "\(count)개의 표현을 복습했어요."
+        case .aiSet: "\(count)개의 맞춤 단어와 표현을 학습했어요."
         }
     }
 }

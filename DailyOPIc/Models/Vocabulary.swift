@@ -203,8 +203,11 @@ enum VocabularyCatalog {
         all.first { $0.id == id }
     }
 
-    static func entries(ids: [String]) -> [VocabularyEntry] {
-        let byID = Dictionary(all.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    /// id로 항목을 되찾는다. `in:`을 주면 시드 대신 그 목록에서 찾는다 —
+    /// AI가 만들어 준 항목(P14.2)도 같은 저장·복습 상태를 쓰기 때문에, 상태에 남은
+    /// id를 되돌릴 때 시드만 보면 AI 항목이 조용히 사라진다.
+    static func entries(ids: [String], in entries: [VocabularyEntry] = all) -> [VocabularyEntry] {
+        let byID = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
         return ids.compactMap { byID[$0] }
     }
 
