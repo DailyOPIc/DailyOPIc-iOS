@@ -33,31 +33,37 @@ struct VocabularyScreen: View {
 
     /// 오늘의 새 단어. 배정이 없거나 어제 것이면 화면이 뜰 때 다시 배정한다.
     private var todayEntries: [VocabularyEntry] {
-        guard let set = preferences.vocabularyDailySet, set.isValid(on: todayLocalDate) else {
+        guard let set = preferences.vocabularyDailySet, set.covers(todayLocalDate) else {
             return []
         }
         return VocabularyCatalog.entries(ids: set.entryIDs)
     }
 
-    /// 오늘 이미 확인한 항목. "3 / 10"의 분자다.
+    /// 오늘 한 번이라도 답한 항목 수. "3 / 10"의 분자다.
+    /// 저장된 기록에서 세므로 같은 세션에서 다시 만난 카드가 진행도를 두 번 올리지 않고,
+    /// 앱을 껐다 켜도 같은 숫자가 나온다.
     private var todayStudiedCount: Int {
-        todayEntries.filter { entry in
-            guard let reviewedAt = stateByID[entry.id]?.lastReviewedAt else { return false }
-            return LocalCalendarDate.text(from: reviewedAt, timeZone: timeZone) == todayLocalDate
-        }
-        .count
+        VocabularyDailyProgress.attemptedCount(
+            assigned: todayEntries.map(\.id),
+            states: stateByID,
+            today: todayLocalDate
+        )
     }
 
+    /// 오늘 아직 답하지 않은 항목. "이어서 학습"은 여기서부터 이어진다.
     private var todayRemaining: [VocabularyEntry] {
-        todayEntries.filter { entry in
-            guard let reviewedAt = stateByID[entry.id]?.lastReviewedAt else { return true }
-            return LocalCalendarDate.text(from: reviewedAt, timeZone: timeZone) != todayLocalDate
-        }
+        let remaining = VocabularyDailyProgress.remainingIDs(
+            assigned: todayEntries.map(\.id),
+            states: stateByID,
+            today: todayLocalDate
+        )
+        return VocabularyCatalog.entries(ids: remaining)
     }
 
-    /// 복습할 차례가 된 항목. 규칙은 `VocabularyReviewPolicy` 한 곳에서 온다.
+    /// 복습할 차례가 된 항목. 예정일이 오늘이거나 지난 것만 — 미래 일정과 아직 배우지
+    /// 않은 단어는 들어오지 않는다. 익힘의 30일 유지 복습은 들어온다.
     private var dueEntries: [VocabularyEntry] {
-        let dueIDs = states.filter { $0.isDueForReview() }.map(\.entryID)
+        let dueIDs = VocabularyDailyProgress.dueIDs(states: states, today: todayLocalDate)
         return VocabularyCatalog.entries(ids: dueIDs)
     }
 
@@ -126,7 +132,7 @@ struct VocabularyScreen: View {
             Text("오늘의 단어")
                 .font(AppTypography.sectionTitle)
             if todayEntries.isEmpty {
-                Text("배울 새 단어를 모두 익혔어요. 주제별 단어에서 더 골라 보세요.")
+                Text("새로 배울 단어를 다 봤어요. 주제별 단어에서 더 골라 보세요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
@@ -136,13 +142,13 @@ struct VocabularyScreen: View {
                         "오늘의 단어 \(todayEntries.count)개 중 \(todayStudiedCount)개 완료"
                     )
                 if todayRemaining.isEmpty {
-                    Label("오늘의 단어 완료", systemImage: "checkmark.circle.fill")
+                    Label("오늘 학습 완료", systemImage: "checkmark.circle.fill")
                         .font(AppTypography.callout)
                         .foregroundStyle(AppPalette.primary)
                 } else {
                     NavigationLink(value: VocabularyRoute.todayStudy) {
                         primaryLabel(
-                            todayStudiedCount > 0 ? "이어서 학습하기" : "오늘의 단어 시작",
+                            todayStudiedCount > 0 ? "이어서 학습" : "오늘의 단어 시작",
                             systemImage: "book.closed.fill"
                         )
                     }
@@ -158,7 +164,7 @@ struct VocabularyScreen: View {
             Text("오늘 복습")
                 .font(AppTypography.sectionTitle)
             if dueEntries.isEmpty {
-                Text("복습할 단어가 아직 없어요.")
+                Text("오늘 복습할 단어가 없어요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
@@ -293,15 +299,17 @@ struct VocabularyScreen: View {
         switch route {
         case .todayStudy:
             VocabularyStudyView(
-                title: "오늘의 단어",
+                kind: .newWords,
                 entries: todayRemaining,
-                persistence: persistence
+                persistence: persistence,
+                timeZone: timeZone
             )
         case .review:
             VocabularyStudyView(
-                title: "오늘 복습",
+                kind: .review,
                 entries: dueEntries,
-                persistence: persistence
+                persistence: persistence,
+                timeZone: timeZone
             )
         case let .topic(topic):
             VocabularyTopicView(topic: topic, states: stateByID)
@@ -324,16 +332,19 @@ struct VocabularyScreen: View {
 
     // MARK: 오늘의 배정
 
-    /// 하루에 한 번만 정한다. 같은 날 다시 들어와도 이미 배정된 10개를 그대로 쓴다.
-    /// 익힌 단어는 새 단어 후보에서 뺀다.
+    /// 하루에 한 번만 정한다. 같은 날 다시 들어와도 이미 배정된 목록을 그대로 쓴다 —
+    /// 학습을 시작한 뒤 항목이 조용히 바뀌지 않는다.
+    ///
+    /// 후보는 **한 번도 학습하지 않은** 항목뿐이다. 이미 배운 단어는 복습 시스템의 몫이라
+    /// 새 단어인 척 돌아오지 않는다. 남은 후보가 10개보다 적으면 그만큼만 준다.
     private func assignTodayIfNeeded() {
         let today = todayLocalDate
-        if let existing = preferences.vocabularyDailySet, existing.isValid(on: today) { return }
-        let mastered = Set(states.filter { $0.status == .mastered }.map(\.entryID))
+        if let existing = preferences.vocabularyDailySet, existing.covers(today) { return }
+        let studied = VocabularyDailyProgress.studiedIDs(states: states)
         preferences.vocabularyDailySet = VocabularyDailySetPlanner.assign(
             localDate: today,
             catalog: VocabularyCatalog.all,
-            excluding: mastered,
+            excluding: studied,
             targetLevel: preferences.targetLevel
         )
     }

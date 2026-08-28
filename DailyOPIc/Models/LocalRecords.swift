@@ -186,42 +186,55 @@ final class VocabularyStateRecord {
     /// 시드 항목의 id. 유니크라 같은 단어가 두 줄이 되지 않는다.
     @Attribute(.unique) var entryID: String
     var statusRaw: String
+    /// 학습 상태와 무관하다. 익혔다고 저장되지 않고, 저장을 풀어도 학습 기록은 남는다.
     var isSaved: Bool
-    var successCount: Int
+    /// **연속** 성공 횟수. 복습 간격을 정하는 값이라 "몰라요" 한 번에 0으로 돌아간다.
+    /// 누적 성공 횟수가 아니다.
+    var consecutiveSuccessCount: Int
+    /// 누적 오답 횟수. 이쪽은 초기화하지 않는다.
     var failureCount: Int
-    var firstLearnedAt: Date?
-    var lastReviewedAt: Date?
-    /// 다음 복습 시각. P14의 잠정 규칙(`VocabularyReviewPolicy`)이 채운다.
-    var nextReviewAt: Date?
+    /// 마지막으로 답한 날("yyyy-MM-dd", 학습 계획 타임존). 오늘 진행도의 근거다 —
+    /// 시각이 아니라 날짜로 들고 있어야 "오늘 봤는가"가 타임존과 무관하게 같은 답을 준다.
+    var lastStudiedLocalDate: String?
+    /// 다음 복습 날짜("yyyy-MM-dd"). 아직 학습 전이면 없다.
+    var nextReviewLocalDate: String?
     var updatedAt: Date
 
     init(
         entryID: String,
         status: VocabularyStatus = .new,
         isSaved: Bool = false,
-        successCount: Int = 0,
+        consecutiveSuccessCount: Int = 0,
         failureCount: Int = 0,
-        firstLearnedAt: Date? = nil,
-        lastReviewedAt: Date? = nil,
-        nextReviewAt: Date? = nil,
+        lastStudiedLocalDate: String? = nil,
+        nextReviewLocalDate: String? = nil,
         updatedAt: Date = .now
     ) {
         self.entryID = entryID
         self.statusRaw = status.rawValue
         self.isSaved = isSaved
-        self.successCount = successCount
+        self.consecutiveSuccessCount = consecutiveSuccessCount
         self.failureCount = failureCount
-        self.firstLearnedAt = firstLearnedAt
-        self.lastReviewedAt = lastReviewedAt
-        self.nextReviewAt = nextReviewAt
+        self.lastStudiedLocalDate = lastStudiedLocalDate
+        self.nextReviewLocalDate = nextReviewLocalDate
         self.updatedAt = updatedAt
     }
 
     var status: VocabularyStatus { VocabularyStatus(rawValue: statusRaw) ?? .new }
 
-    /// 지금 복습할 차례인가. 예정 시각이 없으면(익힘·미학습) 차례가 아니다.
-    func isDueForReview(at now: Date = .now) -> Bool {
-        guard status != .mastered, let nextReviewAt else { return false }
-        return nextReviewAt <= now
+    /// 한 번이라도 학습한 항목인가. 오늘의 **새** 단어 후보에서 빼는 기준이다 —
+    /// 저장만 해 둔 항목(`.new`)은 아직 새 단어다.
+    var hasBeenStudied: Bool { status != .new }
+
+    /// 오늘 복습할 차례인가. 예정일이 오늘이거나 지났으면 차례다.
+    /// 익힘(mastered)도 30일마다 돌아오므로 여기서 빠지지 않는다.
+    /// "yyyy-MM-dd"는 사전순 비교가 곧 날짜순 비교다.
+    func isDueForReview(on today: String) -> Bool {
+        guard let nextReviewLocalDate else { return false }
+        return nextReviewLocalDate <= today
     }
+
+    /// 오늘 이미 답했는가. 같은 세션에서 다시 만나도 이 값은 한 번만 오늘로 바뀐다.
+    func wasStudied(on today: String) -> Bool { lastStudiedLocalDate == today }
 }
+

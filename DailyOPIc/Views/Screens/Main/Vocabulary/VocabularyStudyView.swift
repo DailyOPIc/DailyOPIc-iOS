@@ -1,37 +1,75 @@
 import SwiftUI
 
+/// 학습 세션의 종류. 오늘의 단어와 복습은 진행도도 마무리 문구도 섞이지 않는다.
+enum VocabularyStudyKind {
+    case newWords
+    case review
+
+    var title: String {
+        switch self {
+        case .newWords: "오늘의 단어"
+        case .review: "오늘 복습"
+        }
+    }
+
+    var completionTitle: String {
+        switch self {
+        case .newWords: "오늘의 단어 완료"
+        case .review: "오늘 복습 완료"
+        }
+    }
+
+    func completionMessage(count: Int) -> String {
+        switch self {
+        case .newWords: "\(count)개의 단어와 표현을 학습했어요."
+        case .review: "\(count)개의 표현을 복습했어요."
+        }
+    }
+}
+
 /// 단어 학습 카드. 뜻을 먼저 떠올리고(1단계), 확인한 뒤(2단계) 스스로 판정한다.
 ///
-/// 카드 묶음은 화면에 들어올 때 한 번 정해진다. 답할 때마다 목록이 줄어들면
-/// 남은 개수가 눈앞에서 흔들린다.
+/// 순서는 `VocabularyStudySession`이 정한다 — 화면은 큐를 직접 주무르지 않는다.
+/// 틀린 항목은 세션 안에서 한 번 더 나오고, 그 이상은 나오지 않는다.
 ///
 /// 발음은 기기 내장 TTS(`PromptPlaybackService`)다 — 네트워크·AI·데일리 토큰과 무관하다.
 struct VocabularyStudyView: View {
-    let title: String
-    let entries: [VocabularyEntry]
+    let kind: VocabularyStudyKind
     let persistence: PersistenceService
+    /// 하루 경계는 학습 계획 타임존을 따른다.
+    let timeZone: TimeZone
 
     @Environment(\.dismiss) private var dismiss
     @StateObject private var playback = PromptPlaybackService()
-    @State private var index = 0
+    @State private var session: VocabularyStudySession
     @State private var isRevealed = false
-    @State private var knownCount = 0
+    /// 세션이 처음 받은 항목 수. 진행도 표시("3 / 10")의 분모다.
+    private let plannedCount: Int
 
-    private var current: VocabularyEntry? {
-        entries.indices.contains(index) ? entries[index] : nil
+    init(
+        kind: VocabularyStudyKind,
+        entries: [VocabularyEntry],
+        persistence: PersistenceService,
+        timeZone: TimeZone
+    ) {
+        self.kind = kind
+        self.persistence = persistence
+        self.timeZone = timeZone
+        plannedCount = entries.count
+        _session = State(initialValue: VocabularyStudySession(entries: entries))
     }
 
     var body: some View {
         Group {
-            if entries.isEmpty {
+            if plannedCount == 0 {
                 emptyState
-            } else if let current {
+            } else if let current = session.current {
                 card(current)
             } else {
                 summary
             }
         }
-        .navigationTitle(title)
+        .navigationTitle(kind.title)
         .navigationBarTitleDisplayMode(.inline)
         .onDisappear { playback.stop() }
     }
@@ -60,11 +98,12 @@ struct VocabularyStudyView: View {
         .padding(AppSpacing.lg)
     }
 
+    /// 다시 나온 카드는 진행도를 되돌리지 않는다 — 이미 답한 개수를 센다.
     private var progressLine: some View {
-        Text("\(index + 1) / \(entries.count)")
+        Text("\(session.attemptedCount) / \(plannedCount)")
             .font(AppTypography.footnote)
             .foregroundStyle(AppPalette.secondaryInk)
-            .accessibilityLabel("\(entries.count)개 중 \(index + 1)번째")
+            .accessibilityLabel("\(plannedCount)개 중 \(session.attemptedCount)개 완료")
     }
 
     private func termBlock(_ entry: VocabularyEntry) -> some View {
@@ -180,29 +219,50 @@ struct VocabularyStudyView: View {
 
     private func answer(_ entry: VocabularyEntry, knewIt: Bool) {
         // 저장 실패가 학습을 막지는 않는다. 다음 카드로는 넘어간다.
-        try? persistence.recordVocabularyAnswer(entryID: entry.id, knewIt: knewIt)
-        if knewIt { knownCount += 1 }
+        try? persistence.recordVocabularyAnswer(
+            entryID: entry.id,
+            knewIt: knewIt,
+            timeZone: timeZone
+        )
         playback.stop()
         isRevealed = false
-        index += 1
+        session.answer(knewIt: knewIt)
     }
 
     // MARK: 마무리 · 빈 상태
 
+    /// 점수도 등급도 없다. 무엇을 했고 무엇을 다시 볼지만 알려 준다.
     private var summary: some View {
         VStack(spacing: AppSpacing.md) {
             Image(systemName: "checkmark.seal.fill")
                 .font(.system(size: 52))
                 .foregroundStyle(AppPalette.primary)
-            Text("\(entries.count)개를 모두 봤어요")
+            Text(kind.completionTitle)
                 .font(AppTypography.cardTitle)
-            Text("알아요 \(knownCount)개 · 몰라요 \(entries.count - knownCount)개")
+            Text(kind.completionMessage(count: session.attemptedCount))
                 .font(AppTypography.body)
                 .foregroundStyle(AppPalette.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            HStack(spacing: AppSpacing.lg) {
+                summaryCount(title: "알아요", value: session.knownCount)
+                summaryCount(title: "다시 볼 표현", value: session.forgottenCount)
+            }
             PrimaryButton(title: "단어장으로 돌아가기") { dismiss() }
                 .padding(.top, AppSpacing.md)
         }
         .padding(AppSpacing.lg)
+    }
+
+    private func summaryCount(title: String, value: Int) -> some View {
+        VStack(spacing: AppSpacing.xs) {
+            Text(title)
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+            Text("\(value)")
+                .font(AppTypography.cardTitle)
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("\(title) \(value)개")
     }
 
     private var emptyState: some View {

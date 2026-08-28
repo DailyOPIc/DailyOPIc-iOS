@@ -323,31 +323,31 @@ final class PersistenceService {
     }
 
     /// 카드에서 "알아요 / 몰라요"를 누른 결과. 다음에 언제 볼지는
-    /// `VocabularyReviewPolicy` 한 곳에서만 정한다(P14.1이 그 규칙을 교체한다).
+    /// `VocabularyReviewPolicy` 한 곳에서만 정한다.
+    ///
+    /// 오늘 날짜는 학습 계획 타임존으로 계산한다 — 기기 자정이 아니라 플래너와 같은 하루 경계다.
     func recordVocabularyAnswer(
         entryID: String,
         knewIt: Bool,
-        now: Date = .now,
-        calendar: Calendar = .current
+        timeZone: TimeZone,
+        now: Date = .now
     ) throws {
         guard let context, !entryID.isEmpty else { return }
         let record = try vocabularyState(entryID: entryID, context: context)
             ?? insertVocabularyState(entryID: entryID, context: context)
-        if knewIt {
-            record.successCount += 1
-        } else {
-            record.failureCount += 1
-        }
+        let today = LocalCalendarDate.text(from: now, timeZone: timeZone)
+        if !knewIt { record.failureCount += 1 }
         let outcome = VocabularyReviewPolicy.apply(
             knewIt: knewIt,
-            successCount: record.successCount,
-            now: now,
-            calendar: calendar
+            consecutiveSuccessCount: record.consecutiveSuccessCount,
+            today: today,
+            timeZone: timeZone
         )
         record.statusRaw = outcome.status.rawValue
-        record.nextReviewAt = outcome.nextReviewAt
-        record.lastReviewedAt = now
-        if record.firstLearnedAt == nil { record.firstLearnedAt = now }
+        record.consecutiveSuccessCount = outcome.consecutiveSuccessCount
+        record.nextReviewLocalDate = outcome.nextReviewLocalDate
+        // 같은 세션에서 다시 답해도 "오늘 봤다"는 사실은 그대로다 — 진행도가 두 번 오르지 않는다.
+        record.lastStudiedLocalDate = today
         record.updatedAt = now
         try context.save()
     }

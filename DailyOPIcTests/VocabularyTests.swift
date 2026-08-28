@@ -3,8 +3,8 @@ import SwiftData
 import Testing
 @testable import DailyOPIc
 
-/// 단어장(P14). 시드 데이터의 무결성, 로컬 검색, 하루치 배정의 안정성,
-/// 이 기기에만 남는 상태 저장을 지킨다. 어느 테스트도 네트워크·AI를 부르지 않는다.
+/// 단어장 시드·검색·주제·하루치 배정(P14). 어느 테스트도 네트워크·AI를 부르지 않는다.
+/// 복습 일정과 세션 큐(P14.1)는 `VocabularyReviewTests`에 있다.
 struct VocabularyTests {
 
     // MARK: 시드 데이터
@@ -153,8 +153,8 @@ struct VocabularyTests {
         let first = VocabularyDailySetPlanner.assign(localDate: "2026-03-05", catalog: VocabularyCatalog.all)
         let second = VocabularyDailySetPlanner.assign(localDate: "2026-03-05", catalog: VocabularyCatalog.all)
         #expect(first == second)
-        #expect(first.isValid(on: "2026-03-05"))
-        #expect(!first.isValid(on: "2026-03-06"))
+        #expect(first.covers("2026-03-05"))
+        #expect(!first.covers("2026-03-06"))
     }
 
     @Test func nextDayMovesTheSelection() {
@@ -163,7 +163,8 @@ struct VocabularyTests {
         #expect(today.entryIDs != tomorrow.entryIDs)
     }
 
-    @Test func masteredEntriesAreLeftOut() {
+    /// 이미 학습한 항목은 새 단어 후보에서 빠진다(P14.1 · 상세는 VocabularyReviewTests).
+    @Test func studiedEntriesAreLeftOut() {
         let plain = VocabularyDailySetPlanner.assign(localDate: "2026-03-05", catalog: VocabularyCatalog.all)
         let excluded = Set(plain.entryIDs.prefix(3))
         let next = VocabularyDailySetPlanner.assign(
@@ -186,7 +187,8 @@ struct VocabularyTests {
     @Test func emptyCatalogGivesAnEmptySet() {
         let set = VocabularyDailySetPlanner.assign(localDate: "2026-03-05", catalog: [])
         #expect(set.entryIDs.isEmpty)
-        #expect(!set.isValid(on: "2026-03-05"))
+        // 비어 있어도 "오늘 몫은 정했다"는 사실은 남는다.
+        #expect(set.covers("2026-03-05"))
     }
 
     /// 하루치가 한 주제로만 채워지지 않는다.
@@ -234,33 +236,6 @@ struct VocabularyTests {
         #expect(VocabularyDailySetPlanner.dayIndex(of: "1999-12-31") == -1)
     }
 
-    // MARK: 복습 판정 (P14 잠정 규칙)
-
-    @Test func wrongAnswerComesBackToday() {
-        let now = Date(timeIntervalSince1970: 1_772_000_000)
-        let outcome = VocabularyReviewPolicy.apply(knewIt: false, successCount: 3, now: now)
-        #expect(outcome.status == .learning)
-        #expect(outcome.nextReviewAt == now)
-    }
-
-    @Test func firstCorrectAnswerSchedulesTomorrow() throws {
-        let now = Date(timeIntervalSince1970: 1_772_000_000)
-        let outcome = VocabularyReviewPolicy.apply(knewIt: true, successCount: 1, now: now)
-        #expect(outcome.status == .reviewing)
-        let next = try #require(outcome.nextReviewAt)
-        #expect(next > now)
-    }
-
-    @Test func secondCorrectAnswerMasters() {
-        let outcome = VocabularyReviewPolicy.apply(
-            knewIt: true,
-            successCount: VocabularyReviewPolicy.masteryThreshold,
-            now: .now
-        )
-        #expect(outcome.status == .mastered)
-        #expect(outcome.nextReviewAt == nil)
-    }
-
     // MARK: 내 단어 저장 (기기 저장소)
 
     @MainActor
@@ -300,34 +275,6 @@ struct VocabularyTests {
         let states = try service.vocabularyStates()
         #expect(states.count == 1)
         #expect(states.first?.isSaved == false)
-    }
-
-    @MainActor
-    @Test func twoCorrectAnswersMasterTheEntryAndPersist() throws {
-        let container = try makeContainer()
-        let service = makeService(container)
-        try service.recordVocabularyAnswer(entryID: "cafe-crowded", knewIt: true)
-        try service.recordVocabularyAnswer(entryID: "cafe-crowded", knewIt: true)
-
-        let record = try #require(try makeService(container).vocabularyStates().first)
-        #expect(record.successCount == 2)
-        #expect(record.failureCount == 0)
-        #expect(record.status == .mastered)
-        #expect(record.nextReviewAt == nil)
-        #expect(record.firstLearnedAt != nil)
-        #expect(!record.isDueForReview())
-    }
-
-    @MainActor
-    @Test func wrongAnswerLeavesTheEntryDue() throws {
-        let container = try makeContainer()
-        let service = makeService(container)
-        try service.recordVocabularyAnswer(entryID: "cafe-crowded", knewIt: false)
-
-        let record = try #require(try service.vocabularyStates().first)
-        #expect(record.failureCount == 1)
-        #expect(record.status == .learning)
-        #expect(record.isDueForReview())
     }
 
     @MainActor
