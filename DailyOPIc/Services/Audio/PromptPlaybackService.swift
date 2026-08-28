@@ -22,6 +22,14 @@ final class PromptPlaybackService: NSObject, ObservableObject, AVSpeechSynthesiz
         speak(question.prompt)
     }
 
+    /// 임의의 영어 문장을 읽어 준다(단어장 발음 듣기 · P14). 기기 내장 음성이라
+    /// 네트워크·AI·데일리 토큰과 아무 관계가 없다. 문제 번호 추적은 하지 않는다.
+    func play(text: String) {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+        speak(trimmed)
+    }
+
     func hasStarted(_ question: GeneratedQuestion) -> Bool {
         startedNumbers.contains(question.number)
     }

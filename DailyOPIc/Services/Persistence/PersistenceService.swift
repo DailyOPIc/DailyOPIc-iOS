@@ -303,6 +303,75 @@ final class PersistenceService {
         return try context.fetch(descriptor).first
     }
 
+    // MARK: 단어장 (P14 · 이 기기에만 저장)
+
+    /// 상태 기록이 있는 항목 전부. 기록이 없는 항목은 `.new`이고 저장 안 함이다.
+    func vocabularyStates() throws -> [VocabularyStateRecord] {
+        guard let context else { return [] }
+        return try context.fetch(FetchDescriptor<VocabularyStateRecord>())
+    }
+
+    /// 저장/저장 해제. 아직 학습한 적 없는 항목도 저장할 수 있어야 해서 없으면 만든다.
+    func setVocabularySaved(entryID: String, isSaved: Bool, now: Date = .now) throws {
+        guard let context, !entryID.isEmpty else { return }
+        let record = try vocabularyState(entryID: entryID, context: context)
+            ?? insertVocabularyState(entryID: entryID, context: context)
+        guard record.isSaved != isSaved else { return }
+        record.isSaved = isSaved
+        record.updatedAt = now
+        try context.save()
+    }
+
+    /// 카드에서 "알아요 / 몰라요"를 누른 결과. 다음에 언제 볼지는
+    /// `VocabularyReviewPolicy` 한 곳에서만 정한다(P14.1이 그 규칙을 교체한다).
+    func recordVocabularyAnswer(
+        entryID: String,
+        knewIt: Bool,
+        now: Date = .now,
+        calendar: Calendar = .current
+    ) throws {
+        guard let context, !entryID.isEmpty else { return }
+        let record = try vocabularyState(entryID: entryID, context: context)
+            ?? insertVocabularyState(entryID: entryID, context: context)
+        if knewIt {
+            record.successCount += 1
+        } else {
+            record.failureCount += 1
+        }
+        let outcome = VocabularyReviewPolicy.apply(
+            knewIt: knewIt,
+            successCount: record.successCount,
+            now: now,
+            calendar: calendar
+        )
+        record.statusRaw = outcome.status.rawValue
+        record.nextReviewAt = outcome.nextReviewAt
+        record.lastReviewedAt = now
+        if record.firstLearnedAt == nil { record.firstLearnedAt = now }
+        record.updatedAt = now
+        try context.save()
+    }
+
+    private func insertVocabularyState(
+        entryID: String,
+        context: ModelContext
+    ) -> VocabularyStateRecord {
+        let record = VocabularyStateRecord(entryID: entryID)
+        context.insert(record)
+        return record
+    }
+
+    private func vocabularyState(
+        entryID: String,
+        context: ModelContext
+    ) throws -> VocabularyStateRecord? {
+        var descriptor = FetchDescriptor<VocabularyStateRecord>(
+            predicate: #Predicate { $0.entryID == entryID }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
+    }
+
     /// "yyyy-MM-dd"는 사전순 비교가 곧 날짜순 비교라 문자열 하나로 잘라낼 수 있다.
     private func trimStudyDayPlans(context: ModelContext, today: String) throws {
         let parts = today.split(separator: "-").compactMap { Int($0) }

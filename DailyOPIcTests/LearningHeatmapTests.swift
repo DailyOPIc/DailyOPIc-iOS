@@ -265,6 +265,8 @@ struct PersistenceSchemaTests {
             "PlannerEventRecord",
             // P11.1 — 그날 학습한 문제의 가벼운 사본. 추가만 했고 뺀 것은 없다.
             "PlannerLearnedQuestionRecord",
+            // P14 — 단어장 항목별 내 상태. 마찬가지로 추가만 했다.
+            "VocabularyStateRecord",
         ])
     }
 

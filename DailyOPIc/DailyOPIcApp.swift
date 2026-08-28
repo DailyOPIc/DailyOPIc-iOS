@@ -40,7 +40,9 @@ extension Schema {
             // 플래너 개인 일정(P3). 메모는 출시된 적이 없어 P10에서 통째로 걷어냈다.
             PlannerEventRecord.self,
             // 그날 학습한 문제의 가벼운 사본(P11.1). 추가만 하는 모델이라 마이그레이션이 없다.
-            PlannerLearnedQuestionRecord.self
+            PlannerLearnedQuestionRecord.self,
+            // 단어장 항목별 내 상태(P14). 마찬가지로 추가만 한다.
+            VocabularyStateRecord.self
         ])
     }
 }

@@ -26,6 +26,7 @@ final class AppPreferences {
         static let studyReminders = "native_study_reminders_enabled"
         static let studyReminderPreference = "native_study_reminder_preference"
         static let reviewRequestAttempt = "native_review_request_attempted_at"
+        static let vocabularyDailySet = "native_vocabulary_daily_set"
     }
 
     private let defaults: UserDefaults
@@ -100,6 +101,22 @@ final class AppPreferences {
             }
         }
     }
+    /// 오늘 배정된 단어장 새 단어(P14). 하루에 한 번만 정해지고, 같은 로컬 날짜
+    /// 안에서는 앱을 다시 열어도 바뀌지 않는다.
+    ///
+    /// SwiftData가 아니라 여기 두는 이유: 하루에 값 **하나**뿐이고 조회 조건이 없다.
+    /// 항목별 상태(저장·성공/실패·복습 시각)는 개수가 늘고 목록으로 훑어야 해서
+    /// `VocabularyStateRecord`(SwiftData)에 남긴다.
+    var vocabularyDailySet: VocabularyDailySet? {
+        didSet {
+            if let vocabularyDailySet,
+               let data = try? JSONCoding.encoder.encode(vocabularyDailySet) {
+                defaults.set(data, forKey: Key.vocabularyDailySet)
+            } else {
+                defaults.removeObject(forKey: Key.vocabularyDailySet)
+            }
+        }
+    }
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -161,6 +178,11 @@ final class AppPreferences {
             mockSurvey = survey
         } else {
             mockSurvey = nil
+        }
+        if let data = defaults.data(forKey: Key.vocabularyDailySet) {
+            vocabularyDailySet = try? JSONCoding.decoder.decode(VocabularyDailySet.self, from: data)
+        } else {
+            vocabularyDailySet = nil
         }
         if ProcessInfo.processInfo.arguments.contains("-uiTestingNewUser") {
             hasCompletedOnboarding = false

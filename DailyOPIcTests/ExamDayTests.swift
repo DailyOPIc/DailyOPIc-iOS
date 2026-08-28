@@ -427,7 +427,7 @@ struct ExamDaySheetTests {
         #expect(!entities.contains("ExamChecklistRecord"))
         #expect(!entities.contains("PlannerExamDayRecord"))
         #expect(!entities.contains("PlannerDayNoteRecord"))
-        // P11.1까지의 모델 그대로 — 시험일 안내는 저장소를 늘리지 않았다.
-        #expect(entities.count == 7)
+        // 시험일 안내는 저장소를 늘리지 않았다. P11.1까지의 7개 + P14 단어장 상태 1개.
+        #expect(entities.count == 8)
     }
 }

@@ -1,0 +1,3197 @@
+{
+  "version": 1,
+  "entries": [
+    {
+      "id": "home-cozy",
+      "term": "cozy",
+      "type": "word",
+      "meaningKo": "아늑한, 포근한",
+      "exampleEn": "My room is pretty small, but it feels really cozy.",
+      "exampleKo": "제 방은 좀 작지만 정말 아늑해요.",
+      "collocations": [
+        "a cozy room",
+        "feel cozy",
+        "make it cozy"
+      ],
+      "topics": [
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-neighborhood",
+      "term": "neighborhood",
+      "type": "word",
+      "meaningKo": "동네, 이웃 지역",
+      "exampleEn": "I've lived in the same neighborhood since I was a kid.",
+      "exampleKo": "저는 어릴 때부터 같은 동네에 살고 있어요.",
+      "collocations": [
+        "a quiet neighborhood",
+        "move to a new neighborhood",
+        "in my neighborhood"
+      ],
+      "topics": [
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-convenient",
+      "term": "convenient",
+      "type": "word",
+      "meaningKo": "편리한, 가까워서 편한",
+      "exampleEn": "Everything is close by, so it's really convenient for me.",
+      "exampleKo": "다 가까이에 있어서 저한테는 정말 편해요.",
+      "collocations": [
+        "really convenient",
+        "convenient for me",
+        "a convenient location"
+      ],
+      "topics": [
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-spacious",
+      "term": "spacious",
+      "type": "word",
+      "meaningKo": "널찍한, 공간이 넓은",
+      "exampleEn": "The living room is spacious enough for the whole family.",
+      "exampleKo": "거실이 온 가족이 쓰기에 충분히 널찍해요.",
+      "collocations": [
+        "a spacious living room",
+        "spacious enough",
+        "feel spacious"
+      ],
+      "topics": [
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-right-next-to",
+      "term": "right next to",
+      "type": "phrase",
+      "meaningKo": "바로 옆에",
+      "exampleEn": "There's a small park right next to my building.",
+      "exampleKo": "저희 건물 바로 옆에 작은 공원이 있어요.",
+      "collocations": [
+        "right next to my place",
+        "right next to the station",
+        "sit right next to"
+      ],
+      "topics": [
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-walking-distance",
+      "term": "within walking distance",
+      "type": "phrase",
+      "meaningKo": "걸어갈 수 있는 거리에",
+      "exampleEn": "The subway station is within walking distance, so I barely drive.",
+      "exampleKo": "지하철역이 걸어갈 수 있는 거리라 운전을 거의 안 해요.",
+      "collocations": [
+        "within walking distance of",
+        "within walking distance from home"
+      ],
+      "topics": [
+        "home_neighborhood",
+        "transportation"
+      ],
+      "usageRoles": [
+        "description",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-best-thing-about",
+      "term": "the best thing about my place is",
+      "type": "pattern",
+      "meaningKo": "우리 집에서 가장 좋은 점은 ~예요",
+      "exampleEn": "The best thing about my place is how quiet it gets at night.",
+      "exampleKo": "우리 집에서 가장 좋은 점은 밤에 아주 조용해진다는 거예요.",
+      "collocations": [
+        "the best thing about it is",
+        "the best part is"
+      ],
+      "topics": [
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "preference",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "home-takes-about",
+      "term": "it takes about ten minutes to get there",
+      "type": "pattern",
+      "meaningKo": "거기까지 10분쯤 걸려요",
+      "exampleEn": "It takes about ten minutes to get there on foot.",
+      "exampleKo": "걸어서 거기까지 10분쯤 걸려요.",
+      "collocations": [
+        "it takes about",
+        "it only takes",
+        "it takes me around"
+      ],
+      "topics": [
+        "home_neighborhood",
+        "transportation"
+      ],
+      "usageRoles": [
+        "description",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-assignment",
+      "term": "assignment",
+      "type": "word",
+      "meaningKo": "과제, 숙제",
+      "exampleEn": "I had three assignments due in the same week.",
+      "exampleKo": "같은 주에 과제 마감이 세 개나 있었어요.",
+      "collocations": [
+        "hand in an assignment",
+        "a group assignment",
+        "finish the assignment"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "description",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-lecture",
+      "term": "lecture",
+      "type": "word",
+      "meaningKo": "강의, 수업",
+      "exampleEn": "The morning lectures are tough, but the professor is really good.",
+      "exampleKo": "오전 강의는 힘들지만 교수님이 정말 좋으세요.",
+      "collocations": [
+        "attend a lecture",
+        "a boring lecture",
+        "skip a lecture"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-strict",
+      "term": "strict",
+      "type": "word",
+      "meaningKo": "엄격한",
+      "exampleEn": "My professor is strict about deadlines, but he's fair.",
+      "exampleKo": "저희 교수님은 마감에 엄격하시지만 공정하세요.",
+      "collocations": [
+        "a strict teacher",
+        "strict about",
+        "pretty strict"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "description",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-cram",
+      "term": "cram for a test",
+      "type": "phrase",
+      "meaningKo": "벼락치기로 시험공부를 하다",
+      "exampleEn": "I used to cram for tests the night before, but I don't anymore.",
+      "exampleKo": "예전에는 시험 전날 벼락치기를 했는데 이제는 안 해요.",
+      "collocations": [
+        "cram all night",
+        "cram for the final"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "change"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-major-in",
+      "term": "major in",
+      "type": "phrase",
+      "meaningKo": "~을 전공하다",
+      "exampleEn": "I majored in business, but I ended up working in design.",
+      "exampleKo": "저는 경영학을 전공했는데 결국 디자인 쪽 일을 하게 됐어요.",
+      "collocations": [
+        "major in economics",
+        "change my major",
+        "my major is"
+      ],
+      "topics": [
+        "school",
+        "work"
+      ],
+      "usageRoles": [
+        "description",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-take-a-class",
+      "term": "take a class",
+      "type": "phrase",
+      "meaningKo": "수업을 듣다",
+      "exampleEn": "I'm taking an online class twice a week these days.",
+      "exampleKo": "요즘은 일주일에 두 번 온라인 수업을 듣고 있어요.",
+      "collocations": [
+        "take a class online",
+        "take an extra class",
+        "drop a class"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "routine",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-currently-majoring",
+      "term": "I'm currently majoring in",
+      "type": "pattern",
+      "meaningKo": "저는 지금 ~을 전공하고 있어요",
+      "exampleEn": "I'm currently majoring in computer science at a university in Seoul.",
+      "exampleKo": "저는 지금 서울에 있는 대학에서 컴퓨터공학을 전공하고 있어요.",
+      "collocations": [
+        "I'm currently studying",
+        "I'm currently working on"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "school-what-i-like-most",
+      "term": "what I like most about my school is",
+      "type": "pattern",
+      "meaningKo": "우리 학교에서 제가 가장 좋아하는 점은 ~예요",
+      "exampleEn": "What I like most about my school is the atmosphere on campus.",
+      "exampleKo": "우리 학교에서 제가 가장 좋아하는 점은 캠퍼스 분위기예요.",
+      "collocations": [
+        "what I like most about it is",
+        "what I really enjoy is"
+      ],
+      "topics": [
+        "school"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-coworker",
+      "term": "coworker",
+      "type": "word",
+      "meaningKo": "직장 동료",
+      "exampleEn": "I get along well with most of my coworkers.",
+      "exampleKo": "저는 대부분의 직장 동료들과 잘 지내요.",
+      "collocations": [
+        "a close coworker",
+        "get along with coworkers",
+        "my coworkers and I"
+      ],
+      "topics": [
+        "work",
+        "family_friends"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-deadline",
+      "term": "deadline",
+      "type": "word",
+      "meaningKo": "마감일",
+      "exampleEn": "Things get stressful when a deadline is coming up.",
+      "exampleKo": "마감이 다가오면 좀 스트레스를 받아요.",
+      "collocations": [
+        "meet a deadline",
+        "a tight deadline",
+        "miss the deadline"
+      ],
+      "topics": [
+        "work"
+      ],
+      "usageRoles": [
+        "description",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-commute",
+      "term": "commute",
+      "type": "word",
+      "meaningKo": "통근하다, 통근",
+      "exampleEn": "I commute by subway, and it takes about an hour each way.",
+      "exampleKo": "저는 지하철로 통근하는데 편도로 한 시간쯤 걸려요.",
+      "collocations": [
+        "commute to work",
+        "a long commute",
+        "commute by bus"
+      ],
+      "topics": [
+        "work",
+        "transportation"
+      ],
+      "usageRoles": [
+        "routine",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-stressful",
+      "term": "stressful",
+      "type": "word",
+      "meaningKo": "스트레스가 많은",
+      "exampleEn": "Last month was stressful, but this month is a lot calmer.",
+      "exampleKo": "지난달은 힘들었는데 이번 달은 훨씬 여유로워요.",
+      "collocations": [
+        "a stressful day",
+        "less stressful",
+        "stressful but rewarding"
+      ],
+      "topics": [
+        "work"
+      ],
+      "usageRoles": [
+        "emotion",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-in-charge-of",
+      "term": "be in charge of",
+      "type": "phrase",
+      "meaningKo": "~을 맡고 있다, 담당하다",
+      "exampleEn": "I'm in charge of talking to clients and writing reports.",
+      "exampleKo": "저는 고객 응대와 보고서 작성을 맡고 있어요.",
+      "collocations": [
+        "in charge of the team",
+        "be in charge of a project"
+      ],
+      "topics": [
+        "work"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-work-overtime",
+      "term": "work overtime",
+      "type": "phrase",
+      "meaningKo": "야근하다",
+      "exampleEn": "I try not to work overtime, but sometimes I have no choice.",
+      "exampleKo": "야근을 안 하려고 하는데 가끔은 어쩔 수 없어요.",
+      "collocations": [
+        "work overtime again",
+        "avoid working overtime"
+      ],
+      "topics": [
+        "work"
+      ],
+      "usageRoles": [
+        "routine",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-been-working-for",
+      "term": "I've been working there for about",
+      "type": "pattern",
+      "meaningKo": "저는 거기서 ~쯤 일해 왔어요",
+      "exampleEn": "I've been working there for about three years now.",
+      "exampleKo": "저는 이제 거기서 3년쯤 일해 왔어요.",
+      "collocations": [
+        "I've been doing it for about",
+        "I've been here since"
+      ],
+      "topics": [
+        "work"
+      ],
+      "usageRoles": [
+        "description",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "work-typical-day-starts",
+      "term": "my typical day at work starts with",
+      "type": "pattern",
+      "meaningKo": "제 평범한 근무 하루는 ~으로 시작해요",
+      "exampleEn": "My typical day at work starts with checking emails over coffee.",
+      "exampleKo": "제 평범한 근무 하루는 커피를 마시며 이메일을 확인하는 걸로 시작해요.",
+      "collocations": [
+        "my day usually starts with",
+        "the first thing I do is"
+      ],
+      "topics": [
+        "work",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-crowded",
+      "term": "crowded",
+      "type": "word",
+      "meaningKo": "붐비는, 사람이 많은",
+      "exampleEn": "The cafe usually gets crowded on weekends.",
+      "exampleKo": "그 카페는 주말에 보통 붐벼요.",
+      "collocations": [
+        "a crowded place",
+        "get crowded",
+        "crowded with people"
+      ],
+      "topics": [
+        "cafes",
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-atmosphere",
+      "term": "atmosphere",
+      "type": "word",
+      "meaningKo": "분위기",
+      "exampleEn": "I go there for the atmosphere more than the coffee.",
+      "exampleKo": "저는 커피보다 분위기 때문에 거기에 가요.",
+      "collocations": [
+        "a quiet atmosphere",
+        "love the atmosphere",
+        "a cozy atmosphere"
+      ],
+      "topics": [
+        "cafes"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-regular",
+      "term": "regular",
+      "type": "word",
+      "meaningKo": "단골손님",
+      "exampleEn": "I'm a regular there, so the staff already know my order.",
+      "exampleKo": "저는 거기 단골이라 직원분들이 제 주문을 이미 알아요.",
+      "collocations": [
+        "a regular customer",
+        "become a regular"
+      ],
+      "topics": [
+        "cafes"
+      ],
+      "usageRoles": [
+        "description",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-grab-a-coffee",
+      "term": "grab a coffee",
+      "type": "phrase",
+      "meaningKo": "커피 한잔하다",
+      "exampleEn": "I usually grab a coffee on my way to work.",
+      "exampleKo": "저는 보통 출근길에 커피 한잔해요.",
+      "collocations": [
+        "grab a quick coffee",
+        "grab a bite",
+        "grab something to drink"
+      ],
+      "topics": [
+        "cafes",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-chat-over-coffee",
+      "term": "chat over coffee",
+      "type": "phrase",
+      "meaningKo": "커피를 마시며 이야기하다",
+      "exampleEn": "We sat there and chatted over coffee for almost two hours.",
+      "exampleKo": "저희는 거기 앉아서 거의 두 시간 동안 커피를 마시며 이야기했어요.",
+      "collocations": [
+        "chat over coffee",
+        "talk over lunch",
+        "catch up over coffee"
+      ],
+      "topics": [
+        "cafes",
+        "family_friends"
+      ],
+      "usageRoles": [
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-favorite-place",
+      "term": "one of my favorite places",
+      "type": "pattern",
+      "meaningKo": "내가 가장 좋아하는 장소 중 하나",
+      "exampleEn": "There's a small cafe near my house, and it's one of my favorite places.",
+      "exampleKo": "집 근처에 작은 카페가 있는데, 제가 가장 좋아하는 장소 중 하나예요.",
+      "collocations": [
+        "one of my favorite places",
+        "one of my favorite things",
+        "one of the best places"
+      ],
+      "topics": [
+        "cafes"
+      ],
+      "usageRoles": [
+        "preference",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-i-usually-order",
+      "term": "I usually order",
+      "type": "pattern",
+      "meaningKo": "저는 보통 ~을 주문해요",
+      "exampleEn": "I usually order an iced americano, even in winter.",
+      "exampleKo": "저는 겨울에도 보통 아이스 아메리카노를 주문해요.",
+      "collocations": [
+        "I usually order",
+        "I always go for",
+        "I normally get"
+      ],
+      "topics": [
+        "cafes"
+      ],
+      "usageRoles": [
+        "routine",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "cafe-great-place-to",
+      "term": "it's a great place to",
+      "type": "pattern",
+      "meaningKo": "~하기에 아주 좋은 곳이에요",
+      "exampleEn": "It's a great place to relax after a long day.",
+      "exampleKo": "긴 하루를 보내고 쉬기에 아주 좋은 곳이에요.",
+      "collocations": [
+        "it's a great place to study",
+        "it's a good place to meet friends"
+      ],
+      "topics": [
+        "cafes",
+        "park"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-spicy",
+      "term": "spicy",
+      "type": "word",
+      "meaningKo": "매운",
+      "exampleEn": "I love spicy food, but my friend can't handle it at all.",
+      "exampleKo": "저는 매운 음식을 정말 좋아하는데 제 친구는 전혀 못 먹어요.",
+      "collocations": [
+        "spicy food",
+        "too spicy",
+        "a bit spicy"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "preference",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-portion",
+      "term": "portion",
+      "type": "word",
+      "meaningKo": "1인분, 양",
+      "exampleEn": "The portions there are huge, so I usually share with someone.",
+      "exampleKo": "거기는 양이 정말 많아서 저는 보통 누군가와 나눠 먹어요.",
+      "collocations": [
+        "a big portion",
+        "share a portion",
+        "the portion size"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "description",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-flavorful",
+      "term": "flavorful",
+      "type": "word",
+      "meaningKo": "맛이 풍부한",
+      "exampleEn": "The soup was simple but really flavorful.",
+      "exampleKo": "그 국은 단순했지만 정말 맛이 풍부했어요.",
+      "collocations": [
+        "a flavorful dish",
+        "rich and flavorful"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-eat-out",
+      "term": "eat out",
+      "type": "phrase",
+      "meaningKo": "외식하다",
+      "exampleEn": "We eat out maybe once or twice a week.",
+      "exampleKo": "저희는 일주일에 한두 번쯤 외식해요.",
+      "collocations": [
+        "eat out with friends",
+        "eat out less often",
+        "eat in instead"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "frequency",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-worth-trying",
+      "term": "be worth trying",
+      "type": "phrase",
+      "meaningKo": "한번 먹어볼 만하다",
+      "exampleEn": "The place is always packed, but it's definitely worth trying.",
+      "exampleKo": "그 가게는 늘 사람이 많지만 확실히 한번 가볼 만해요.",
+      "collocations": [
+        "worth trying",
+        "worth the wait",
+        "worth a visit"
+      ],
+      "topics": [
+        "food",
+        "travel"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-picky-eater",
+      "term": "I'm not a picky eater",
+      "type": "pattern",
+      "meaningKo": "저는 가리는 음식이 없어요",
+      "exampleEn": "I'm not a picky eater, so I'll try almost anything.",
+      "exampleKo": "저는 가리는 음식이 없어서 거의 뭐든 먹어봐요.",
+      "collocations": [
+        "I'm not picky about",
+        "I'm pretty open to"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "preference",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-go-to-place",
+      "term": "it's my go-to place for",
+      "type": "pattern",
+      "meaningKo": "거기는 제가 ~할 때 늘 가는 곳이에요",
+      "exampleEn": "It's my go-to place for dinner when I don't feel like cooking.",
+      "exampleKo": "요리하기 싫을 때 저녁 먹으러 늘 가는 곳이에요.",
+      "collocations": [
+        "my go-to place",
+        "my go-to order",
+        "my go-to spot"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "preference",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "food-ended-up-eating",
+      "term": "we ended up eating",
+      "type": "pattern",
+      "meaningKo": "결국 우리는 ~을 먹게 됐어요",
+      "exampleEn": "The restaurant was closed, so we ended up eating at a street stall.",
+      "exampleKo": "식당이 문을 닫아서 결국 포장마차에서 먹게 됐어요.",
+      "collocations": [
+        "we ended up eating",
+        "I ended up going",
+        "we ended up staying"
+      ],
+      "topics": [
+        "food"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-plot",
+      "term": "plot",
+      "type": "word",
+      "meaningKo": "줄거리",
+      "exampleEn": "The plot was a little confusing at first, but it made sense later.",
+      "exampleKo": "줄거리가 처음엔 좀 헷갈렸는데 나중에는 이해가 됐어요.",
+      "collocations": [
+        "a simple plot",
+        "the plot twist",
+        "follow the plot"
+      ],
+      "topics": [
+        "movies"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-touching",
+      "term": "touching",
+      "type": "word",
+      "meaningKo": "감동적인",
+      "exampleEn": "The ending was so touching that I almost cried.",
+      "exampleKo": "결말이 너무 감동적이어서 눈물이 날 뻔했어요.",
+      "collocations": [
+        "a touching story",
+        "really touching",
+        "touching scene"
+      ],
+      "topics": [
+        "movies"
+      ],
+      "usageRoles": [
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-genre",
+      "term": "genre",
+      "type": "word",
+      "meaningKo": "장르",
+      "exampleEn": "My favorite genre is comedy because it helps me relax.",
+      "exampleKo": "제가 가장 좋아하는 장르는 코미디예요. 마음이 편해지거든요.",
+      "collocations": [
+        "a favorite genre",
+        "any genre",
+        "switch genres"
+      ],
+      "topics": [
+        "movies",
+        "music"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-come-out",
+      "term": "come out",
+      "type": "phrase",
+      "meaningKo": "개봉하다, 나오다",
+      "exampleEn": "A new movie came out last weekend, and I watched it right away.",
+      "exampleKo": "지난 주말에 새 영화가 개봉해서 바로 봤어요.",
+      "collocations": [
+        "come out next month",
+        "just came out",
+        "come out on Netflix"
+      ],
+      "topics": [
+        "movies"
+      ],
+      "usageRoles": [
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-binge-watch",
+      "term": "binge-watch",
+      "type": "phrase",
+      "meaningKo": "몰아서 보다",
+      "exampleEn": "I binge-watched the whole series in one weekend.",
+      "exampleKo": "저는 주말 하루 만에 그 시리즈를 다 몰아 봤어요.",
+      "collocations": [
+        "binge-watch a series",
+        "binge-watch all night"
+      ],
+      "topics": [
+        "movies",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-really-into",
+      "term": "I'm really into",
+      "type": "pattern",
+      "meaningKo": "저는 ~에 푹 빠져 있어요",
+      "exampleEn": "I'm really into old animated movies these days.",
+      "exampleKo": "저는 요즘 옛날 애니메이션 영화에 푹 빠져 있어요.",
+      "collocations": [
+        "I'm really into",
+        "I've been into",
+        "I'm not really into"
+      ],
+      "topics": [
+        "movies",
+        "music"
+      ],
+      "usageRoles": [
+        "preference",
+        "change"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-story-is-about",
+      "term": "the story is about",
+      "type": "pattern",
+      "meaningKo": "그 이야기는 ~에 관한 거예요",
+      "exampleEn": "The story is about a man who travels back to his hometown.",
+      "exampleKo": "그 이야기는 고향으로 돌아가는 한 남자에 관한 거예요.",
+      "collocations": [
+        "the story is about",
+        "it's basically about",
+        "it tells the story of"
+      ],
+      "topics": [
+        "movies"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "movie-definitely-recommend",
+      "term": "I'd definitely recommend it",
+      "type": "pattern",
+      "meaningKo": "정말 추천하고 싶어요",
+      "exampleEn": "It's not a famous film, but I'd definitely recommend it.",
+      "exampleKo": "유명한 영화는 아니지만 정말 추천하고 싶어요.",
+      "collocations": [
+        "I'd definitely recommend",
+        "I'd recommend it to anyone"
+      ],
+      "topics": [
+        "movies"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-catchy",
+      "term": "catchy",
+      "type": "word",
+      "meaningKo": "귀에 쏙 들어오는",
+      "exampleEn": "The chorus is so catchy that I keep humming it.",
+      "exampleKo": "후렴이 너무 귀에 쏙 들어와서 계속 흥얼거리게 돼요.",
+      "collocations": [
+        "a catchy song",
+        "really catchy",
+        "a catchy tune"
+      ],
+      "topics": [
+        "music"
+      ],
+      "usageRoles": [
+        "description",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-lyrics",
+      "term": "lyrics",
+      "type": "word",
+      "meaningKo": "가사",
+      "exampleEn": "I like songs with lyrics I can actually relate to.",
+      "exampleKo": "저는 제가 공감할 수 있는 가사가 있는 노래를 좋아해요.",
+      "collocations": [
+        "the lyrics of a song",
+        "meaningful lyrics",
+        "memorize the lyrics"
+      ],
+      "topics": [
+        "music"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-upbeat",
+      "term": "upbeat",
+      "type": "word",
+      "meaningKo": "경쾌한, 신나는",
+      "exampleEn": "I listen to upbeat music when I work out.",
+      "exampleKo": "저는 운동할 때 신나는 음악을 들어요.",
+      "collocations": [
+        "upbeat music",
+        "an upbeat song",
+        "something upbeat"
+      ],
+      "topics": [
+        "music",
+        "exercise"
+      ],
+      "usageRoles": [
+        "preference",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-cheer-me-up",
+      "term": "cheer me up",
+      "type": "phrase",
+      "meaningKo": "기분을 좋게 해 주다",
+      "exampleEn": "That song always cheers me up when I'm having a bad day.",
+      "exampleKo": "그 노래는 힘든 날에 항상 제 기분을 좋게 해 줘요.",
+      "collocations": [
+        "cheer me up",
+        "cheer someone up",
+        "it cheers me up"
+      ],
+      "topics": [
+        "music"
+      ],
+      "usageRoles": [
+        "emotion",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-put-on-music",
+      "term": "put on some music",
+      "type": "phrase",
+      "meaningKo": "음악을 틀다",
+      "exampleEn": "The first thing I do at home is put on some music.",
+      "exampleKo": "집에 오면 제일 먼저 하는 일이 음악을 트는 거예요.",
+      "collocations": [
+        "put on some music",
+        "put on a playlist",
+        "turn the music up"
+      ],
+      "topics": [
+        "music",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-go-to-a-concert",
+      "term": "go to a concert",
+      "type": "phrase",
+      "meaningKo": "콘서트에 가다",
+      "exampleEn": "I went to a concert last summer, and the crowd was amazing.",
+      "exampleKo": "작년 여름에 콘서트에 갔는데 관객 분위기가 정말 좋았어요.",
+      "collocations": [
+        "go to a live concert",
+        "at the concert",
+        "book concert tickets"
+      ],
+      "topics": [
+        "music"
+      ],
+      "usageRoles": [
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-whenever-i",
+      "term": "I listen to music whenever I",
+      "type": "pattern",
+      "meaningKo": "저는 ~할 때마다 음악을 들어요",
+      "exampleEn": "I listen to music whenever I commute or clean my room.",
+      "exampleKo": "저는 통근하거나 방을 청소할 때마다 음악을 들어요.",
+      "collocations": [
+        "whenever I have time",
+        "whenever I feel like it"
+      ],
+      "topics": [
+        "music"
+      ],
+      "usageRoles": [
+        "routine",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "music-depends-on-mood",
+      "term": "it really depends on my mood",
+      "type": "pattern",
+      "meaningKo": "그건 정말 제 기분에 따라 달라요",
+      "exampleEn": "I don't have one favorite genre. It really depends on my mood.",
+      "exampleKo": "저는 딱 하나 좋아하는 장르는 없어요. 정말 기분에 따라 달라요.",
+      "collocations": [
+        "it depends on the day",
+        "it depends on the situation"
+      ],
+      "topics": [
+        "music"
+      ],
+      "usageRoles": [
+        "preference",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-stretch",
+      "term": "stretch",
+      "type": "word",
+      "meaningKo": "스트레칭하다",
+      "exampleEn": "I stretch for about ten minutes before I start.",
+      "exampleKo": "저는 시작하기 전에 10분쯤 스트레칭을 해요.",
+      "collocations": [
+        "stretch before a workout",
+        "stretch my back",
+        "do some stretching"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-sweat",
+      "term": "sweat",
+      "type": "word",
+      "meaningKo": "땀을 흘리다",
+      "exampleEn": "I sweat a lot, so I always bring an extra shirt.",
+      "exampleKo": "저는 땀을 많이 흘려서 항상 여벌 옷을 챙겨요.",
+      "collocations": [
+        "sweat a lot",
+        "break a sweat",
+        "sweat it out"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "description",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-out-of-shape",
+      "term": "out of shape",
+      "type": "phrase",
+      "meaningKo": "몸이 예전 같지 않은",
+      "exampleEn": "I got out of shape during the winter, so I started running again.",
+      "exampleKo": "겨울 동안 몸이 둔해져서 다시 달리기를 시작했어요.",
+      "collocations": [
+        "get out of shape",
+        "stay in shape",
+        "get back in shape"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "change",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-work-out",
+      "term": "work out",
+      "type": "phrase",
+      "meaningKo": "운동하다",
+      "exampleEn": "I work out at a gym near my apartment.",
+      "exampleKo": "저는 아파트 근처 헬스장에서 운동해요.",
+      "collocations": [
+        "work out at the gym",
+        "work out at home",
+        "a light workout"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-three-times-a-week",
+      "term": "three times a week",
+      "type": "phrase",
+      "meaningKo": "일주일에 세 번",
+      "exampleEn": "I try to exercise three times a week, usually in the evening.",
+      "exampleKo": "저는 보통 저녁에 일주일에 세 번 운동하려고 해요.",
+      "collocations": [
+        "twice a week",
+        "once a month",
+        "every other day"
+      ],
+      "topics": [
+        "exercise",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "frequency",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-stick-to",
+      "term": "stick to",
+      "type": "phrase",
+      "meaningKo": "꾸준히 하다, 계속 지키다",
+      "exampleEn": "The hard part isn't starting. It's sticking to it.",
+      "exampleKo": "어려운 건 시작이 아니라 꾸준히 하는 거예요.",
+      "collocations": [
+        "stick to a routine",
+        "stick to a plan",
+        "stick with it"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "reason",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-feel-refreshed",
+      "term": "I feel refreshed after",
+      "type": "pattern",
+      "meaningKo": "저는 ~하고 나면 개운해져요",
+      "exampleEn": "I feel refreshed after a short run, even if I'm tired.",
+      "exampleKo": "피곤해도 짧게 달리고 나면 개운해져요.",
+      "collocations": [
+        "I feel refreshed after",
+        "I feel much better after"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "emotion",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "exercise-try-to-at-least",
+      "term": "I try to work out at least",
+      "type": "pattern",
+      "meaningKo": "저는 적어도 ~는 운동하려고 해요",
+      "exampleEn": "I try to work out at least twice a week, but it's not always easy.",
+      "exampleKo": "저는 적어도 일주일에 두 번은 운동하려고 하는데 늘 쉽지는 않아요.",
+      "collocations": [
+        "I try to at least",
+        "I try my best to"
+      ],
+      "topics": [
+        "exercise"
+      ],
+      "usageRoles": [
+        "frequency",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-peaceful",
+      "term": "peaceful",
+      "type": "word",
+      "meaningKo": "평화로운, 고요한",
+      "exampleEn": "The park is really peaceful early in the morning.",
+      "exampleKo": "그 공원은 이른 아침에 정말 고요해요.",
+      "collocations": [
+        "a peaceful place",
+        "peaceful and quiet",
+        "feel peaceful"
+      ],
+      "topics": [
+        "park"
+      ],
+      "usageRoles": [
+        "description",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-bench",
+      "term": "bench",
+      "type": "word",
+      "meaningKo": "벤치",
+      "exampleEn": "I usually sit on a bench and just watch people go by.",
+      "exampleKo": "저는 보통 벤치에 앉아서 지나가는 사람들을 구경해요.",
+      "collocations": [
+        "sit on a bench",
+        "an empty bench",
+        "a bench by the lake"
+      ],
+      "topics": [
+        "park"
+      ],
+      "usageRoles": [
+        "routine",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-shady",
+      "term": "shady",
+      "type": "word",
+      "meaningKo": "그늘진",
+      "exampleEn": "In summer I look for a shady spot under the trees.",
+      "exampleKo": "여름에는 나무 아래 그늘진 자리를 찾아요.",
+      "collocations": [
+        "a shady spot",
+        "shady trees",
+        "stay in the shade"
+      ],
+      "topics": [
+        "park",
+        "weather"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-take-a-walk",
+      "term": "take a walk",
+      "type": "phrase",
+      "meaningKo": "산책하다",
+      "exampleEn": "I take a walk there almost every evening after dinner.",
+      "exampleKo": "저는 저녁 먹고 거의 매일 저녁 거기서 산책해요.",
+      "collocations": [
+        "take a short walk",
+        "go for a walk",
+        "take a walk with my dog"
+      ],
+      "topics": [
+        "park",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-fresh-air",
+      "term": "get some fresh air",
+      "type": "phrase",
+      "meaningKo": "바람을 쐬다",
+      "exampleEn": "When I feel stuck, I go outside to get some fresh air.",
+      "exampleKo": "답답할 때는 밖에 나가서 바람을 쐬어요.",
+      "collocations": [
+        "get some fresh air",
+        "need fresh air",
+        "step out for fresh air"
+      ],
+      "topics": [
+        "park"
+      ],
+      "usageRoles": [
+        "problemSolution",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-jogging-trail",
+      "term": "jogging trail",
+      "type": "phrase",
+      "meaningKo": "조깅 코스",
+      "exampleEn": "There's a jogging trail around the lake, and it's about two kilometers.",
+      "exampleKo": "호수를 따라 조깅 코스가 있는데 2킬로미터쯤 돼요.",
+      "collocations": [
+        "a jogging trail",
+        "run on the trail",
+        "a walking path"
+      ],
+      "topics": [
+        "park",
+        "exercise"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-five-minute-walk",
+      "term": "it's just a five-minute walk from my place",
+      "type": "pattern",
+      "meaningKo": "우리 집에서 걸어서 5분밖에 안 걸려요",
+      "exampleEn": "It's just a five-minute walk from my place, so I go there a lot.",
+      "exampleKo": "우리 집에서 걸어서 5분밖에 안 걸려서 자주 가요.",
+      "collocations": [
+        "a five-minute walk",
+        "a ten-minute drive",
+        "just around the corner"
+      ],
+      "topics": [
+        "park",
+        "home_neighborhood"
+      ],
+      "usageRoles": [
+        "description",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "park-i-go-there-when",
+      "term": "I usually go there when I want to",
+      "type": "pattern",
+      "meaningKo": "저는 ~하고 싶을 때 보통 거기에 가요",
+      "exampleEn": "I usually go there when I want to clear my head.",
+      "exampleKo": "저는 머리를 식히고 싶을 때 보통 거기에 가요.",
+      "collocations": [
+        "I go there when",
+        "I usually go there to"
+      ],
+      "topics": [
+        "park"
+      ],
+      "usageRoles": [
+        "routine",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-affordable",
+      "term": "affordable",
+      "type": "word",
+      "meaningKo": "가격이 적당한",
+      "exampleEn": "I look for something affordable rather than a big brand.",
+      "exampleKo": "저는 유명 브랜드보다는 가격이 적당한 걸 찾아요.",
+      "collocations": [
+        "affordable prices",
+        "more affordable",
+        "affordable but good"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "preference",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-refund",
+      "term": "refund",
+      "type": "word",
+      "meaningKo": "환불",
+      "exampleEn": "I asked for a refund because the size didn't fit.",
+      "exampleKo": "사이즈가 안 맞아서 환불을 요청했어요.",
+      "collocations": [
+        "get a refund",
+        "ask for a refund",
+        "a full refund"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "problemSolution",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-on-sale",
+      "term": "on sale",
+      "type": "phrase",
+      "meaningKo": "세일 중인",
+      "exampleEn": "I bought this jacket when it was on sale last winter.",
+      "exampleKo": "이 재킷은 작년 겨울에 세일할 때 샀어요.",
+      "collocations": [
+        "be on sale",
+        "go on sale",
+        "half off"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-look-around",
+      "term": "look around",
+      "type": "phrase",
+      "meaningKo": "구경하다, 둘러보다",
+      "exampleEn": "Sometimes I just look around without buying anything.",
+      "exampleKo": "가끔은 아무것도 안 사고 그냥 둘러만 봐요.",
+      "collocations": [
+        "look around a store",
+        "just looking around",
+        "walk around and look"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-try-on",
+      "term": "try on",
+      "type": "phrase",
+      "meaningKo": "입어 보다, 신어 보다",
+      "exampleEn": "I like to try things on before I buy them.",
+      "exampleKo": "저는 사기 전에 입어 보는 걸 좋아해요.",
+      "collocations": [
+        "try on clothes",
+        "try it on",
+        "try on a pair of shoes"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "preference",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-impulse-buy",
+      "term": "impulse buy",
+      "type": "phrase",
+      "meaningKo": "충동구매하다",
+      "exampleEn": "I used to impulse buy a lot, but now I make a list first.",
+      "exampleKo": "예전에는 충동구매를 많이 했는데 지금은 먼저 목록을 만들어요.",
+      "collocations": [
+        "an impulse buy",
+        "impulse buying",
+        "buy on impulse"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "change",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-online-because",
+      "term": "I usually shop online because",
+      "type": "pattern",
+      "meaningKo": "저는 보통 온라인으로 쇼핑해요, 왜냐하면 ~",
+      "exampleEn": "I usually shop online because it saves me a lot of time.",
+      "exampleKo": "저는 시간이 많이 절약돼서 보통 온라인으로 쇼핑해요.",
+      "collocations": [
+        "I usually do it online",
+        "I prefer online because"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "reason",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "shopping-ended-up-buying",
+      "term": "I ended up buying",
+      "type": "pattern",
+      "meaningKo": "결국 저는 ~을 샀어요",
+      "exampleEn": "I went in for socks, and I ended up buying a whole outfit.",
+      "exampleKo": "양말 사러 들어갔다가 결국 옷 한 벌을 다 샀어요.",
+      "collocations": [
+        "I ended up buying",
+        "I ended up spending",
+        "I ended up staying"
+      ],
+      "topics": [
+        "shopping"
+      ],
+      "usageRoles": [
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-sightseeing",
+      "term": "sightseeing",
+      "type": "word",
+      "meaningKo": "관광",
+      "exampleEn": "We spent the first day sightseeing around the old town.",
+      "exampleKo": "저희는 첫날을 구시가지 관광하며 보냈어요.",
+      "collocations": [
+        "go sightseeing",
+        "a sightseeing tour",
+        "do some sightseeing"
+      ],
+      "topics": [
+        "travel"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-pack",
+      "term": "pack",
+      "type": "word",
+      "meaningKo": "짐을 싸다",
+      "exampleEn": "I always pack the night before, or I forget something.",
+      "exampleKo": "저는 항상 전날 밤에 짐을 싸요. 안 그러면 뭔가 빠뜨리거든요.",
+      "collocations": [
+        "pack a bag",
+        "pack light",
+        "pack for a trip"
+      ],
+      "topics": [
+        "travel"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-book",
+      "term": "book",
+      "type": "word",
+      "meaningKo": "예약하다",
+      "exampleEn": "I booked the flight about two months in advance.",
+      "exampleKo": "저는 항공권을 두 달쯤 전에 예약했어요.",
+      "collocations": [
+        "book a flight",
+        "book a hotel",
+        "book in advance"
+      ],
+      "topics": [
+        "travel",
+        "vacation"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-get-around",
+      "term": "get around",
+      "type": "phrase",
+      "meaningKo": "돌아다니다, 이동하다",
+      "exampleEn": "We got around by subway because taxis were expensive.",
+      "exampleKo": "택시가 비싸서 저희는 지하철로 돌아다녔어요.",
+      "collocations": [
+        "get around by bus",
+        "easy to get around",
+        "get around on foot"
+      ],
+      "topics": [
+        "travel",
+        "transportation"
+      ],
+      "usageRoles": [
+        "problemSolution",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-local-food",
+      "term": "try the local food",
+      "type": "phrase",
+      "meaningKo": "현지 음식을 먹어 보다",
+      "exampleEn": "The best part of the trip was trying the local food.",
+      "exampleKo": "그 여행에서 제일 좋았던 건 현지 음식을 먹어 본 거였어요.",
+      "collocations": [
+        "try the local food",
+        "local dishes",
+        "eat like a local"
+      ],
+      "topics": [
+        "travel",
+        "food"
+      ],
+      "usageRoles": [
+        "preference",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-plan-out",
+      "term": "plan out",
+      "type": "phrase",
+      "meaningKo": "미리 계획을 짜다",
+      "exampleEn": "I don't plan everything out. I like leaving some room for surprises.",
+      "exampleKo": "저는 전부 계획하지는 않아요. 예상 밖의 일이 생길 여지를 남기는 걸 좋아해요.",
+      "collocations": [
+        "plan out a trip",
+        "plan everything out",
+        "plan ahead"
+      ],
+      "topics": [
+        "travel"
+      ],
+      "usageRoles": [
+        "preference",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-most-memorable",
+      "term": "the most memorable trip I've had was",
+      "type": "pattern",
+      "meaningKo": "제가 했던 여행 중 가장 기억에 남는 건 ~였어요",
+      "exampleEn": "The most memorable trip I've had was a two-week trip to Jeju.",
+      "exampleKo": "제가 했던 여행 중 가장 기억에 남는 건 제주도에서 보낸 2주였어요.",
+      "collocations": [
+        "the most memorable thing was",
+        "the trip I remember most is"
+      ],
+      "topics": [
+        "travel"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH",
+        "AL"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "travel-what-surprised-me",
+      "term": "what surprised me the most was",
+      "type": "pattern",
+      "meaningKo": "가장 놀라웠던 건 ~였어요",
+      "exampleEn": "What surprised me the most was how friendly everyone was.",
+      "exampleKo": "가장 놀라웠던 건 사람들이 정말 친절하다는 거였어요.",
+      "collocations": [
+        "what surprised me was",
+        "what I didn't expect was"
+      ],
+      "topics": [
+        "travel"
+      ],
+      "usageRoles": [
+        "emotion",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH",
+        "AL"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-transfer",
+      "term": "transfer",
+      "type": "word",
+      "meaningKo": "환승하다",
+      "exampleEn": "I have to transfer twice to get to my office.",
+      "exampleKo": "저는 사무실에 가려면 두 번 환승해야 해요.",
+      "collocations": [
+        "transfer to line 2",
+        "transfer once",
+        "a transfer station"
+      ],
+      "topics": [
+        "transportation",
+        "work"
+      ],
+      "usageRoles": [
+        "routine",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-delayed",
+      "term": "delayed",
+      "type": "word",
+      "meaningKo": "지연된",
+      "exampleEn": "The bus was delayed, so I was almost late for class.",
+      "exampleKo": "버스가 지연돼서 수업에 거의 늦을 뻔했어요.",
+      "collocations": [
+        "a delayed train",
+        "get delayed",
+        "delayed by traffic"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "problemSolution",
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-fare",
+      "term": "fare",
+      "type": "word",
+      "meaningKo": "요금",
+      "exampleEn": "The fare went up last year, but it's still cheap.",
+      "exampleKo": "작년에 요금이 올랐지만 그래도 여전히 싸요.",
+      "collocations": [
+        "a bus fare",
+        "pay the fare",
+        "the fare went up"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "change",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-rush-hour",
+      "term": "rush hour",
+      "type": "phrase",
+      "meaningKo": "출퇴근 혼잡 시간",
+      "exampleEn": "I leave early to avoid rush hour.",
+      "exampleKo": "저는 혼잡 시간을 피하려고 일찍 나가요.",
+      "collocations": [
+        "during rush hour",
+        "avoid rush hour",
+        "the morning rush"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "routine",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-stuck-in-traffic",
+      "term": "get stuck in traffic",
+      "type": "phrase",
+      "meaningKo": "차가 막혀 꼼짝 못 하다",
+      "exampleEn": "We got stuck in traffic for over an hour on the way back.",
+      "exampleKo": "돌아오는 길에 한 시간 넘게 차가 막혀서 꼼짝 못 했어요.",
+      "collocations": [
+        "get stuck in traffic",
+        "heavy traffic",
+        "traffic jam"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-public-transportation",
+      "term": "public transportation",
+      "type": "phrase",
+      "meaningKo": "대중교통",
+      "exampleEn": "Public transportation here is cheap and runs pretty often.",
+      "exampleKo": "여기 대중교통은 저렴하고 꽤 자주 다녀요.",
+      "collocations": [
+        "take public transportation",
+        "use public transportation"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "description",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-takes-me-about",
+      "term": "it takes me about forty minutes to get to",
+      "type": "pattern",
+      "meaningKo": "저는 ~까지 40분쯤 걸려요",
+      "exampleEn": "It takes me about forty minutes to get to work on a normal day.",
+      "exampleKo": "평소에는 회사까지 40분쯤 걸려요.",
+      "collocations": [
+        "it takes me about",
+        "it takes twice as long",
+        "it usually takes"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "routine",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "transport-i-take-because",
+      "term": "I usually take the subway because",
+      "type": "pattern",
+      "meaningKo": "저는 보통 지하철을 타요, 왜냐하면 ~",
+      "exampleEn": "I usually take the subway because it's faster than driving.",
+      "exampleKo": "저는 운전보다 빨라서 보통 지하철을 타요.",
+      "collocations": [
+        "I usually take the bus because",
+        "I'd rather take the subway"
+      ],
+      "topics": [
+        "transportation"
+      ],
+      "usageRoles": [
+        "reason",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-humid",
+      "term": "humid",
+      "type": "word",
+      "meaningKo": "습한",
+      "exampleEn": "Summer here is really hot and humid.",
+      "exampleKo": "여기 여름은 정말 덥고 습해요.",
+      "collocations": [
+        "hot and humid",
+        "humid weather",
+        "get humid"
+      ],
+      "topics": [
+        "weather"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-chilly",
+      "term": "chilly",
+      "type": "word",
+      "meaningKo": "쌀쌀한",
+      "exampleEn": "It gets chilly at night, so I always bring a jacket.",
+      "exampleKo": "밤에는 쌀쌀해져서 저는 항상 재킷을 챙겨요.",
+      "collocations": [
+        "a chilly morning",
+        "get chilly",
+        "a bit chilly"
+      ],
+      "topics": [
+        "weather"
+      ],
+      "usageRoles": [
+        "description",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-pour",
+      "term": "pour",
+      "type": "word",
+      "meaningKo": "비가 쏟아지다",
+      "exampleEn": "It started pouring right when I left the house.",
+      "exampleKo": "제가 집을 나서자마자 비가 쏟아지기 시작했어요.",
+      "collocations": [
+        "pour down",
+        "pouring rain",
+        "start pouring"
+      ],
+      "topics": [
+        "weather"
+      ],
+      "usageRoles": [
+        "pastExperience"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-forecast",
+      "term": "forecast",
+      "type": "word",
+      "meaningKo": "일기예보",
+      "exampleEn": "I check the forecast every morning before I get dressed.",
+      "exampleKo": "저는 매일 아침 옷 입기 전에 일기예보를 확인해요.",
+      "collocations": [
+        "the weather forecast",
+        "check the forecast",
+        "according to the forecast"
+      ],
+      "topics": [
+        "weather",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-warm-up",
+      "term": "warm up",
+      "type": "phrase",
+      "meaningKo": "날이 풀리다",
+      "exampleEn": "It should warm up in a couple of weeks.",
+      "exampleKo": "몇 주 뒤면 날이 풀릴 거예요.",
+      "collocations": [
+        "warm up soon",
+        "cool down",
+        "the weather is warming up"
+      ],
+      "topics": [
+        "weather"
+      ],
+      "usageRoles": [
+        "change"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-stay-indoors",
+      "term": "stay indoors",
+      "type": "phrase",
+      "meaningKo": "실내에 있다",
+      "exampleEn": "When it rains, I just stay indoors and watch something.",
+      "exampleKo": "비가 오면 그냥 집에 있으면서 뭔가를 봐요.",
+      "collocations": [
+        "stay indoors all day",
+        "stay inside",
+        "stay home"
+      ],
+      "topics": [
+        "weather",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-been-pretty-lately",
+      "term": "the weather has been pretty ~ lately",
+      "type": "pattern",
+      "meaningKo": "요즘 날씨가 꽤 ~해요",
+      "exampleEn": "The weather has been pretty unpredictable lately.",
+      "exampleKo": "요즘 날씨가 꽤 종잡을 수 없어요.",
+      "collocations": [
+        "it's been pretty cold lately",
+        "it's been raining a lot lately"
+      ],
+      "topics": [
+        "weather"
+      ],
+      "usageRoles": [
+        "change",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "weather-depends-on-season",
+      "term": "it depends on the season",
+      "type": "pattern",
+      "meaningKo": "그건 계절에 따라 달라요",
+      "exampleEn": "What I do on weekends depends on the season, honestly.",
+      "exampleKo": "솔직히 주말에 뭘 하는지는 계절에 따라 달라요.",
+      "collocations": [
+        "it depends on the season",
+        "it changes with the season"
+      ],
+      "topics": [
+        "weather"
+      ],
+      "usageRoles": [
+        "comparison",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-recharge",
+      "term": "recharge",
+      "type": "word",
+      "meaningKo": "재충전하다",
+      "exampleEn": "I just need a few quiet days to recharge.",
+      "exampleKo": "저는 재충전할 조용한 며칠이 필요할 뿐이에요.",
+      "collocations": [
+        "recharge my batteries",
+        "recharge at home",
+        "time to recharge"
+      ],
+      "topics": [
+        "vacation"
+      ],
+      "usageRoles": [
+        "reason",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-laid-back",
+      "term": "laid-back",
+      "type": "word",
+      "meaningKo": "느긋한, 여유로운",
+      "exampleEn": "I prefer a laid-back trip over a packed schedule.",
+      "exampleKo": "저는 빡빡한 일정보다 느긋한 여행을 더 좋아해요.",
+      "collocations": [
+        "a laid-back trip",
+        "laid-back person",
+        "keep it laid-back"
+      ],
+      "topics": [
+        "vacation",
+        "travel"
+      ],
+      "usageRoles": [
+        "preference",
+        "comparison"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-staycation",
+      "term": "staycation",
+      "type": "word",
+      "meaningKo": "집에서 보내는 휴가",
+      "exampleEn": "Last summer I had a staycation and honestly it was great.",
+      "exampleKo": "작년 여름에 집에서 휴가를 보냈는데 솔직히 정말 좋았어요.",
+      "collocations": [
+        "have a staycation",
+        "a staycation at home"
+      ],
+      "topics": [
+        "vacation"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IH",
+        "AL"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-days-off",
+      "term": "take a few days off",
+      "type": "phrase",
+      "meaningKo": "며칠 휴가를 내다",
+      "exampleEn": "I took a few days off last month and stayed with my family.",
+      "exampleKo": "지난달에 며칠 휴가를 내고 가족들과 지냈어요.",
+      "collocations": [
+        "take a day off",
+        "take time off",
+        "use my vacation days"
+      ],
+      "topics": [
+        "vacation",
+        "work"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "routine"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-catch-up-on-sleep",
+      "term": "catch up on sleep",
+      "type": "phrase",
+      "meaningKo": "밀린 잠을 자다",
+      "exampleEn": "The first thing I do on vacation is catch up on sleep.",
+      "exampleKo": "휴가 때 제일 먼저 하는 일은 밀린 잠을 자는 거예요.",
+      "collocations": [
+        "catch up on sleep",
+        "catch up on work",
+        "catch up on shows"
+      ],
+      "topics": [
+        "vacation",
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-book-in-advance",
+      "term": "book in advance",
+      "type": "phrase",
+      "meaningKo": "미리 예약하다",
+      "exampleEn": "If you book in advance, you can save quite a bit.",
+      "exampleKo": "미리 예약하면 꽤 많이 아낄 수 있어요.",
+      "collocations": [
+        "book in advance",
+        "reserve in advance",
+        "plan in advance"
+      ],
+      "topics": [
+        "vacation",
+        "travel"
+      ],
+      "usageRoles": [
+        "reason",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-usually-spend",
+      "term": "I usually spend my vacation",
+      "type": "pattern",
+      "meaningKo": "저는 보통 휴가를 ~하며 보내요",
+      "exampleEn": "I usually spend my vacation visiting my parents in the countryside.",
+      "exampleKo": "저는 보통 시골에 계신 부모님을 뵈러 가며 휴가를 보내요.",
+      "collocations": [
+        "I usually spend my weekends",
+        "I spend most of my time"
+      ],
+      "topics": [
+        "vacation"
+      ],
+      "usageRoles": [
+        "routine",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "vacation-if-i-had-more-time",
+      "term": "if I had more time, I would",
+      "type": "pattern",
+      "meaningKo": "시간이 더 있다면 저는 ~할 거예요",
+      "exampleEn": "If I had more time, I would travel somewhere far away.",
+      "exampleKo": "시간이 더 있다면 저는 어딘가 먼 곳으로 여행을 갈 거예요.",
+      "collocations": [
+        "if I had more time",
+        "if I had the chance",
+        "if I could"
+      ],
+      "topics": [
+        "vacation"
+      ],
+      "usageRoles": [
+        "preference",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH",
+        "AL"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-close",
+      "term": "close",
+      "type": "word",
+      "meaningKo": "친한, 가까운",
+      "exampleEn": "We're pretty close, even though we don't meet that often.",
+      "exampleKo": "저희는 자주 만나지는 않지만 꽤 친해요.",
+      "collocations": [
+        "a close friend",
+        "close to my sister",
+        "we're really close"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "description"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-supportive",
+      "term": "supportive",
+      "type": "word",
+      "meaningKo": "힘이 되어 주는",
+      "exampleEn": "My family is really supportive whenever I try something new.",
+      "exampleKo": "제가 새로운 걸 시도할 때마다 가족들이 정말 힘이 되어 줘요.",
+      "collocations": [
+        "a supportive friend",
+        "be supportive of",
+        "really supportive"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "description",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-outgoing",
+      "term": "outgoing",
+      "type": "word",
+      "meaningKo": "외향적인, 활발한",
+      "exampleEn": "He's more outgoing than I am, so he does most of the talking.",
+      "exampleKo": "그 친구가 저보다 활발해서 말은 주로 그 친구가 해요.",
+      "collocations": [
+        "an outgoing person",
+        "pretty outgoing",
+        "more outgoing than me"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "comparison",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-spend-time-with",
+      "term": "spend time with",
+      "type": "phrase",
+      "meaningKo": "~와 시간을 보내다",
+      "exampleEn": "On weekends I like to spend time with my family.",
+      "exampleKo": "주말에는 가족과 시간을 보내는 걸 좋아해요.",
+      "collocations": [
+        "spend time with friends",
+        "spend time together",
+        "spend more time with"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "routine",
+        "preference"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-get-along-with",
+      "term": "get along with",
+      "type": "phrase",
+      "meaningKo": "~와 잘 지내다",
+      "exampleEn": "I get along with my brother better now than when we were kids.",
+      "exampleKo": "저는 어릴 때보다 지금 형이랑 더 잘 지내요.",
+      "collocations": [
+        "get along well",
+        "get along with everyone",
+        "get along fine"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "comparison",
+        "change"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-keep-in-touch",
+      "term": "keep in touch",
+      "type": "phrase",
+      "meaningKo": "연락하며 지내다",
+      "exampleEn": "We keep in touch through messages, even though we live far apart.",
+      "exampleKo": "멀리 떨어져 살지만 메시지로 연락하며 지내요.",
+      "collocations": [
+        "keep in touch with",
+        "stay in touch",
+        "lose touch"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "routine",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-known-each-other",
+      "term": "we've known each other since",
+      "type": "pattern",
+      "meaningKo": "저희는 ~부터 알고 지냈어요",
+      "exampleEn": "We've known each other since high school, so about ten years.",
+      "exampleKo": "저희는 고등학교 때부터 알고 지냈으니까 10년쯤 됐어요.",
+      "collocations": [
+        "we've known each other for",
+        "we met back in"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "pastExperience",
+        "description"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "friends-kind-of-person-who",
+      "term": "she's the kind of person who",
+      "type": "pattern",
+      "meaningKo": "그 사람은 ~하는 사람이에요",
+      "exampleEn": "She's the kind of person who always remembers small details.",
+      "exampleKo": "그 사람은 사소한 것도 늘 기억하는 사람이에요.",
+      "collocations": [
+        "he's the kind of person who",
+        "the type of person who"
+      ],
+      "topics": [
+        "family_friends"
+      ],
+      "usageRoles": [
+        "description",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH",
+        "AL"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-routine",
+      "term": "routine",
+      "type": "word",
+      "meaningKo": "일과, 루틴",
+      "exampleEn": "My routine hasn't changed much over the past year.",
+      "exampleKo": "제 일과는 지난 1년 동안 크게 바뀌지 않았어요.",
+      "collocations": [
+        "a daily routine",
+        "my morning routine",
+        "change my routine"
+      ],
+      "topics": [
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "change"
+      ],
+      "recommendedLevels": [
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-productive",
+      "term": "productive",
+      "type": "word",
+      "meaningKo": "생산적인, 알차게 보낸",
+      "exampleEn": "I feel productive when I finish things before lunch.",
+      "exampleKo": "점심 전에 일을 끝내면 알차게 보낸 기분이 들어요.",
+      "collocations": [
+        "a productive day",
+        "feel productive",
+        "stay productive"
+      ],
+      "topics": [
+        "daily_life"
+      ],
+      "usageRoles": [
+        "emotion",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-run-errands",
+      "term": "run errands",
+      "type": "phrase",
+      "meaningKo": "볼일을 보다",
+      "exampleEn": "I usually run errands on Saturday morning.",
+      "exampleKo": "저는 보통 토요일 오전에 볼일을 봐요.",
+      "collocations": [
+        "run some errands",
+        "run errands together",
+        "errands to run"
+      ],
+      "topics": [
+        "daily_life",
+        "shopping"
+      ],
+      "usageRoles": [
+        "routine",
+        "frequency"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-put-off",
+      "term": "put off",
+      "type": "phrase",
+      "meaningKo": "미루다",
+      "exampleEn": "I tend to put off cleaning until the weekend.",
+      "exampleKo": "저는 청소를 주말까지 미루는 편이에요.",
+      "collocations": [
+        "put off a task",
+        "put it off again",
+        "stop putting it off"
+      ],
+      "topics": [
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "problemSolution"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-hang-out",
+      "term": "hang out",
+      "type": "phrase",
+      "meaningKo": "어울려 놀다, 시간을 보내다",
+      "exampleEn": "We usually hang out near the station because it's easy to meet there.",
+      "exampleKo": "만나기 쉬워서 저희는 보통 역 근처에서 놀아요.",
+      "collocations": [
+        "hang out with friends",
+        "hang out at home",
+        "hang out for a bit"
+      ],
+      "topics": [
+        "daily_life",
+        "family_friends"
+      ],
+      "usageRoles": [
+        "routine",
+        "reason"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-wind-down",
+      "term": "wind down",
+      "type": "phrase",
+      "meaningKo": "긴장을 풀고 하루를 마무리하다",
+      "exampleEn": "I wind down by reading a few pages before bed.",
+      "exampleKo": "저는 자기 전에 몇 페이지 읽으면서 하루를 마무리해요.",
+      "collocations": [
+        "wind down at night",
+        "wind down after work"
+      ],
+      "topics": [
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "emotion"
+      ],
+      "recommendedLevels": [
+        "IM3",
+        "IH"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-as-soon-as-i-wake-up",
+      "term": "as soon as I wake up",
+      "type": "pattern",
+      "meaningKo": "일어나자마자",
+      "exampleEn": "As soon as I wake up, I drink a glass of water.",
+      "exampleKo": "저는 일어나자마자 물 한 잔을 마셔요.",
+      "collocations": [
+        "as soon as I get home",
+        "as soon as I finish",
+        "right after I wake up"
+      ],
+      "topics": [
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "transition"
+      ],
+      "recommendedLevels": [
+        "IL",
+        "IM1",
+        "IM2"
+      ],
+      "source": "dailyopic-curated-v1"
+    },
+    {
+      "id": "daily-these-days-i-usually",
+      "term": "these days I usually",
+      "type": "pattern",
+      "meaningKo": "요즘 저는 보통 ~해요",
+      "exampleEn": "These days I usually stay in on weekdays and go out on weekends.",
+      "exampleKo": "요즘 저는 평일에는 보통 집에 있고 주말에 나가요.",
+      "collocations": [
+        "these days I usually",
+        "lately I've been",
+        "I used to, but now"
+      ],
+      "topics": [
+        "daily_life"
+      ],
+      "usageRoles": [
+        "routine",
+        "change",
+        "transition"
+      ],
+      "recommendedLevels": [
+        "IM2",
+        "IM3"
+      ],
+      "source": "dailyopic-curated-v1"
+    }
+  ]
+}

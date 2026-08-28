@@ -171,3 +171,57 @@ final class MockDraftRecord {
     var questionSet: QuestionSet? { try? JSONCoding.decoder.decode(QuestionSet.self, from: questionSetData) }
     var answers: [RecordedAnswer] { (try? JSONCoding.decoder.decode([RecordedAnswer].self, from: answersData)) ?? [] }
 }
+
+/// 단어장 항목 하나에 대한 **내 상태**(P14). 항목 내용은 번들 시드가 진실이고,
+/// 여기에는 그 항목을 내가 어떻게 다뤘는지만 남는다 — 저장했는지, 몇 번 맞히고
+/// 틀렸는지, 언제 다시 볼지.
+///
+/// 여기 없는 것: 단어 뜻·예문(시드에 있다) · 사용자 식별자 · 토큰/결제 정보.
+/// 이 기기에만 저장되고 서버로 보내지 않는다.
+///
+/// 상태 기록이 아예 없는 항목은 `.new`이고 저장하지 않은 항목이다 — 128개 시드에
+/// 대해 빈 레코드를 미리 만들어 두지 않는다.
+@Model
+final class VocabularyStateRecord {
+    /// 시드 항목의 id. 유니크라 같은 단어가 두 줄이 되지 않는다.
+    @Attribute(.unique) var entryID: String
+    var statusRaw: String
+    var isSaved: Bool
+    var successCount: Int
+    var failureCount: Int
+    var firstLearnedAt: Date?
+    var lastReviewedAt: Date?
+    /// 다음 복습 시각. P14의 잠정 규칙(`VocabularyReviewPolicy`)이 채운다.
+    var nextReviewAt: Date?
+    var updatedAt: Date
+
+    init(
+        entryID: String,
+        status: VocabularyStatus = .new,
+        isSaved: Bool = false,
+        successCount: Int = 0,
+        failureCount: Int = 0,
+        firstLearnedAt: Date? = nil,
+        lastReviewedAt: Date? = nil,
+        nextReviewAt: Date? = nil,
+        updatedAt: Date = .now
+    ) {
+        self.entryID = entryID
+        self.statusRaw = status.rawValue
+        self.isSaved = isSaved
+        self.successCount = successCount
+        self.failureCount = failureCount
+        self.firstLearnedAt = firstLearnedAt
+        self.lastReviewedAt = lastReviewedAt
+        self.nextReviewAt = nextReviewAt
+        self.updatedAt = updatedAt
+    }
+
+    var status: VocabularyStatus { VocabularyStatus(rawValue: statusRaw) ?? .new }
+
+    /// 지금 복습할 차례인가. 예정 시각이 없으면(익힘·미학습) 차례가 아니다.
+    func isDueForReview(at now: Date = .now) -> Bool {
+        guard status != .mastered, let nextReviewAt else { return false }
+        return nextReviewAt <= now
+    }
+}
