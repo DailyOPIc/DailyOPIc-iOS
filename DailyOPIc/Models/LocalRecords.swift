@@ -193,6 +193,11 @@ final class VocabularyStateRecord {
     var consecutiveSuccessCount: Int
     /// 누적 오답 횟수. 이쪽은 초기화하지 않는다.
     var failureCount: Int
+    /// 처음 학습한 **뒤에** 다시 학습한 횟수(P14.5.2). 화면에 "복습 n회"로 그대로 나가는
+    /// 숫자라 부풀리지 않는다: 첫 학습은 복습이 아니고(0회), 같은 날 다시 답한 것도
+    /// 세지 않는다. 날이 바뀌어 다시 만났을 때만 1 오른다.
+    /// 기본값이 있어야 기존 저장소가 그대로 열린다 — 예전 사용자는 0에서 시작한다.
+    var reviewCount: Int = 0
     /// 마지막으로 답한 날("yyyy-MM-dd", 학습 계획 타임존). 오늘 진행도의 근거다 —
     /// 시각이 아니라 날짜로 들고 있어야 "오늘 봤는가"가 타임존과 무관하게 같은 답을 준다.
     var lastStudiedLocalDate: String?
@@ -206,6 +211,7 @@ final class VocabularyStateRecord {
         isSaved: Bool = false,
         consecutiveSuccessCount: Int = 0,
         failureCount: Int = 0,
+        reviewCount: Int = 0,
         lastStudiedLocalDate: String? = nil,
         nextReviewLocalDate: String? = nil,
         updatedAt: Date = .now
@@ -215,6 +221,7 @@ final class VocabularyStateRecord {
         self.isSaved = isSaved
         self.consecutiveSuccessCount = consecutiveSuccessCount
         self.failureCount = failureCount
+        self.reviewCount = reviewCount
         self.lastStudiedLocalDate = lastStudiedLocalDate
         self.nextReviewLocalDate = nextReviewLocalDate
         self.updatedAt = updatedAt

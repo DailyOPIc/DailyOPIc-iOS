@@ -4,6 +4,16 @@ import SwiftUI
 struct VocabularyEntryRow: View {
     let entry: VocabularyEntry
     let state: VocabularyStateRecord?
+    /// 학습 상태와 복습 횟수를 한 줄 더 보여줄지(P14.5.2). "오늘 학습한 단어"에서만 켠다.
+    var showsProgress = false
+
+    /// 상태 + 복습 횟수 한 줄. 복습을 한 번도 하지 않았으면 숫자를 붙이지 않는다 —
+    /// "복습 0회"는 알려 주는 게 없다.
+    static func progressText(_ state: VocabularyStateRecord?) -> String {
+        let status = state?.status ?? .new
+        let reviews = state?.reviewCount ?? 0
+        return reviews > 0 ? "\(status.label) · 복습 \(reviews)회" : status.label
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: AppSpacing.sm) {
@@ -30,6 +40,11 @@ struct VocabularyEntryRow: View {
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
+                if showsProgress {
+                    Text(Self.progressText(state))
+                        .font(AppTypography.caption)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
             }
             Spacer(minLength: 0)
             Text(entry.type.label)
@@ -93,12 +108,15 @@ struct VocabularyTopicView: View {
     }
 }
 
-/// 저장한 단어 · 익힌 단어. 두 목록의 차이는 제목과 재료뿐이라 한 화면을 나눠 쓴다.
+/// 저장한 단어 · 익힌 단어 · 오늘 학습한 단어. 세 목록의 차이는 제목과 재료뿐이라
+/// 한 화면을 나눠 쓴다 — 단어를 훑어보는 화면을 새로 만들지 않는다.
 struct VocabularyMyWordsView: View {
     let title: String
     let emptyMessage: String
     let entries: [VocabularyEntry]
     let states: [String: VocabularyStateRecord]
+    /// 줄마다 학습 상태·복습 횟수를 함께 보여줄지. "오늘 학습한 단어"에서만 켠다.
+    var showsProgress = false
 
     var body: some View {
         ScrollView {
@@ -111,7 +129,11 @@ struct VocabularyMyWordsView: View {
                 } else {
                     ForEach(entries) { entry in
                         NavigationLink(value: entry) {
-                            VocabularyEntryRow(entry: entry, state: states[entry.id])
+                            VocabularyEntryRow(
+                                entry: entry,
+                                state: states[entry.id],
+                                showsProgress: showsProgress
+                            )
                         }
                         .buttonStyle(.plain)
                     }

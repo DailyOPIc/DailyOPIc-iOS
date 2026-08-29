@@ -5,76 +5,147 @@ import SwiftData
 ///
 /// 날짜는 여기 없다(P10). 하루를 열 때는 화면을 밀어내지 않고 `PlannerDaySheet`를 띄운다 —
 /// 날짜를 확인할 때마다 뒤로 가기를 눌러야 했던 것이 플래너에서 가장 지치는 동작이었다.
+///
+/// 전체 캘린더도 여기 없다(P14.5.2). 플래너 홈이 곧 월간 캘린더라서 밀어낼 곳이 없다 —
+/// 미리보기와 진짜 캘린더가 따로 있으면 같은 달을 두 번 그리게 된다.
 enum PlannerRoute: Hashable, CaseIterable {
-    case fullCalendar
     case settings
+    /// 학습 알림(P14.5.2). 오른쪽 위 종이 여는 곳이다.
+    case notifications
 }
 
-/// 플래너 홈. 첫 화면에서 "오늘 뭘 해야 하지?"에 답하는 것이 이 화면의 전부다.
-/// 월간 격자·설정·알림·잠긴 기능은 여기 두지 않고 각자의 화면으로 보낸다.
+/// 플래너 홈 = 월간 캘린더(P14.5.2).
+///
+/// 이 탭이 답하는 질문은 하나다: **"나는 언제 무엇을 했고, 언제 무엇을 하기로 했는가."**
+/// 그래서 화면의 대부분은 달력이고, 달력 위에는 연속 학습 한 줄, 아래에는 고른 날의
+/// 짧은 요약만 둔다. 학습하러 가는 버튼은 없다 — 데일리는 데일리 탭이, 단어는 단어장
+/// 탭이 각자 자기 일을 한다. 플래너를 다른 탭으로 보내는 바로가기 허브로 쓰지 않는다.
+///
+/// 칸에 찍히는 숫자는 전부 **실제로 한 학습**이다. 계획도 예정도 아니고, 화면에서
+/// 추정하지도 않는다(`PlannerActivityCalendar`).
 struct PlannerHomeView: View {
     let snapshot: StudyCalendarSnapshot
     let settings: StudyPlanSettings
     let targetLevel: OPIcLevel
-    let planName: String
     let isShowingCachedSettings: Bool
-    /// 데일리 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
-    let onStartDaily: () -> Void
-    /// 단어장 탭으로 이동(P14.5). 여기서도 플래너는 학습 화면을 따로 만들지 않는다 —
-    /// 오늘의 단어가 아직 없으면 단어장이 주제를 묻고, 있으면 그 묶음을 그대로 이어간다.
-    let onStartVocabulary: () -> Void
+    /// 날짜별 학습 완료 수. 칸의 진하기(히트맵)는 예전 그대로 이 값에서 나온다.
+    let completions: [Date: Int]
+    /// 날짜별 실제 활동(단어 · 데일리 · 모의). 캘린더 밖에서 한 번만 모아서 받는다.
+    let activities: [String: PlannerDayActivity]
 
-    /// 날짜를 누르면 알려만 준다. 시트는 플래너 뿌리 한 곳에서만 띄운다.
+    /// 하루 시트를 열어 달라고 알린다. 시트는 플래너 뿌리 한 곳에서만 띄운다.
     let onSelectDate: (String) -> Void
 
-    /// 주간 스트립의 작은 표시용. 전체 캘린더와 같은 날에 같은 표시가 뜨게 한다.
+    /// 칸 안의 일정 막대. 기존 개인 일정 모델을 그대로 읽는다(새 일정 모델을 만들지 않는다).
     @Query private var events: [PlannerEventRecord]
+
+    @State private var monthOffset = 0
+    /// 캘린더 아래 요약에 쓰는 선택 날짜. 탭 한 번은 요약까지고, 자세히 보기는 시트다 —
+    /// 날짜를 볼 때마다 시트가 튀어 오르면 달력을 훑을 수가 없다.
+    @State private var selectedLocalDate: String?
+
+    private var calendar: Calendar { settings.calendar }
+    private var today: Date { snapshot.today.date }
+
+    private var monthStart: Date {
+        let components = calendar.dateComponents([.year, .month], from: today)
+        let firstOfThisMonth = calendar.date(from: components) ?? today
+        return calendar.date(byAdding: .month, value: monthOffset, to: firstOfThisMonth)
+            ?? firstOfThisMonth
+    }
+
+    private var days: [StudyDay] {
+        StudyCalendarEngine.days(
+            from: monthStart,
+            count: calendar.range(of: .day, in: .month, for: monthStart)?.count ?? 30,
+            today: today,
+            settings: settings,
+            schedule: snapshot.schedule,
+            completions: completions
+        )
+    }
+
+    /// 1일 앞에 비워 둘 칸 수. 요일 머리글이 일~토이므로 같은 기준(일=0)으로 센다.
+    private var leadingBlanks: Int {
+        StudyWeekday.from(date: monthStart, calendar: calendar).displayColumn
+    }
+
+    /// 날짜별 일정 제목. 칸마다 전체 목록을 훑으면 한 달에 30번 도는 일이 된다.
+    private var eventTitlesByDate: [String: [String]] {
+        PlannerEventRecord.sorted(events).reduce(into: [:]) { result, event in
+            result[event.localDate, default: []].append(event.title)
+        }
+    }
 
     var body: some View {
         ScrollView {
-            VStack(alignment: .leading, spacing: AppSpacing.lg) {
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
                 if isShowingCachedSettings {
                     Text("오프라인이라 저장된 학습 계획을 보여주고 있어요.")
                         .font(AppTypography.footnote)
                         .foregroundStyle(AppPalette.secondaryInk)
                 }
-                contextLine
-                // 오늘의 팁은 학습 CTA보다 위에 있지만 주인공은 아니다. 앱에 담긴 고정
-                // 문구라 네트워크·플랜·토큰과 아무 관계가 없다.
-                OPIcTipCard(
-                    tip: OPIcTipCatalog.tip(for: snapshot.today.date, timeZone: settings.timeZone)
-                )
-                todayCard
-                vocabularyCard
-                weekCard
+                streakHeader
+                monthHeader
+                monthGrid
+                selectedDaySummary
                 plannerStateMessage
-                fullCalendarLink
-                Text(StudyPlanEstimator.disclaimer)
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
             }
             .padding(AppSpacing.lg)
         }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                NavigationLink(value: PlannerRoute.settings) {
-                    Image(systemName: "slider.horizontal.3")
+                NavigationLink(value: PlannerRoute.notifications) {
+                    Image(systemName: "bell")
                 }
-                .accessibilityLabel("플래너 설정")
+                .accessibilityLabel("학습 알림")
             }
         }
     }
 
     private var plan: AdaptiveStudyPlan { snapshot.plan }
 
-    // MARK: 헤더 문맥
+    // MARK: 머리
 
-    /// "목표 IH · 시험 D-24". 시험일이 없으면 목표만 말하고 지어내지 않는다.
-    private var contextLine: some View {
-        Text(contextText)
-            .font(AppTypography.callout)
-            .foregroundStyle(AppPalette.secondaryInk)
-            .accessibilityLabel(contextText.replacingOccurrences(of: "·", with: ","))
+    /// 연속 학습 두 숫자 + 목표/시험 문맥 한 줄. 카드가 아니라 머리글이다 —
+    /// 여기가 커지면 캘린더가 밀린다.
+    private var streakHeader: some View {
+        HStack(alignment: .firstTextBaseline, spacing: AppSpacing.lg) {
+            streakValue(
+                title: "현재 연속 학습",
+                value: snapshot.streak,
+                emphasized: true
+            )
+            streakValue(
+                title: "최고 연속 학습",
+                value: snapshot.bestStreak,
+                emphasized: false
+            )
+            Spacer(minLength: 0)
+            VStack(alignment: .trailing, spacing: AppSpacing.xs) {
+                Text(contextText)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .accessibilityLabel(contextText.replacingOccurrences(of: "·", with: ","))
+                // 학습 계획(공부 요일·강도·시험일)으로 가는 길. 오른쪽 위 아이콘이 종이 된 뒤
+                // 이 줄이 유일한 입구라 작아도 지우지 않는다.
+                NavigationLink("학습 계획", value: PlannerRoute.settings)
+                    .font(AppTypography.caption)
+                    .minimumTouchTarget()
+            }
+        }
+    }
+
+    private func streakValue(title: String, value: Int, emphasized: Bool) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text(title)
+                .font(AppTypography.caption)
+                .foregroundStyle(AppPalette.secondaryInk)
+            Text(emphasized ? "🔥 \(value)일" : "\(value)일")
+                .font(AppTypography.sectionTitle)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(title) \(value)일")
     }
 
     private var contextText: String {
@@ -90,236 +161,130 @@ struct PlannerHomeView: View {
         return remaining == 0 ? "시험 당일" : "시험일 지남"
     }
 
-    // MARK: 오늘
+    // MARK: 캘린더
 
-    /// 첫 화면의 주인공. 상태별로 할 말이 없으면 가짜 할 일을 만들지 않는다.
-    private var todayCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("오늘의 학습")
+    private var monthHeader: some View {
+        HStack {
+            Text(monthStart.formatted(.dateTime.year().month()))
                 .font(AppTypography.sectionTitle)
-            if plan.mode == .completed {
-                Text("계획한 학습을 모두 완료했어요.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                Label("권장 학습 계획 완료", systemImage: "checkmark.seal.fill")
-                    .font(AppTypography.callout)
-                    .foregroundStyle(AppPalette.primary)
-            } else if snapshot.today.state == .rest {
-                Text("오늘은 쉬는 날이에요. 원하면 그냥 연습해도 좋아요.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                // 권하지는 않되 길은 열어 둔다. 주 버튼으로 만들면 쉬는 날이 아니게 된다.
-                Button("그래도 연습하기", action: onStartDaily)
-                    .font(AppTypography.callout)
-                    .minimumTouchTarget()
-            } else {
-                // 오늘 배정량은 압축 모드에서 달라진다. 고정된 기본 학습량이 아니다.
-                Text("\(snapshot.today.completedSets) / \(snapshot.today.targetSets)세트")
-                    .font(AppTypography.title)
-                    .accessibilityLabel(
-                        "오늘 \(snapshot.today.targetSets)세트 중 \(snapshot.today.completedSets)세트 완료"
-                    )
-                if plan.isCappedByPlan {
-                    // 토큰 계산은 여기 적지 않는다. 비용은 새 세트·AI 분석 버튼에서 이미 말한다.
-                    Text("오늘 권장 \(snapshot.today.targetSets)세트 · 현재 \(planName) 플랜은 하루 \(plan.dailyCapacity)세트까지 계획해요")
-                        .font(AppTypography.footnote)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                }
-                if snapshot.extraToday > 0 {
-                    // 자동 재조정이 없는 플랜에는 "남은 일정에 반영했어요"라고 말하지 않는다.
-                    Text(
-                        plan.policy.canAutoReplan
-                        ? "오늘 계획보다 \(snapshot.extraToday)세트 더 학습했어요. 남은 일정에 반영했어요."
-                        : "오늘 계획보다 \(snapshot.extraToday)세트 더 학습했어요."
-                    )
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                }
-                if snapshot.today.state == .completed {
-                    Label("오늘 학습 완료", systemImage: "checkmark.circle.fill")
-                        .font(AppTypography.callout)
-                        .foregroundStyle(AppPalette.primary)
-                } else {
-                    PrimaryButton(
-                        title: snapshot.today.completedSets > 0 ? "학습 이어하기" : "학습 시작하기",
-                        systemImage: "mic.fill",
-                        action: onStartDaily
-                    )
-                }
-            }
+            Spacer(minLength: 0)
+            Button("이전 달", systemImage: "chevron.left") { monthOffset -= 1 }
+                .labelStyle(.iconOnly)
+                .minimumTouchTarget()
+            Button("다음 달", systemImage: "chevron.right") { monthOffset += 1 }
+                .labelStyle(.iconOnly)
+                .minimumTouchTarget()
         }
-        .cardStyle()
     }
 
-    /// 단어 학습 진입점(P14.5). 플래너를 열거나 이 줄을 그리는 것으로는 아무것도
-    /// 만들지 않는다 — 오늘의 단어 배정도, AI 호출도, 토큰 예약도 여기서 일어나지 않는다.
-    private var vocabularyCard: some View {
-        Button(action: onStartVocabulary) {
-            HStack(spacing: AppSpacing.sm) {
-                Image(systemName: "book.closed.fill")
-                    .foregroundStyle(AppPalette.primary)
-                Text("단어 학습하기")
-                    .font(AppTypography.callout)
-                    .foregroundStyle(AppPalette.ink)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
+    private var monthGrid: some View {
+        let titles = eventTitlesByDate
+        let startOfToday = calendar.startOfDay(for: today)
+        return LazyVGrid(
+            columns: Array(repeating: GridItem(.flexible(), spacing: AppSpacing.xs), count: 7),
+            spacing: AppSpacing.sm
+        ) {
+            // 머리글은 일~토. 각 칸이 스스로 요일을 읽어 주므로 머리글은 VoiceOver에서 숨긴다.
+            ForEach(StudyWeekday.displayOrder) { weekday in
+                Text(weekday.shortLabel)
                     .font(AppTypography.caption)
                     .foregroundStyle(AppPalette.secondaryInk)
+                    .accessibilityHidden(true)
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .minimumTouchTarget()
-        .cardStyle()
-        .accessibilityHint("오늘의 단어를 학습합니다")
-    }
-
-    // MARK: 이번 주
-
-    /// 주간 스트립과 주간 요약은 같은 7일을 말한다. 카드를 둘로 나누면 같은 이야기가
-    /// 두 번 쌓이므로 한 칸에 담는다.
-    private var weekCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.md) {
-            weekStrip
-            weekSummary
-        }
-        .cardStyle()
-    }
-
-    /// 일요일부터 시작하는 7칸. 전체 캘린더와 **같은** 칸(`StudyDayCell`)을 쓰고,
-    /// 누르면 **같은** 하루 시트를 연다.
-    private var weekStrip: some View {
-        let eventDates = Set(events.map(\.localDate))
-        return HStack(spacing: AppSpacing.xs) {
-            ForEach(snapshot.weekDays) { day in
+            ForEach(0..<leadingBlanks, id: \.self) { _ in
+                Color.clear.frame(height: 1)
+            }
+            ForEach(days) { day in
                 let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
                 Button {
-                    onSelectDate(key)
+                    // 같은 날을 다시 누르면 접는다. 요약이 캘린더를 계속 밀고 있지 않게 한다.
+                    selectedLocalDate = selectedLocalDate == key ? nil : key
                 } label: {
                     StudyDayCell(
                         day: day,
-                        calendar: settings.calendar,
-                        isToday: day.date == snapshot.today.date,
-                        // 시험일 판정은 설정 한 곳에서만 온다. 전체 캘린더도 같은 것을 묻는다.
+                        calendar: calendar,
+                        isToday: day.date == startOfToday,
                         isExamDay: settings.isExamDay(day.date),
-                        hasEvent: eventDates.contains(key)
+                        hasEvent: titles[key]?.isEmpty == false,
+                        showsWeekday: false,
+                        activity: activities[key] ?? .empty,
+                        eventTitles: titles[key] ?? [],
+                        isSelected: selectedLocalDate == key
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("하루 정보를 봅니다")
+                .accessibilityHint("하루 요약을 봅니다")
             }
         }
     }
 
-    private var weekSummary: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            HStack {
-                VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                    Text("이번 주")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                    Text("\(snapshot.weekCompletedDays) / \(snapshot.weekScheduledDays)일 완료")
-                        .font(AppTypography.sectionTitle)
-                }
-                Spacer(minLength: 0)
-                VStack(alignment: .trailing, spacing: AppSpacing.xs) {
-                    Text("연속 학습")
-                        .font(AppTypography.caption)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                    Text("🔥 \(snapshot.streak)일")
-                        .font(AppTypography.sectionTitle)
-                        .accessibilityLabel("연속 학습 \(snapshot.streak)일")
-                }
-            }
-            if plan.mode != .completed {
-                Text(remainingText)
+    // MARK: 고른 하루
+
+    /// 캘린더 **아래**의 짧은 요약. 그날 한 학습과 그날의 일정만 말하고,
+    /// 더 자세한 것(문제 목록·일정 추가)은 예전부터 있던 하루 시트로 넘긴다.
+    @ViewBuilder
+    private var selectedDaySummary: some View {
+        if let key = selectedLocalDate,
+           let date = LocalCalendarDate.date(from: key, timeZone: settings.timeZone) {
+            let activity = activities[key] ?? .empty
+            let titles = eventTitlesByDate[key] ?? []
+            VStack(alignment: .leading, spacing: AppSpacing.sm) {
+                Text(date.formatted(.dateTime.month().day().weekday()))
+                    .font(AppTypography.sectionTitle)
+                Text(PlannerActivityCalendar.accessibilityText(activity) ?? "학습 기록이 없어요.")
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
+                if !titles.isEmpty {
+                    ForEach(titles.prefix(3), id: \.self) { title in
+                        Label(title, systemImage: "calendar")
+                            .font(AppTypography.footnote)
+                            .lineLimit(1)
+                    }
+                }
+                Button {
+                    onSelectDate(key)
+                } label: {
+                    Label(titles.isEmpty ? "+ 일정 추가" : "자세히 보기", systemImage: "chevron.right")
+                        .labelStyle(.titleOnly)
+                        .font(AppTypography.callout)
+                }
+                .minimumTouchTarget()
             }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardStyle()
         }
-        .cardStyle()
-    }
-
-    private var remainingText: String {
-        let remaining = "남은 권장 학습 \(plan.remainingSets)세트"
-        guard let completion = plan.estimatedCompletionDate else { return remaining }
-        return remaining
-            + " · \(completion.formatted(.dateTime.month().day())) 완료 예상"
     }
 
     // MARK: 계획 상태 안내
 
     /// 부족한 상태를 감추지 않되 자책하게 만드는 표현은 쓰지 않는다.
-    /// 여기서 권하는 행동은 설정 수정뿐이다. 플랜 업그레이드를 권하지 않는다(G4).
+    /// 카드가 아니라 한 줄이다 — 캘린더가 주인공인 화면에서 경고가 자리를 차지하지 않는다.
     @ViewBuilder
     private var plannerStateMessage: some View {
         switch plan.mode {
         case .compressed:
-            Text("시험일까지 남은 기간을 반영해 학습량을 조정했어요.")
-                .font(AppTypography.footnote)
-                .foregroundStyle(AppPalette.secondaryInk)
+            noticeLine("시험일까지 남은 기간을 반영해 학습량을 조정했어요.", isWarning: false)
         case .insufficientTime:
-            warningCard {
-                Text("현재 설정으로는 시험 전 권장 학습량을 모두 완료하기 어려워요.")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.dangerInk)
-                if let possible = plan.maximumSetsPossibleBeforeExam {
-                    Text("남은 권장 학습 \(plan.remainingSets)세트 · 현재 일정에서 시험 전 최대 \(possible)세트 가능")
-                        .font(AppTypography.footnote)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                }
-            }
+            noticeLine("현재 설정으로는 시험 전 권장 학습량을 모두 완료하기 어려워요.", isWarning: true)
         case .onTrack where plan.finishesAfterExam:
-            // 시험일 역산이 잠겨 있어도 위험은 그대로 알린다. 대신 여기서 결제를 권하지 않는다.
-            warningCard {
-                Text("현재 일정대로면 시험 전에 권장 학습량을 모두 마치기 어려워요.")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.dangerInk)
-            }
+            noticeLine("현재 일정대로면 시험 전에 권장 학습량을 모두 마치기 어려워요.", isWarning: true)
         case .onTrack, .completed:
             EmptyView()
         }
     }
 
-    private func warningCard(@ViewBuilder content: () -> some View) -> some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            content()
-            NavigationLink("학습 설정 수정", value: PlannerRoute.settings)
-                .font(AppTypography.callout)
-                .minimumTouchTarget()
-        }
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardStyle()
-    }
-
-    // MARK: 전체 캘린더
-
-    private var fullCalendarLink: some View {
-        NavigationLink(value: PlannerRoute.fullCalendar) {
-            HStack(spacing: AppSpacing.sm) {
-                Image(systemName: "calendar")
-                    .foregroundStyle(AppPalette.primary)
-                Text("전체 캘린더 보기")
-                    .font(AppTypography.callout)
-                Spacer(minLength: 0)
-                Image(systemName: "chevron.right")
-                    .font(AppTypography.caption)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-        .buttonStyle(.plain)
-        .minimumTouchTarget()
-        .cardStyle()
-        .accessibilityHint("월간 학습 계획을 봅니다")
+    private func noticeLine(_ text: String, isWarning: Bool) -> some View {
+        Text(text)
+            .font(AppTypography.footnote)
+            .foregroundStyle(isWarning ? AppPalette.dangerInk : AppPalette.secondaryInk)
+            .fixedSize(horizontal: false, vertical: true)
     }
 }
 
-/// 하루 한 칸. 주간 스트립과 월간 격자가 이 하나를 같이 쓴다.
+/// 하루 한 칸. 월간 격자가 쓰는 유일한 칸이다.
 ///
-/// 칸이 말하는 것은 **그날 실제로 학습한 횟수**뿐이다(P10). 계획 대비 달성률이 아니고,
-/// 완료·일부 완료 기호도 더는 그리지 않는다 — 계획 상태는 하루 시트와 오늘 카드가 맡는다.
+/// 칸이 말하는 것은 **그날 실제로 한 일**이다: 학습 횟수(진하기), 무엇을 했는지(배지),
+/// 그날의 일정(막대). 계획 대비 달성률은 여기서 말하지 않는다 — 하루 시트의 몫이다.
 struct StudyDayCell: View {
     let day: StudyDay
     /// 학습 계획 타임존의 달력. 기기 타임존으로 그리면 요일·날짜가 하루 어긋날 수 있다.
@@ -328,10 +293,15 @@ struct StudyDayCell: View {
     /// 설정한 OPIc 시험일인지(P12). 학습량 채우기·오늘 테두리와 **별개 채널**이라
     /// 별이 켜져도 히트맵 진하기는 그대로다.
     var isExamDay = false
-    /// 개인 일정이 있는지. 학습량과 헷갈리지 않게 원 **바깥**에 아주 작게 찍는다.
+    /// 개인 일정이 있는지. 제목까지 보여줄 자리가 없을 때를 위한 최소 표시다.
     var hasEvent = false
     /// 월간 격자에는 요일 머리글이 따로 있다. 칸마다 또 쓰면 격자가 시끄러워진다.
     var showsWeekday = true
+    /// 그날 실제로 한 학습(P14.5.2). 기본값이 비어 있어 예전 호출부는 그대로 동작한다.
+    var activity: PlannerDayActivity = .empty
+    /// 그날의 일정 제목. 칸이 좁으므로 최대 두 개만 그리고 나머지는 "+n"으로 접는다.
+    var eventTitles: [String] = []
+    var isSelected = false
 
     /// 오늘 테두리는 채우기와 겹치지 않게 한 겹 바깥에 그린다. 글자 크기를 키우면 같이 커진다.
     @ScaledMetric(relativeTo: .footnote) private var fillDiameter: CGFloat = 28
@@ -340,18 +310,35 @@ struct StudyDayCell: View {
         LearningActivityLevel.make(completedSets: day.completedSets)
     }
 
+    /// 데일리 핵심 학습을 끝낸 날. 배정이 없던 날(휴식일 자율 학습)도 학습은 학습이다.
+    private var dailyCompleted: Bool {
+        day.state == .completed || day.hasUnscheduledLearning
+    }
+
+    /// 데일리도 오늘의 단어도 다 한 날. 하나만 한 날과 눈으로 구분되어야 해서
+    /// 배지가 아니라 칸 자체에 도장을 찍는다.
+    private var isFullyComplete: Bool {
+        dailyCompleted && activity.isVocabularyComplete
+    }
+
     var body: some View {
-        VStack(spacing: AppSpacing.xs) {
+        VStack(spacing: 2) {
             if showsWeekday {
                 Text(StudyWeekday.from(date: day.date, calendar: calendar).shortLabel)
                     .font(AppTypography.caption)
                     .foregroundStyle(AppPalette.secondaryInk)
             }
             activityCircle
-            eventIndicator
+            badgeRow
+            eventBars
+            Spacer(minLength: 0)
         }
-        .frame(maxWidth: .infinity, minHeight: 44)
+        .frame(maxWidth: .infinity, minHeight: 86, alignment: .top)
         .padding(.vertical, AppSpacing.xs)
+        .background(
+            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
+                .fill(isSelected ? AppPalette.primarySoft : .clear)
+        )
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)
@@ -373,6 +360,7 @@ struct StudyDayCell: View {
                     .frame(width: fillDiameter + 8, height: fillDiameter + 8)
             }
             if isExamDay { examStar }
+            if isFullyComplete { completionSeal }
         }
         .frame(width: fillDiameter + 8, height: fillDiameter + 8)
     }
@@ -394,13 +382,65 @@ struct StudyDayCell: View {
             .accessibilityHidden(true)
     }
 
-    /// 개인 일정 표시. 학습 진하기와 섞이지 않게 원 아래 작은 점 하나로만 둔다.
-    /// 자리는 일정이 없어도 비워 두어 칸 높이가 들쭉날쭉해지지 않게 한다.
-    private var eventIndicator: some View {
-        Circle()
-            .fill(hasEvent ? AppPalette.secondaryInk : Color.clear)
-            .frame(width: 4, height: 4)
+    /// 데일리 + 오늘의 단어를 둘 다 끝낸 날의 도장. 별과 겹치지 않게 왼쪽 아래에 둔다.
+    private var completionSeal: some View {
+        Image(systemName: "checkmark.seal.fill")
+            .font(.system(size: 9))
+            .foregroundStyle(AppPalette.primary)
+            .background(.background, in: Circle())
+            .frame(
+                width: fillDiameter + 8, height: fillDiameter + 8,
+                alignment: .bottomLeading
+            )
             .accessibilityHidden(true)
+    }
+
+    /// 무엇을 했는지. 아이콘 + 숫자 한 쌍씩, 실제로 한 것만 최대 세 개다.
+    /// 자리는 비워 두어 칸 높이가 들쭉날쭉해지지 않게 한다.
+    private var badgeRow: some View {
+        HStack(spacing: 2) {
+            ForEach(PlannerActivityCalendar.badges(activity), id: \.label) { badge in
+                HStack(spacing: 1) {
+                    Image(systemName: badge.symbol)
+                        .font(.system(size: 7))
+                    Text("\(badge.count)")
+                        .font(.system(size: 8))
+                }
+                .foregroundStyle(AppPalette.primary)
+            }
+        }
+        .frame(height: 10)
+        .accessibilityHidden(true)
+    }
+
+    /// 그날의 일정. 제목 한 줄짜리 작은 막대 두 개까지 보여주고 나머지는 "+n"이다.
+    private var eventBars: some View {
+        VStack(spacing: 1) {
+            ForEach(eventTitles.prefix(2), id: \.self) { title in
+                Text(title)
+                    .font(.system(size: 8))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                    .padding(.horizontal, 2)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(AppPalette.primarySoft, in: RoundedRectangle(cornerRadius: 2))
+            }
+            if eventTitles.count > 2 {
+                Text("+\(eventTitles.count - 2)")
+                    .font(.system(size: 8))
+                    .foregroundStyle(AppPalette.secondaryInk)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 2)
+            }
+            // 일정 제목을 그릴 자리가 아예 없을 때(예전 호출부)를 위한 최소 표시.
+            if eventTitles.isEmpty && hasEvent {
+                Circle()
+                    .fill(AppPalette.secondaryInk)
+                    .frame(width: 4, height: 4)
+            }
+        }
+        .foregroundStyle(AppPalette.ink)
+        .accessibilityHidden(true)
     }
 
     private var accessibilityText: String {
@@ -410,7 +450,8 @@ struct StudyDayCell: View {
             isToday: isToday,
             isExamDay: isExamDay,
             completedSets: day.completedSets,
-            hasEvent: hasEvent
+            hasEvent: hasEvent || !eventTitles.isEmpty,
+            activity: activity
         )
     }
 
@@ -424,12 +465,15 @@ struct StudyDayCell: View {
         isToday: Bool,
         isExamDay: Bool = false,
         completedSets: Int,
-        hasEvent: Bool
+        hasEvent: Bool,
+        activity: PlannerDayActivity = .empty
     ) -> String {
         let today = isToday ? "오늘, " : ""
         let exam = isExamDay ? "OPIc 시험일, " : ""
         let event = hasEvent ? ", 개인 일정 있음" : ""
         let learning = LearningActivityLevel.accessibilityText(completedSets: completedSets)
-        return "\(date) \(weekday), \(today)\(exam)\(learning)\(event)"
+        // 배지는 아이콘이라 소리로는 읽히지 않는다. 한 일을 이름 그대로 덧붙인다.
+        let detail = PlannerActivityCalendar.accessibilityText(activity).map { ", \($0)" } ?? ""
+        return "\(date) \(weekday), \(today)\(exam)\(learning)\(detail)\(event)"
     }
 }

@@ -379,6 +379,20 @@ enum LearningStreak {
         }
         return streak
     }
+
+    /// 지금까지 가장 길었던 연속 학습(P14.5.2). 오늘 기준이 아니라 기록 전체에서 가장 긴 구간이다.
+    /// 현재 연속과 **같은 재료**(학습이 있었던 날)를 쓴다 — 두 숫자가 서로 다른 정의를 갖지 않는다.
+    static func longest(learningDays: Set<Date>, calendar: Calendar) -> Int {
+        var best = 0
+        var run = 0
+        for day in learningDays.sorted() {
+            let previous = calendar.date(byAdding: .day, value: -1, to: day)
+                .map { calendar.startOfDay(for: $0) }
+            run = previous.map(learningDays.contains) == true ? run + 1 : 1
+            best = max(best, run)
+        }
+        return best
+    }
 }
 
 /// 대시보드가 한 번에 필요로 하는 파생값 묶음. 저장하지 않고 매번 계산한다.
@@ -389,6 +403,8 @@ struct StudyCalendarSnapshot: Sendable {
     let weekDays: [StudyDay]
     /// 실제 학습이 며칠 연속됐는가(`LearningStreak`). 계획 이행률과 다른 지표다.
     let streak: Int
+    /// 가장 길었던 연속 학습. 지금이 최고 기록보다 짧아도 지난 기록을 지우지 않는다.
+    let bestStreak: Int
     /// 계획 이행률의 분자. 배정된 학습일 중 배정량을 다 채운 날 수다.
     /// 휴식일 자율 학습은 여기 들어오지 않는다 — 계획에 없던 날이기 때문이다.
     let weekCompletedDays: Int
@@ -451,6 +467,10 @@ struct StudyCalendarSnapshot: Sendable {
             streak: LearningStreak.current(
                 learningDays: LearningStreak.learningDays(from: completions),
                 today: startOfToday,
+                calendar: calendar
+            ),
+            bestStreak: LearningStreak.longest(
+                learningDays: LearningStreak.learningDays(from: completions),
                 calendar: calendar
             ),
             weekCompletedDays: summary.completed,

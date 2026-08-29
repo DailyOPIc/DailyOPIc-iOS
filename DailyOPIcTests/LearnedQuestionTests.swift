@@ -494,7 +494,7 @@ struct LearnedQuestionPresentationTests {
 
     /// 화면을 밀어내는 경로는 P10에서 없앤 그대로다. 문제 목록도 새 화면을 만들지 않는다.
     @Test func noPushRouteIsReintroduced() {
-        #expect(Set(PlannerRoute.allCases) == [.fullCalendar, .settings])
+        #expect(Set(PlannerRoute.allCases) == [.settings, .notifications])
         #expect(PlannerRoute.allCases.count == 2)
     }
 

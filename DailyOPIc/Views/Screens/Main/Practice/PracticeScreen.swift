@@ -145,13 +145,6 @@ struct PracticeScreen: View {
                             removal: .opacity
                         ))
 
-                    // 답하기 전에 쓸 표현을 보여 준다(P14.4). 계산은 기기 안에서 끝나고
-                    // 토큰을 쓰지 않는다 — 녹음·분석 흐름은 그대로다.
-                    PracticeVocabularySection(
-                        question: question,
-                        targetLevel: preferences.targetLevel
-                    )
-
                     if let result = viewModel.currentResult {
                         savedResult(result)
                     } else {

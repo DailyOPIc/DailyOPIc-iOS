@@ -166,7 +166,8 @@ struct DailyTokenEnforcementTests {
         let surfaces = [
             "Views/Screens/Main/Calendar/PlannerHomeView.swift",
             "Views/Screens/Main/Calendar/PlannerDaySheet.swift",
-            "Views/Screens/Main/Calendar/PlannerFullCalendarView.swift",
+            // 전체 캘린더는 P14.5.2에서 플래너 홈에 흡수됐다(파일 자체가 없다).
+            "Views/Screens/Main/Calendar/PlannerNotificationSettingsView.swift",
             "Views/Screens/Onboarding/OPIcGuideView.swift",
         ]
         for surface in surfaces {

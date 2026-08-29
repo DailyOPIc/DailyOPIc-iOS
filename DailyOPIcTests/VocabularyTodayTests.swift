@@ -69,6 +69,14 @@ struct VocabularyTodayTests {
             .joined(separator: "\n")
     }
 
+    /// 홈이 실제로 그리는 범위(`home` 선언부터 라우트 목적지 직전까지).
+    /// 라우트 목적지는 사용자-facing 홈이 아니라서 이 범위 밖이다.
+    private func homeBody(_ screen: String) throws -> String {
+        let start = try #require(screen.range(of: "private var home: some View"))
+        let end = try #require(screen.range(of: "private func destination("))
+        return String(screen[start.lowerBound..<end.lowerBound])
+    }
+
     private let screenPath = "Views/Screens/Main/Vocabulary/VocabularyScreen.swift"
     private let studyPath = "Views/Screens/Main/Vocabulary/VocabularyStudyView.swift"
     private let plannerPath = "Views/Screens/Main/Calendar/PlannerHomeView.swift"
@@ -295,17 +303,19 @@ struct VocabularyTodayTests {
         #expect(!study.contains("vocabulary/generate"))
     }
 
-    // MARK: 6. 플래너 진입점
+    // MARK: 6. 플래너는 단어장으로 보내지 않는다(P14.5.2)
 
-    @Test func plannerHasAVocabularyEntryPoint() throws {
+    /// 플래너에 있던 "단어 학습하기" 바로가기는 내렸다. 플래너는 캘린더이지
+    /// 다른 탭으로 보내는 허브가 아니다 — 단어는 단어장 탭 한 곳에서 시작한다.
+    @Test func plannerNoLongerShortcutsIntoVocabulary() throws {
         let planner = code(try source(plannerPath))
-        #expect(planner.contains("단어 학습하기"))
-        #expect(planner.contains("Button(action: onStartVocabulary)"))
-        // 플래너는 두 번째 단어 학습 화면을 갖지 않는다. 탭으로 보낼 뿐이다.
-        #expect(code(try source(tabPath)).contains("onStartVocabulary: { selectedTab = .vocabulary }"))
+        #expect(!planner.contains("단어 학습하기"))
+        #expect(!planner.contains("onStartVocabulary"))
+        #expect(!planner.contains("오늘의 학습"))
+        #expect(!code(try source(tabPath)).contains("onStartVocabulary"))
     }
 
-    /// 플래너를 열거나 그 줄을 그리는 것으로는 아무것도 만들어지지 않는다.
+    /// 플래너를 열거나 그 화면을 그리는 것으로는 아무것도 만들어지지 않는다.
     @Test func openingThePlannerCreatesNothing() throws {
         let planner = code(try source(plannerPath))
         #expect(!planner.contains("VocabularyDailySetPlanner"))
@@ -334,26 +344,166 @@ struct VocabularyTodayTests {
         #expect(!screen.contains("맞춤 단어 만들기"))
     }
 
-    /// 홈에 남는 것: 검색 · 오늘의 단어 · 오늘 복습 · 내 단어.
-    @Test func homeKeepsSearchTodayAndReview() throws {
+    /// 홈에 남는 것은 오늘의 단어 하나다(P14.5.2). 검색·큰 제목·목표 안내·복습 카드는 내렸다.
+    @Test func homeKeepsOnlyTodaysWords() throws {
         let screen = code(try source(screenPath))
-        #expect(screen.contains("단어나 뜻으로 검색"))
         #expect(screen.contains("Text(\"오늘의 단어\")"))
-        #expect(screen.contains("Text(\"오늘 복습\")"))
         #expect(screen.contains("todayCard"))
-        #expect(screen.contains("reviewCard"))
-        #expect(screen.contains("VocabularyCatalog.search(query, in: allEntries)"))
+        // 홈이 그리는 것은 오늘의 카드 하나뿐이다.
+        #expect(screen.contains("todayCard.padding(AppSpacing.lg)"))
+        // 검색은 통째로 사라졌다 — 입력창도, 결과 목록도, 검색 상태도 없다.
+        #expect(!screen.contains("단어나 뜻으로 검색"))
+        #expect(!screen.contains(".searchable("))
+        #expect(!screen.contains("searchList"))
+        #expect(!screen.contains("VocabularyCatalog.search("))
+        // 큰 제목과 목표 안내도 없다.
+        #expect(!screen.contains("Text(\"단어장\")"))
+        #expect(!screen.contains("에 맞춰 추천해요"))
+        // 복습 카드도, 그 자리를 대신하던 작은 줄도 없다.
+        #expect(!screen.contains("reviewCard"))
+        #expect(!screen.contains("오늘 복습"))
+    }
+
+    /// 홈에는 복습으로 들어가는 길이 하나도 없다(P14.5.2 재작업). 남은 due 목록은
+    /// 라우트가 쓰는 내부 값일 뿐 사용자에게 보이는 CTA가 아니다.
+    @Test func homeHasNoReviewEntryPoint() throws {
+        let screen = code(try source(screenPath))
+        #expect(!screen.contains("오늘 복습할 단어"))
+        #expect(!screen.contains("reviewLine"))
+        #expect(!screen.contains("NavigationLink(value: VocabularyRoute.review)"))
+        // 홈 본문 안에는 dueEntries조차 등장하지 않는다.
+        let home = try homeBody(screen)
+        #expect(!home.contains("dueEntries"))
+        #expect(!home.contains("VocabularyRoute.review"))
+    }
+
+    /// 홈에서 "내 단어"(저장한 단어 · 익힌 단어)를 내렸다. 단어장 홈 = 오늘의 단어다.
+    @Test func homeHasNoMyWordsSection() throws {
+        let screen = code(try source(screenPath))
+        #expect(!screen.contains("내 단어"))
+        #expect(!screen.contains("myWordsSection"))
+        #expect(!screen.contains("myWordsRow"))
+        #expect(!screen.contains("NavigationLink(value: VocabularyRoute.saved)"))
+        #expect(!screen.contains("NavigationLink(value: VocabularyRoute.mastered)"))
+        // 홈이 그리는 범위 안에는 저장/익힘 목록도, 그 문구도 없다.
+        // (같은 문구가 남아 있는 곳은 라우트 목적지의 화면 제목뿐이다.)
+        let home = try homeBody(screen)
+        #expect(!home.contains("savedEntries"))
+        #expect(!home.contains("masteredEntries"))
+        #expect(!home.contains("저장한 단어"))
+        #expect(!home.contains("익힌 단어"))
+    }
+
+    /// 홈에서 진입점을 내렸다고 복습을 없앤 것이 아니다. 라우트·화면·엔진(1·3·7·14·30일)과
+    /// 예정일 계산은 그대로 살아 있다 — 진입점 제거 ≠ 시스템 삭제다.
+    @Test func reviewEngineSurvivesWithoutAHomeEntry() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("case review"))
+        #expect(screen.contains("case .review:"))
+        #expect(screen.contains("kind: .review"))
+        #expect(screen.contains("VocabularyDailyProgress.dueIDs(states: states, today: todayLocalDate)"))
+        #expect(VocabularyReviewPolicy.intervalDaysBySuccess == [1, 3, 7, 14, 30])
+        #expect(VocabularyReviewPolicy.masteryThreshold == 5)
+        // 상태 모델의 복습 필드도 그대로다.
+        let record = try source("Models/LocalRecords.swift")
+        #expect(record.contains("var nextReviewLocalDate: String?"))
+        #expect(record.contains("var reviewCount: Int = 0"))
+    }
+
+    /// 예정일 계산이 실제로 도는지 값으로 확인한다(문자열 검사가 아니다).
+    /// 한 번 맞히면 1일 뒤, 두 번 연속이면 3일 뒤다.
+    @Test func reviewSchedulingStillRunsEndToEnd() throws {
+        let service = try makeService()
+        try service.recordVocabularyAnswer(
+            entryID: "e1", knewIt: true, timeZone: seoul, now: try moment("2026-01-10")
+        )
+        #expect(try state(service, "e1").nextReviewLocalDate == "2026-01-11")
+        try service.recordVocabularyAnswer(
+            entryID: "e1", knewIt: true, timeZone: seoul, now: try moment("2026-01-11")
+        )
+        #expect(try state(service, "e1").nextReviewLocalDate == "2026-01-14")
+    }
+
+    /// 저장·익힘도 홈에서만 내렸다. 화면·라우트·저장소는 그대로고, 저장 토글은
+    /// 오늘의 카드에서 여전히 동작한다.
+    @Test func savedAndMasteredStayInternal() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("case saved"))
+        #expect(screen.contains("case mastered"))
+        #expect(screen.contains("case .saved:"))
+        #expect(screen.contains("case .mastered:"))
+        #expect(screen.contains("private var savedEntries"))
+        #expect(screen.contains("private var masteredEntries"))
+        #expect(try source("Views/Screens/Main/Vocabulary/VocabularyListViews.swift")
+            .contains("struct VocabularyMyWordsView"))
+        // 저장은 기록으로 남고, 오늘 학습한 단어 목록이 그 상태를 그대로 읽는다.
+        let service = try makeService()
+        try service.setVocabularySaved(entryID: "e1", isSaved: true)
+        #expect(try state(service, "e1").isSaved)
+    }
+
+    /// 오늘 학습을 끝내면 방금 한 단어를 다시 볼 수 있다. 목록의 진실은 오늘 배정된
+    /// entryID 그 자체다 — 다시 세거나 추측하지 않는다.
+    @Test func finishedDayOffersTodaysWordList() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("case todayLearned"))
+        #expect(screen.contains("NavigationLink(value: VocabularyRoute.todayLearned)"))
+        #expect(screen.contains("오늘 학습한 단어 보기"))
+        #expect(screen.contains("entries: todayEntries"))
+        #expect(screen.contains("showsProgress: true"))
+        // 새 목록 화면을 만들지 않고 저장한 단어·익힌 단어와 같은 화면을 나눠 쓴다.
+        #expect(screen.contains("VocabularyMyWordsView("))
+    }
+
+    /// 줄마다 영어 · 뜻 · 저장 여부 · 학습 상태 · 복습 횟수가 보인다.
+    @Test func todaysWordRowsShowStatusAndReviewCount() throws {
+        let list = code(try source("Views/Screens/Main/Vocabulary/VocabularyListViews.swift"))
+        #expect(list.contains("Text(entry.term)"))
+        #expect(list.contains("Text(entry.meaningKo)"))
+        #expect(list.contains("state?.isSaved == true"))
+        #expect(list.contains("Text(Self.progressText(state))"))
+        // 복습을 한 적 없으면 "복습 0회"라고 적지 않는다.
+        #expect(VocabularyEntryRow.progressText(nil) == "새 단어")
+    }
+
+    /// 추가 20개는 아직 열지 않았다. 홈의 CTA도 완료 화면과 같은 비활성 상태이고,
+    /// 열릴 때의 값(데일리 토큰 1개)만 미리 밝힌다.
+    @Test func theExtraTwentyStaysClosedAndPriced() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("오늘 \\(VocabularyDailySet.dailyTarget)개 더 학습하기"))
+        #expect(screen.contains("isDisabled: true"))
+        #expect(screen.contains("데일리 토큰 1개"))
+        // 눌러도 부를 것이 없다 — 생성 경로가 이 화면에 아예 없다.
+        #expect(!screen.contains("VocabularyGenerationViewModel"))
+        #expect(!screen.contains("vocabulary/generate"))
+        #expect(!screen.contains("VocabularyDailySetPlanner.assign(localDate: today, catalog: VocabularyCatalog.all, excluding: [])"))
     }
 
     /// 오늘의 주제 고르기는 남는다 — 이것이 "주제별 단어"와 다른 점이다.
-    /// 고르는 목록은 여전히 기존 16개 `VocabularyTopic`이다.
     @Test func todayTopicPickerSurvivesTheHomeCleanup() throws {
         let screen = code(try source(screenPath))
         #expect(screen.contains("case todayTopicPicker"))
         #expect(screen.contains("VocabularyTodayTopicPicker("))
+    }
+
+    /// 주제 고르기가 실제로 도는 목록은 `VocabularyCatalog.topics`이고, 그것은
+    /// 기존 `VocabularyTaxonomy`(=`VocabularyTopic`) 전체와 **같은 순서·같은 원소**다.
+    /// 축약된 주제 목록을 따로 만들지 않았고, 잘라내지도 않는다.
+    @Test func topicPickerOffersEveryVocabularyTopic() throws {
+        // 1) 화면이 도는 collection이 무엇인지.
+        let screen = code(try source(screenPath))
         #expect(screen.contains("ForEach(VocabularyCatalog.topics)"))
+        #expect(!screen.contains("VocabularyCatalog.topics.prefix"))
+        #expect(!screen.contains("topics.prefix("))
+        // 2) 그 collection의 실제 내용이 taxonomy 전체인지.
         #expect(VocabularyTopic.allCases.count == 16)
-        #expect(VocabularyCatalog.topics.count == 16)
+        #expect(VocabularyCatalog.topics == VocabularyTopic.allCases)
+        // 3) 화면이 각 칸에 붙이는 개수도 16개 전부 계산된다(빈 주제가 없다).
+        let counts = VocabularyTopic.allCases.reduce(into: [VocabularyTopic: Int]()) {
+            $0[$1] = VocabularyCatalog.entries(topic: $1).count
+        }
+        #expect(counts.count == 16)
+        #expect(counts.values.allSatisfy { $0 > 0 })
     }
 
     /// 홈에서 내렸다고 구현을 지우지 않았다. P14.2 생성 아키텍처와 토큰 계약은 그대로다.
@@ -362,10 +512,11 @@ struct VocabularyTodayTests {
         #expect(viewModel.contains("tokenCost"))
         #expect(VocabularyGenerationViewModel.tokenCost == 1)
         #expect(try source("Services/API/APIClient.swift").contains("/v1/vocabulary/generate"))
-        // P14.4의 데일리 질문 CTA가 그 화면을 계속 연다.
-        let practice = code(try source("Views/Screens/Main/Practice/PracticeVocabularySection.swift"))
-        #expect(practice.contains("VocabularyGenerationSheet("))
-        #expect(practice.contains("VocabularyTopicView(topic: topic"))
+        // 화면·라우트도 그대로 있다. P14.5.2에서 마지막 진입점(데일리 질문 CTA)이
+        // 사라져 지금은 부르는 곳이 없지만, P14.6이 여기에 다시 붙는다.
+        let sheet = code(try source("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift"))
+        #expect(sheet.contains("struct VocabularyGenerationSheet"))
+        #expect(sheet.contains("VocabularyGenerationViewModel"))
     }
 
     /// AI 말하기 코치(P14.3)도 그대로 있다. 홈에 새 큰 CTA를 만들지도 않았다.

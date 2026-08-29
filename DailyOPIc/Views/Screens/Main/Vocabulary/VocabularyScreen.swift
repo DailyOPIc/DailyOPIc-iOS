@@ -6,6 +6,8 @@ enum VocabularyRoute: Hashable {
     /// 오늘의 주제 고르기(P14.5). 여기서 고른 뒤에야 오늘의 단어가 배정된다.
     case todayTopicPicker
     case todayStudy
+    /// 오늘 배정된 단어 다시 보기(P14.5.2). 오늘 학습을 끝낸 뒤에만 나온다.
+    case todayLearned
     case review
     case topic(VocabularyTopic)
     case saved
@@ -19,16 +21,22 @@ enum VocabularyRoute: Hashable {
     case speakingCoach(VocabularyEntry)
 }
 
-/// 단어장 홈. "오늘 뭘 외우지?"에 답하는 것이 이 화면의 전부다.
-/// 통계는 여기 두지 않는다 — 통계 탭이 이미 그 일을 한다.
+/// 단어장 홈 = **오늘의 단어** 하나다(P14.5.2). 검색·큰 제목·복습 진입점·주제
+/// 둘러보기·내 단어(저장한/익힌 단어)는 홈에서 내렸다 — 통계는 통계 탭이,
+/// 학습 기록은 플래너 캘린더가 이미 그 일을 한다.
 ///
-/// 무료 영역(오늘의 단어 · 오늘 복습 · 주제별 · 검색 · 내 단어)은 **네트워크도 AI도
-/// 부르지 않는다.** 단어 데이터는 앱에 담긴 시드(`VocabularyCatalog`)와 이미 받아 둔
-/// AI 세트이고, 내 상태는 이 기기의 SwiftData다.
+/// 내린 것은 **홈의 진입점뿐이고 기능이 아니다**: 복습 엔진(`VocabularyReviewPolicy` ·
+/// 예정일 · 익힘 · 복습 횟수)도, 저장·익힘 상태와 그 목록 화면도 그대로 살아 있다.
+/// 오늘의 카드에서 저장하면 저장되고, 오늘 학습한 단어 보기에서 그 상태가 보인다.
 ///
-/// 토큰이 나가는 곳은 둘뿐이다: "AI 맞춤 단어장"을 **만들 때 1개**(P14.2)와,
-/// 단어 상세의 "직접 말해보기"에서 **AI 코칭을 요청할 때 1개**(P14.3).
-/// 이미 만든 세트를 다시 여는 것도, 녹음·전사도, 받아 둔 코칭을 다시 보는 것도 공짜다.
+/// 오늘의 기본 20개로 가는 길은 **전부 무료다**: 주제 고르기 · 배정 · 학습 · 뜻 보기 ·
+/// 듣기 · 알아요/몰라요 · 저장 · 복습 상태 갱신 어느 것도 네트워크도 AI도 부르지 않는다.
+/// 단어는 앱에 담긴 시드(`VocabularyCatalog`)와 이미 받아 둔 AI 세트이고,
+/// 내 상태는 이 기기의 SwiftData다.
+///
+/// 토큰이 나가는 곳은 하나뿐이다: 단어 상세의 "직접 말해보기"에서 **AI 코칭을 요청할 때
+/// 1개**(P14.3). 오늘 20개를 더 받는 "추가 20개"는 아직 열지 않았다 —
+/// 열릴 때(P14.6) 데일리 토큰 1개이고, 그전까지 공짜로 배정하지 않는다.
 struct VocabularyScreen: View {
     let preferences: AppPreferences
     let persistence: PersistenceService
@@ -37,7 +45,6 @@ struct VocabularyScreen: View {
     @Query private var states: [VocabularyStateRecord]
     @Query(sort: \VocabularyGeneratedSetRecord.createdAt, order: .reverse)
     private var generatedSets: [VocabularyGeneratedSetRecord]
-    @State private var query = ""
 
     /// 하루 경계는 학습 계획 타임존을 따른다 — 플래너의 "오늘"과 단어장의 "오늘"이
     /// 다른 날을 가리키면 안 된다.
@@ -109,57 +116,25 @@ struct VocabularyScreen: View {
         )
     }
 
-    /// 검색도 AI 세트를 포함한다. 화면을 하나 더 만들지 않는다.
-    private var searchResults: [VocabularyEntry] { VocabularyCatalog.search(query, in: allEntries) }
-
     var body: some View {
-        ScrollView {
-            if query.trimmingCharacters(in: .whitespaces).isEmpty {
-                home
-            } else {
-                searchList
+        ScrollView { home }
+            .navigationDestination(for: VocabularyRoute.self, destination: destination)
+            .navigationDestination(for: VocabularyEntry.self) { entry in
+                VocabularyEntryDetailView(
+                    entry: entry,
+                    state: stateByID[entry.id],
+                    persistence: persistence
+                )
             }
-        }
-        .searchable(text: $query, prompt: "단어나 뜻으로 검색")
-        .navigationDestination(for: VocabularyRoute.self, destination: destination)
-        .navigationDestination(for: VocabularyEntry.self) { entry in
-            VocabularyEntryDetailView(
-                entry: entry,
-                state: stateByID[entry.id],
-                persistence: persistence
-            )
-        }
     }
 
     // MARK: 홈
 
     private var home: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.lg) {
-            header
-            todayCard
-            reviewCard
-            myWordsSection
-        }
-        .padding(AppSpacing.lg)
+        todayCard.padding(AppSpacing.lg)
     }
 
-    private var header: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            Text("단어장")
-                .font(AppTypography.title)
-            // 목표 등급은 여기서 새로 정하지 않는다. 온보딩에서 정한 값을 그대로 읽는다.
-            if let targetLevel = preferences.targetLevel {
-                Text("목표 \(targetLevel.rawValue)에 맞춰 추천해요")
-                    .font(AppTypography.callout)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            } else {
-                Text("OPIc 답변에서 바로 쓰는 표현만 모았어요")
-                    .font(AppTypography.callout)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
-        }
-    }
-
+    /// 이 화면의 주인공. 하루의 상태는 셋뿐이다 — 아직 안 골랐다 / 하는 중 / 다 했다.
     private var todayCard: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("오늘의 단어")
@@ -174,7 +149,7 @@ struct VocabularyScreen: View {
                 }
                 .buttonStyle(PressableButtonStyle())
             } else if todayEntries.isEmpty {
-                Text("새로 배울 단어를 다 봤어요. 오늘 복습으로 이어가 보세요.")
+                Text("오늘 배정할 새 단어가 더 없어요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
@@ -185,13 +160,11 @@ struct VocabularyScreen: View {
                         "오늘의 단어 \(todayEntries.count)개 중 \(todayStudiedCount)개 완료"
                     )
                 if todayRemaining.isEmpty {
-                    Label("오늘 학습 완료", systemImage: "checkmark.circle.fill")
-                        .font(AppTypography.callout)
-                        .foregroundStyle(AppPalette.primary)
+                    todayDoneActions
                 } else {
                     NavigationLink(value: VocabularyRoute.todayStudy) {
                         primaryLabel(
-                            todayStudiedCount > 0 ? "이어서 학습" : "오늘의 단어 시작",
+                            todayStudiedCount > 0 ? "이어 학습하기" : "오늘의 단어 시작",
                             systemImage: "book.closed.fill"
                         )
                     }
@@ -202,7 +175,41 @@ struct VocabularyScreen: View {
         .cardStyle()
     }
 
-    /// 오늘의 주제와 구성. 고른 주제만으로 하루 목표를 채우지 못한 날에는 그 사실을
+    /// 오늘 몫을 다 끝낸 뒤. 방금 한 것을 되돌아보는 길과, 더 하고 싶을 때의 길을 함께 둔다.
+    private var todayDoneActions: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Label("오늘 학습 완료", systemImage: "checkmark.circle.fill")
+                .font(AppTypography.callout)
+                .foregroundStyle(AppPalette.primary)
+            NavigationLink(value: VocabularyRoute.todayLearned) {
+                primaryLabel("오늘 학습한 단어 보기", systemImage: "list.bullet")
+            }
+            .buttonStyle(PressableButtonStyle())
+            extraWordsCTA
+        }
+    }
+
+    /// "오늘 20개 더". **아직 열지 않았다** — 누를 수 없는 버튼이라 여기서 단어가
+    /// 배정되는 일도, AI가 불리는 일도, 토큰이 나가는 일도 없다.
+    /// 열릴 때(P14.6) 데일리 토큰 1개다. 지금 공짜로 배정해 두면 나중에 유료로
+    /// 바꾸는 순간 사용자가 손해 본 것처럼 느낀다.
+    /// (완료 화면의 같은 CTA와 문구·상태를 맞춘다 — 두 곳이 다른 말을 하면 안 된다.)
+    private var extraWordsCTA: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            PrimaryButton(
+                title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기",
+                isDisabled: true
+            ) {}
+            HStack(spacing: AppSpacing.xs) {
+                DailyTokenIcon(size: 16)
+                Text("다음 업데이트에서 열려요. 데일리 토큰 1개")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+        }
+    }
+
+    /// 주제와 구성. 고른 주제만으로 하루 목표를 채우지 못한 날에는 그 사실을
     /// 그대로 적는다 — 다른 주제에서 채운 단어를 고른 주제인 척 보여주지 않는다.
     @ViewBuilder
     private var todayTopicLine: some View {
@@ -216,109 +223,6 @@ struct VocabularyScreen: View {
             .font(AppTypography.callout)
             .foregroundStyle(AppPalette.secondaryInk)
         }
-    }
-
-    private var reviewCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("오늘 복습")
-                .font(AppTypography.sectionTitle)
-            if dueEntries.isEmpty {
-                Text("오늘 복습할 단어가 없어요.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            } else {
-                Text("\(dueEntries.count)개")
-                    .font(AppTypography.title)
-                    .accessibilityLabel("복습할 단어 \(dueEntries.count)개")
-                NavigationLink(value: VocabularyRoute.review) {
-                    primaryLabel("복습하기", systemImage: "arrow.clockwise")
-                }
-                .buttonStyle(PressableButtonStyle())
-            }
-        }
-        .cardStyle()
-    }
-
-    /// 주제 탐색(`주제별 단어`)과 AI 맞춤 단어장 만들기는 이 홈에서 내렸다(P14.5.1).
-    /// 단어장의 주인공은 "오늘의 단어" 하나이고, 주제는 그 시작에서 고르는 입력값이다.
-    /// 두 흐름의 화면·라우트·생성 아키텍처는 지우지 않았다 —
-    /// 주제 목록은 데일리 질문의 추천(P14.4)이, AI 30개 만들기는 같은 화면의 CTA가 계속 쓴다.
-
-    private var myWordsSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("내 단어")
-                .font(AppTypography.sectionTitle)
-            VStack(spacing: 0) {
-                myWordsRow(
-                    title: "저장한 단어",
-                    systemImage: "bookmark.fill",
-                    count: savedEntries.count,
-                    route: .saved
-                )
-                Divider()
-                myWordsRow(
-                    title: "익힌 단어",
-                    systemImage: "checkmark.seal.fill",
-                    count: masteredEntries.count,
-                    route: .mastered
-                )
-            }
-            .cardStyle()
-        }
-    }
-
-    private func myWordsRow(
-        title: String,
-        systemImage: String,
-        count: Int,
-        route: VocabularyRoute
-    ) -> some View {
-        NavigationLink(value: route) {
-            HStack(spacing: AppSpacing.sm) {
-                Image(systemName: systemImage)
-                    .foregroundStyle(AppPalette.primary)
-                Text(title)
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.ink)
-                Spacer(minLength: 0)
-                Text("\(count)개")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                Image(systemName: "chevron.right")
-                    .font(.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
-            .padding(.vertical, AppSpacing.sm)
-            .contentShape(Rectangle())
-        }
-        .buttonStyle(.plain)
-        .minimumTouchTarget()
-        .accessibilityLabel("\(title) \(count)개")
-    }
-
-    // MARK: 검색
-
-    /// AI를 쓰지 않는 로컬 검색이다. 영어 표현·한국어 뜻·예문 안의 단어까지 찾는다.
-    private var searchList: some View {
-        LazyVStack(alignment: .leading, spacing: AppSpacing.sm) {
-            if searchResults.isEmpty {
-                Text("\"\(query)\"와 맞는 단어가 없어요.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                    .padding(.top, AppSpacing.lg)
-            } else {
-                Text("\(searchResults.count)개 찾았어요")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                ForEach(searchResults) { entry in
-                    NavigationLink(value: entry) {
-                        VocabularyEntryRow(entry: entry, state: stateByID[entry.id])
-                    }
-                    .buttonStyle(.plain)
-                }
-            }
-        }
-        .padding(AppSpacing.lg)
     }
 
     // MARK: 경로
@@ -338,6 +242,15 @@ struct VocabularyScreen: View {
                 entries: todayRemaining,
                 persistence: persistence,
                 timeZone: timeZone
+            )
+        case .todayLearned:
+            // 오늘 배정된 목록 그 자체가 진실이다 — 다시 세거나 추측하지 않는다.
+            VocabularyMyWordsView(
+                title: "오늘 학습한 단어",
+                emptyMessage: "오늘 학습한 단어가 아직 없어요.",
+                entries: todayEntries,
+                states: stateByID,
+                showsProgress: true
             )
         case .review:
             VocabularyStudyView(
@@ -401,13 +314,16 @@ struct VocabularyScreen: View {
     private func assignToday(topic: VocabularyTopic) {
         let today = todayLocalDate
         if let existing = preferences.vocabularyDailySet, existing.covers(today) { return }
-        preferences.vocabularyDailySet = VocabularyDailySetPlanner.assign(
+        let set = VocabularyDailySetPlanner.assign(
             localDate: today,
             catalog: VocabularyCatalog.all,
             excluding: VocabularyDailyProgress.studiedIDs(states: states),
             targetLevel: preferences.targetLevel,
             topic: topic
         )
+        preferences.vocabularyDailySet = set
+        // 플래너 캘린더가 "오늘 다 했는가"를 판단할 분모. 배정 순간 한 번만 남긴다.
+        try? persistence.setVocabularyDailyGoal(localDate: today, count: set.entryIDs.count)
     }
 
     /// 주제별로 오늘 배정될 수 있는 새 단어 수. 이미 학습한 항목은 빼고 센다 —

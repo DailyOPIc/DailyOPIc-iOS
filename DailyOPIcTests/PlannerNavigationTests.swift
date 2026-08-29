@@ -57,10 +57,11 @@ struct PlannerNavigationTests {
         )
     }
 
-    /// 하루로 **밀고 들어가는** 경로는 더 이상 없다. 남은 경로는 전체 캘린더와 설정뿐이다.
-    /// (숨은 두 번째 경로가 생기면 여기서 걸린다.)
+    /// 하루로 **밀고 들어가는** 경로는 더 이상 없다. 전체 캘린더 경로도 없다 —
+    /// 플래너 홈이 곧 캘린더라서 밀어낼 곳이 사라졌다(P14.5.2).
+    /// 남은 경로는 학습 계획 설정과 학습 알림뿐이다.
     @Test func plannerHasNoDayDetailRoute() {
-        #expect(Set(PlannerRoute.allCases) == [.fullCalendar, .settings])
+        #expect(Set(PlannerRoute.allCases) == [.settings, .notifications])
         #expect(PlannerRoute.allCases.count == 2)
     }
 

@@ -1,24 +1,23 @@
 import SwiftUI
 import SwiftData
 
-/// 플래너 탭의 뿌리. 설정 전에는 온보딩, 설정 후에는 플래너 홈이다.
-/// 월간 격자와 설정은 여기서 밀어내고 각각 `PlannerFullCalendarView`,
-/// `PlannerSettingsView`로 보낸다.
+/// 플래너 탭의 뿌리. 설정 전에는 온보딩, 설정 후에는 월간 캘린더(플래너 홈)다.
+/// 학습 계획 설정과 학습 알림만 여기서 밀어낸다 — 캘린더는 밀어낼 곳이 없다(P14.5.2).
 struct StudyCalendarScreen: View {
     let viewModel: StudyCalendarViewModel
     let preferences: AppPreferences
     /// 하루 시트의 개인 일정 저장소. 화면이 SwiftData를 직접 만지지 않게 서비스로 받는다.
     let persistence: PersistenceService
-    /// Daily 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
-    let onStartDaily: () -> Void
-    /// 단어장 탭으로 이동(P14.5). 오늘의 단어 흐름은 단어장 한 곳에만 있다.
-    let onStartVocabulary: () -> Void
 
     @Query(sort: \StudySetCompletionRecord.completedAt, order: .reverse)
     private var completionRecords: [StudySetCompletionRecord]
     @Query(sort: \PracticeHistoryRecord.createdAt, order: .reverse)
     private var practiceRecords: [PracticeHistoryRecord]
     @Query private var dayPlanRecords: [StudyDayPlanRecord]
+    /// 날짜별 활동의 재료 셋. 서로 다른 기록이라 각자 읽어서 한 번에 합친다(P14.5.2).
+    @Query private var activityRecords: [StudyActivityDailyRecord]
+    @Query private var learnedQuestionRecords: [PlannerLearnedQuestionRecord]
+    @Query private var mockRecords: [MockHistoryRecord]
 
     /// 지금 열려 있는 하루. 주간 스트립과 전체 캘린더가 **같은** 이 값 하나를 바꾸고,
     /// 시트도 여기 한 곳에서만 뜬다 — 화면마다 시트를 달면 언젠가 두 개가 겹친다.
@@ -39,6 +38,18 @@ struct StudyCalendarScreen: View {
     /// 최근 분석 결과의 예상 등급. 판정 규칙은 알림 예약과 공유한다.
     private var recentLevel: OPIcLevel? {
         StudyCalendarViewModel.recentLevel(from: practiceRecords.first)
+    }
+
+    /// 캘린더 칸이 읽을 "실제로 한 학습". 단어는 날짜별 기록에서, 데일리는 분석이
+    /// 끝난 문제 하나하나에서, 모의고사는 채점까지 끝난 응시에서 온다 —
+    /// 어느 것도 화면에서 다시 세거나 추정하지 않는다.
+    private var activities: [String: PlannerDayActivity] {
+        PlannerActivityCalendar.activities(
+            vocabulary: activityRecords,
+            dailyAnsweredAt: learnedQuestionRecords.map(\.learnedAt),
+            mockCompletedAt: mockRecords.map(\.createdAt),
+            timeZone: viewModel.settings?.timeZone ?? .current
+        )
     }
 
     private var snapshot: StudyCalendarSnapshot? {
@@ -62,10 +73,9 @@ struct StudyCalendarScreen: View {
                         snapshot: snapshot,
                         settings: viewModel.settings ?? .draft,
                         targetLevel: viewModel.targetLevel,
-                        planName: viewModel.plan.displayName,
                         isShowingCachedSettings: viewModel.isShowingCachedSettings,
-                        onStartDaily: onStartDaily,
-                        onStartVocabulary: onStartVocabulary,
+                        completions: completions,
+                        activities: activities,
                         onSelectDate: { selectedDate = PlannerSelectedDate($0) }
                     )
                     // 오늘까지의 배정 학습량을 고정해 둔다. 내일 설정을 바꿔도 오늘의 기록은
@@ -94,20 +104,12 @@ struct StudyCalendarScreen: View {
         }
         .navigationDestination(for: PlannerRoute.self) { route in
             switch route {
-            case .fullCalendar:
-                if let snapshot {
-                    PlannerFullCalendarView(
-                        settings: viewModel.settings ?? .draft,
-                        schedule: snapshot.schedule,
-                        completions: completions,
-                        today: snapshot.today.date,
-                        onSelectDate: { selectedDate = PlannerSelectedDate($0) }
-                    )
-                }
             case .settings:
                 PlannerSettingsView(viewModel: viewModel) {
                     preferences.isPresentingLevelSelection = true
                 }
+            case .notifications:
+                PlannerNotificationSettingsView(viewModel: viewModel)
             }
         }
         .task { await viewModel.loadIfNeeded() }

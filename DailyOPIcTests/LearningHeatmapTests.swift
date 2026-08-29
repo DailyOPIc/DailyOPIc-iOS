@@ -271,6 +271,8 @@ struct PersistenceSchemaTests {
             "VocabularyGeneratedSetRecord",
             // P14.3 — 이미 값을 치른 AI 말하기 코칭 결과. 역시 추가만 했다.
             "VocabularyCoachResultRecord",
+            // P14.5.2 — 날짜별 단어 학습량. 캘린더가 읽을 하루 한 줄이고, 역시 추가만 했다.
+            "StudyActivityDailyRecord",
         ])
     }
 

@@ -46,7 +46,9 @@ extension Schema {
             // AI 맞춤 단어장 세트(P14.2). 상한 없이 늘어나므로 설정이 아니라 여기다.
             VocabularyGeneratedSetRecord.self,
             // AI 말하기 코칭 결과(P14.3). 이미 값을 치른 결과라 재열람이 무료여야 한다.
-            VocabularyCoachResultRecord.self
+            VocabularyCoachResultRecord.self,
+            // 날짜별 단어 학습량(P14.5.2). 플래너 캘린더의 "단어 20"이 여기서 나온다.
+            StudyActivityDailyRecord.self
         ])
     }
 }

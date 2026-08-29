@@ -417,8 +417,9 @@ struct ExamDaySheetTests {
     }
 
     /// 새 화면도, 새 경로도 만들지 않았다. 시트는 여전히 하나다.
+    /// (P14.5.2에서 전체 캘린더 경로가 빠지고 학습 알림 경로가 들어왔다.)
     @Test func noNewScreenOrRouteIsIntroduced() {
-        #expect(Set(PlannerRoute.allCases) == [.fullCalendar, .settings])
+        #expect(Set(PlannerRoute.allCases) == [.settings, .notifications])
     }
 
     /// 체크 상태를 저장하지 않는다. P12는 안내이지 할 일 관리가 아니다.
@@ -428,7 +429,8 @@ struct ExamDaySheetTests {
         #expect(!entities.contains("PlannerExamDayRecord"))
         #expect(!entities.contains("PlannerDayNoteRecord"))
         // 시험일 안내는 저장소를 늘리지 않았다. P11.1까지의 7개 + P14 단어장 상태 1개
-        // + P14.2 AI 단어장 세트 1개 + P14.3 말하기 코칭 결과 1개.
-        #expect(entities.count == 10)
+        // + P14.2 AI 단어장 세트 1개 + P14.3 말하기 코칭 결과 1개
+        // + P14.5.2 날짜별 학습량 1개.
+        #expect(entities.count == 11)
     }
 }

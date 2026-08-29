@@ -336,6 +336,13 @@ final class PersistenceService {
         let record = try vocabularyState(entryID: entryID, context: context)
             ?? insertVocabularyState(entryID: entryID, context: context)
         let today = LocalCalendarDate.text(from: now, timeZone: timeZone)
+        // 오늘 이 항목을 처음 만졌을 때만 세는 것들(P14.5.2). 같은 세션에서 "몰라요" 뒤에
+        // 다시 답해도 복습 횟수와 하루 학습량은 한 번만 오른다.
+        // 상태를 바꾸기 **전에** 물어야 한다 — 첫 학습은 복습이 아니다.
+        if record.lastStudiedLocalDate != today {
+            if record.hasBeenStudied { record.reviewCount += 1 }
+            try bumpVocabularyStudied(localDate: today, context: context, now: now)
+        }
         if !knewIt { record.failureCount += 1 }
         let outcome = VocabularyReviewPolicy.apply(
             knewIt: knewIt,
@@ -350,6 +357,63 @@ final class PersistenceService {
         record.lastStudiedLocalDate = today
         record.updatedAt = now
         try context.save()
+    }
+
+    // MARK: 날짜별 학습량 (P14.5.2 · 이 기기에만 저장)
+
+    /// 플래너 캘린더가 읽는 날짜별 단어 학습량 전부. 하루 한 줄이라 통째로 읽어도 가볍다.
+    func studyActivityRecords() throws -> [StudyActivityDailyRecord] {
+        guard let context else { return [] }
+        return try context.fetch(FetchDescriptor<StudyActivityDailyRecord>())
+    }
+
+    /// 오늘 배정한 단어 개수를 기록한다. 완료 배지의 분모라서 배정이 정해질 때 한 번 남긴다.
+    /// 같은 값으로 다시 불러도 아무 일도 일어나지 않는다.
+    func setVocabularyDailyGoal(
+        localDate: String,
+        count: Int,
+        now: Date = .now
+    ) throws {
+        guard let context, !localDate.isEmpty else { return }
+        let record = try studyActivity(localDate: localDate, context: context)
+            ?? insertStudyActivity(localDate: localDate, context: context)
+        guard record.vocabularyGoalCount != count else { return }
+        record.vocabularyGoalCount = count
+        record.updatedAt = now
+        try context.save()
+    }
+
+    /// 그날 처음 다룬 단어 하나를 더한다. 호출자가 "오늘 처음인가"를 이미 판단했다
+    /// — 여기서 두 번 세지 않는 책임은 `recordVocabularyAnswer` 한 곳에만 있다.
+    private func bumpVocabularyStudied(
+        localDate: String,
+        context: ModelContext,
+        now: Date
+    ) throws {
+        let record = try studyActivity(localDate: localDate, context: context)
+            ?? insertStudyActivity(localDate: localDate, context: context)
+        record.vocabularyStudiedCount += 1
+        record.updatedAt = now
+    }
+
+    private func insertStudyActivity(
+        localDate: String,
+        context: ModelContext
+    ) -> StudyActivityDailyRecord {
+        let record = StudyActivityDailyRecord(localDate: localDate)
+        context.insert(record)
+        return record
+    }
+
+    private func studyActivity(
+        localDate: String,
+        context: ModelContext
+    ) throws -> StudyActivityDailyRecord? {
+        var descriptor = FetchDescriptor<StudyActivityDailyRecord>(
+            predicate: #Predicate { $0.localDate == localDate }
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first
     }
 
     // MARK: AI 맞춤 단어장 (P14.2 · 이 기기에만 저장)

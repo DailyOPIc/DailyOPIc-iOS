@@ -166,7 +166,9 @@ struct SetupView: View {
         )
     }
 
-    /// 학습 알림 스위치. **앱 전체에서 여기 하나뿐이다** — 플래너 설정에는 시간만 있다.
+    /// 학습 알림 스위치. P14.5.2에서 플래너 종 아이콘 아래에도 같은 스위치가 생겼지만,
+    /// **둘 다 `studyReminders.preference` 하나를 읽고 쓴다** — 화면이 둘이어도 진실은 하나라
+    /// 한쪽에서 끈 알림이 다른 쪽에서 켜져 보일 수 없다.
     /// 전 플랜이 쓸 수 있으므로 잠금도 Paywall도 없다(P9).
     private var notificationToggle: some View {
         Toggle(

@@ -58,11 +58,7 @@ struct MainTabView: View {
                 StudyCalendarScreen(
                     viewModel: environment.studyCalendarViewModel,
                     preferences: environment.preferences,
-                    persistence: environment.persistence,
-                    // 플래너는 학습 화면을 따로 만들지 않고 기존 데일리 탭으로 보낸다.
-                    onStartDaily: { selectedTab = .daily },
-                    // 단어 학습도 마찬가지다 — 플래너가 두 번째 단어 학습 화면을 갖지 않는다.
-                    onStartVocabulary: { selectedTab = .vocabulary }
+                    persistence: environment.persistence
                 )
             }
             .tabItem { Label(MainTab.planner.title, systemImage: MainTab.planner.systemImage) }
