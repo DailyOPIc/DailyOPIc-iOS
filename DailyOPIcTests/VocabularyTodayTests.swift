@@ -314,7 +314,72 @@ struct VocabularyTodayTests {
         #expect(!planner.contains("generate("))
     }
 
-    // MARK: 7. 토큰 경계
+    // MARK: 7. 단어장 홈의 제품 초점(P14.5.1)
+
+    /// 홈에서 "주제별 단어" 탐색을 내렸다. 주제는 이제 오늘의 단어를 시작하는
+    /// 입력값이지 그 자체로 둘러보는 목적지가 아니다.
+    @Test func homeNoLongerBrowsesTopics() throws {
+        let screen = code(try source(screenPath))
+        #expect(!screen.contains("주제별 단어"))
+        #expect(!screen.contains("VocabularyRoute.topic("))
+        #expect(!screen.contains("topicsSection"))
+    }
+
+    /// 홈에서 "AI 맞춤 단어장 만들기"를 내렸다. 홈에서 P14.2 생성 시트를 여는 길이 없다.
+    @Test func homeNoLongerOffersAIGeneration() throws {
+        let screen = code(try source(screenPath))
+        #expect(!screen.contains("AI 맞춤 단어장"))
+        #expect(!screen.contains("VocabularyGenerationSheet"))
+        #expect(!screen.contains("VocabularyGenerationViewModel"))
+        #expect(!screen.contains("맞춤 단어 만들기"))
+    }
+
+    /// 홈에 남는 것: 검색 · 오늘의 단어 · 오늘 복습 · 내 단어.
+    @Test func homeKeepsSearchTodayAndReview() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("단어나 뜻으로 검색"))
+        #expect(screen.contains("Text(\"오늘의 단어\")"))
+        #expect(screen.contains("Text(\"오늘 복습\")"))
+        #expect(screen.contains("todayCard"))
+        #expect(screen.contains("reviewCard"))
+        #expect(screen.contains("VocabularyCatalog.search(query, in: allEntries)"))
+    }
+
+    /// 오늘의 주제 고르기는 남는다 — 이것이 "주제별 단어"와 다른 점이다.
+    /// 고르는 목록은 여전히 기존 16개 `VocabularyTopic`이다.
+    @Test func todayTopicPickerSurvivesTheHomeCleanup() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("case todayTopicPicker"))
+        #expect(screen.contains("VocabularyTodayTopicPicker("))
+        #expect(screen.contains("ForEach(VocabularyCatalog.topics)"))
+        #expect(VocabularyTopic.allCases.count == 16)
+        #expect(VocabularyCatalog.topics.count == 16)
+    }
+
+    /// 홈에서 내렸다고 구현을 지우지 않았다. P14.2 생성 아키텍처와 토큰 계약은 그대로다.
+    @Test func generationArchitectureStaysIntact() throws {
+        let viewModel = try source("ViewModels/VocabularyGenerationViewModel.swift")
+        #expect(viewModel.contains("tokenCost"))
+        #expect(VocabularyGenerationViewModel.tokenCost == 1)
+        #expect(try source("Services/API/APIClient.swift").contains("/v1/vocabulary/generate"))
+        // P14.4의 데일리 질문 CTA가 그 화면을 계속 연다.
+        let practice = code(try source("Views/Screens/Main/Practice/PracticeVocabularySection.swift"))
+        #expect(practice.contains("VocabularyGenerationSheet("))
+        #expect(practice.contains("VocabularyTopicView(topic: topic"))
+    }
+
+    /// AI 말하기 코치(P14.3)도 그대로 있다. 홈에 새 큰 CTA를 만들지도 않았다.
+    @Test func speakingCoachStaysAsASecondaryTool() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("case speakingCoach(VocabularyEntry)"))
+        #expect(screen.contains("VocabularySpeakingCoachView("))
+        // 진입점은 예전 그대로 단어 상세 안에 있다 — 홈의 큰 CTA가 아니다.
+        #expect(try source("Views/Screens/Main/Vocabulary/VocabularyListViews.swift")
+            .contains("NavigationLink(value: VocabularyRoute.speakingCoach(entry))"))
+        #expect(!code(try source(screenPath)).contains("말하기 코치"))
+    }
+
+    // MARK: 8. 토큰 경계
 
     /// 기본 오늘의 단어(주제 고르기 · 배정 · 카드 · 저장)는 값이 0이다.
     /// 토큰이 나가는 자리는 여전히 "AI 맞춤 단어 만들기" 한 곳뿐이다.

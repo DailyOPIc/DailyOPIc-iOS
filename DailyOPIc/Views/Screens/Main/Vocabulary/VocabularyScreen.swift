@@ -38,10 +38,6 @@ struct VocabularyScreen: View {
     @Query(sort: \VocabularyGeneratedSetRecord.createdAt, order: .reverse)
     private var generatedSets: [VocabularyGeneratedSetRecord]
     @State private var query = ""
-    @State private var isPresentingGeneration = false
-    /// 첫 탭 전까지는 만들지 않는다. 단어장을 구경만 하는 사용자에게 네트워크
-    /// 클라이언트를 붙들 이유가 없다.
-    @State private var generation: VocabularyGenerationViewModel?
 
     /// 하루 경계는 학습 계획 타임존을 따른다 — 플래너의 "오늘"과 단어장의 "오늘"이
     /// 다른 날을 가리키면 안 된다.
@@ -133,16 +129,6 @@ struct VocabularyScreen: View {
                 persistence: persistence
             )
         }
-        .sheet(isPresented: $isPresentingGeneration) {
-            if let generation {
-                VocabularyGenerationSheet(
-                    viewModel: generation,
-                    targetLevel: preferences.targetLevel ?? .IM2,
-                    // 이미 가진 표현만 제외 힌트로 보낸다. 시드 전체를 보내지 않는다.
-                    existingTerms: generatedSets.flatMap { $0.entries.map(\.term) }
-                )
-            }
-        }
     }
 
     // MARK: 홈
@@ -152,8 +138,6 @@ struct VocabularyScreen: View {
             header
             todayCard
             reviewCard
-            topicsSection
-            aiVocabularySection
             myWordsSection
         }
         .padding(AppSpacing.lg)
@@ -190,7 +174,7 @@ struct VocabularyScreen: View {
                 }
                 .buttonStyle(PressableButtonStyle())
             } else if todayEntries.isEmpty {
-                Text("새로 배울 단어를 다 봤어요. 주제별 단어에서 더 골라 보세요.")
+                Text("새로 배울 단어를 다 봤어요. 오늘 복습으로 이어가 보세요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
@@ -255,95 +239,10 @@ struct VocabularyScreen: View {
         .cardStyle()
     }
 
-    /// 시드에 실제로 단어가 있는 주제만 보여준다. 빈 칸을 만들지 않는다.
-    private var topicsSection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("주제별 단어")
-                .font(AppTypography.sectionTitle)
-            LazyVGrid(
-                columns: [GridItem(.flexible(), spacing: AppSpacing.sm),
-                          GridItem(.flexible(), spacing: AppSpacing.sm)],
-                spacing: AppSpacing.sm
-            ) {
-                ForEach(VocabularyCatalog.topics) { topic in
-                    let count = VocabularyCatalog.entries(topic: topic).count
-                    NavigationLink(value: VocabularyRoute.topic(topic)) {
-                        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-                            Text(topic.label)
-                                .font(AppTypography.callout)
-                                .foregroundStyle(AppPalette.ink)
-                            Text("\(count)개")
-                                .font(AppTypography.footnote)
-                                .foregroundStyle(AppPalette.secondaryInk)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .padding(AppSpacing.md)
-                        .background(AppPalette.surface)
-                        .clipShape(
-                            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
-                        )
-                    }
-                    .buttonStyle(PressableButtonStyle())
-                    .accessibilityLabel("\(topic.label) 단어 \(count)개")
-                }
-            }
-        }
-    }
-
-    /// 유일하게 토큰이 나가는 자리. 무료 영역보다 아래에 둔다 — 단어장 전체가
-    /// 유료처럼 보이면 안 된다.
-    private var aiVocabularySection: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("AI 맞춤 단어장")
-                .font(AppTypography.sectionTitle)
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text("목표 \(preferences.targetLevel?.rawValue ?? "IM2")에 맞춰 30개를 만들어요.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                    .fixedSize(horizontal: false, vertical: true)
-                // 누르기 전에 비용을 말한다. 화폐는 데일리 토큰 하나뿐이다.
-                HStack(spacing: AppSpacing.xs) {
-                    DailyTokenIcon(size: 18)
-                    Text("\(VocabularyGenerationViewModel.tokenCost)")
-                        .font(AppTypography.callout)
-                        .foregroundStyle(AppPalette.secondaryInk)
-                }
-                .accessibilityElement(children: .combine)
-                .accessibilityLabel(
-                    "데일리 토큰 \(VocabularyGenerationViewModel.tokenCost)개를 사용해요"
-                )
-                PrimaryButton(title: "맞춤 단어 만들기") {
-                    if generation == nil {
-                        generation = VocabularyGenerationViewModel(environment: environment)
-                    }
-                    isPresentingGeneration = true
-                }
-                if !generatedSets.isEmpty {
-                    // 이미 만든 세트를 다시 보는 것은 무료다.
-                    NavigationLink(value: VocabularyRoute.generatedSets) {
-                        HStack(spacing: AppSpacing.sm) {
-                            Text("AI 단어장")
-                                .font(AppTypography.body)
-                                .foregroundStyle(AppPalette.ink)
-                            Spacer(minLength: 0)
-                            Text("\(generatedSets.count)개")
-                                .font(AppTypography.footnote)
-                                .foregroundStyle(AppPalette.secondaryInk)
-                            Image(systemName: "chevron.right")
-                                .font(.footnote)
-                                .foregroundStyle(AppPalette.secondaryInk)
-                        }
-                        .padding(.vertical, AppSpacing.sm)
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .minimumTouchTarget()
-                    .accessibilityLabel("AI 단어장 \(generatedSets.count)개")
-                }
-            }
-            .cardStyle()
-        }
-    }
+    /// 주제 탐색(`주제별 단어`)과 AI 맞춤 단어장 만들기는 이 홈에서 내렸다(P14.5.1).
+    /// 단어장의 주인공은 "오늘의 단어" 하나이고, 주제는 그 시작에서 고르는 입력값이다.
+    /// 두 흐름의 화면·라우트·생성 아키텍처는 지우지 않았다 —
+    /// 주제 목록은 데일리 질문의 추천(P14.4)이, AI 30개 만들기는 같은 화면의 CTA가 계속 쓴다.
 
     private var myWordsSection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {

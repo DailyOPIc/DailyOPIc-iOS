@@ -416,14 +416,15 @@ struct VocabularyQuestionRecommendationTests {
         #expect(!file.contains("initialTopic"))
     }
 
-    /// 단어장 탭에서 열던 기존 P14.2 경로는 그대로다 — 기본 주제가 골라진 채로 열린다.
+    /// 기본 주제가 골라진 채로 여는 예전 경로(`.vocabularyTab`)는 그대로다.
+    /// 단어장 홈에서는 이 시트를 더 이상 열지 않지만(P14.5.1) 계약은 손대지 않았다 —
+    /// 인자 없이 부르면 여전히 카페가 골라진 채로 열린다.
     @Test func vocabularyTabGeneratorKeepsItsDefaultTopic() throws {
         #expect(VocabularyGenerationSheet.initialSelection(.vocabularyTab) == .cafes)
-        let screen = try source("Views/Screens/Main/Vocabulary/VocabularyScreen.swift")
-        // 단어장 탭 호출부는 손대지 않았다(source 인자 없이 기본값 .vocabularyTab).
-        #expect(screen.contains("VocabularyGenerationSheet("))
-        #expect(!screen.contains("source:"))
-        #expect(!screen.contains("initialTopic"))
+        let sheet = try source("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift")
+        #expect(sheet.contains("source: Source = .vocabularyTab"))
+        #expect(sheet.contains("case .vocabularyTab: .cafes"))
+        #expect(!sheet.contains("initialTopic"))
     }
 
     /// 생성 경로도 값도 그대로다. 데일리에서 들어와도 요청은 하나, 토큰은 1개다.
