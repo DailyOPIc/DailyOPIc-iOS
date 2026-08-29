@@ -27,12 +27,15 @@ enum VocabularyStatus: String, Codable, CaseIterable, Sendable {
 ///
 /// 서버에 저장하지 않는다 — 배정은 기기에서 결정되고 네트워크가 없어도 돌아야 한다.
 struct VocabularyDailySet: Codable, Equatable, Sendable {
-    /// 기본 하루 목표. 화면 카피("0 / 10")도 이 값을 쓴다.
-    static let dailyTarget = 10
+    /// 기본 하루 목표. 화면 카피("0 / 20")도 이 값을 쓴다.
+    static let dailyTarget = 20
 
     /// "yyyy-MM-dd"(학습 계획 타임존 기준).
     let localDate: String
     let entryIDs: [String]
+    /// 그날 사용자가 고른 주제(P14.5). 예전 저장본에는 없으므로 `nil`이고,
+    /// 그때는 예전처럼 주제를 가리지 않고 배정한 묶음이라는 뜻이다.
+    var topic: VocabularyTopic?
 
     /// 오늘 쓸 배정인가. 후보가 바닥나 목록이 비어 있어도 그날의 답은 "이미 정했다"이다 —
     /// 비었다고 매번 다시 계산하면 화면을 열 때마다 배정이 흔들린다.
@@ -54,29 +57,59 @@ enum VocabularyDailySetPlanner {
     ///   - excluding: 한 번이라도 학습한 항목 id. 오늘의 **새** 단어에서 빼낸다 —
     ///     이미 배운 단어는 복습 시스템의 몫이라 새 단어인 척 다시 나오지 않는다.
     ///   - targetLevel: 목표 등급. 맞는 항목으로 먼저 채우고, 모자라면 나머지로 메운다.
+    ///   - topic: 사용자가 그날 고른 주제(P14.5). 그 주제 항목을 먼저 다 쓰고,
+    ///     모자란 만큼만 다른 주제에서 채운다. `nil`이면 예전처럼 주제를 가리지 않는다.
     static func assign(
         localDate: String,
         catalog: [VocabularyEntry],
         excluding excluded: Set<String> = [],
         targetLevel: OPIcLevel? = nil,
+        topic: VocabularyTopic? = nil,
         count: Int = VocabularyDailySet.dailyTarget
     ) -> VocabularyDailySet {
         let candidates = catalog.filter { !excluded.contains($0.id) }
         guard !candidates.isEmpty, count > 0 else {
-            return VocabularyDailySet(localDate: localDate, entryIDs: [])
+            return VocabularyDailySet(localDate: localDate, entryIDs: [], topic: topic)
         }
-        // 주제별로 번갈아 세운 뒤 목표 등급에 맞는 것과 아닌 것으로 나눈다.
-        // 순서를 지키는 변환들이라 같은 입력이면 언제나 같은 결과다.
-        let interleaved = interleavedByTopic(candidates)
+        guard let topic else {
+            let picked = pick(candidates, localDate: localDate, targetLevel: targetLevel, count: count)
+            return VocabularyDailySet(localDate: localDate, entryIDs: picked.map(\.id), topic: nil)
+        }
+        // 고른 주제를 먼저 다 쓴다. 시드는 한 주제에 8~17개뿐이라 하루 목표에 못 미치는
+        // 날이 있고, 그때만 다른 주제에서 채운다 — 채운 항목을 고른 주제인 척 보여주지
+        // 않는다(구성은 화면이 나눠서 적는다).
+        let onTopic = candidates.filter { $0.topics.contains(topic) }
+        let head = pick(onTopic, localDate: localDate, targetLevel: targetLevel, count: count)
+        let used = Set(head.map(\.id))
+        let others = candidates.filter { !used.contains($0.id) }
+        let tail = pick(others, localDate: localDate, targetLevel: targetLevel, count: count - head.count)
+        return VocabularyDailySet(
+            localDate: localDate,
+            entryIDs: (head + tail).map(\.id),
+            topic: topic
+        )
+    }
+
+    /// 후보 목록에서 오늘 몫을 끊어 온다.
+    ///
+    /// 주제별로 번갈아 세운 뒤 목표 등급에 맞는 것과 아닌 것으로 나눈다.
+    /// 순서를 지키는 변환들이라 같은 입력이면 언제나 같은 결과다.
+    ///
+    /// 목표 등급 쪽을 먼저 채우고 모자란 만큼만 나머지에서 가져온다. 목표 등급 항목이
+    /// 적으면 그 안에서 며칠 만에 한 바퀴를 돈다 — 반복 주기 조절은 P14.1(간격 반복)의 몫이다.
+    /// 후보가 목표보다 적으면 있는 만큼만 준다. 이미 배운 단어를 새 단어로 재활용하지 않는다.
+    private static func pick(
+        _ entries: [VocabularyEntry],
+        localDate: String,
+        targetLevel: OPIcLevel?,
+        count: Int
+    ) -> [VocabularyEntry] {
+        guard !entries.isEmpty, count > 0 else { return [] }
+        let interleaved = interleavedByTopic(entries)
         let preferred = interleaved.filter { $0.matches(targetLevel: targetLevel) }
         let rest = interleaved.filter { !$0.matches(targetLevel: targetLevel) }
-
-        // 목표 등급 쪽을 먼저 채우고 모자란 만큼만 나머지에서 가져온다. 목표 등급 항목이
-        // 적으면 그 안에서 며칠 만에 한 바퀴를 돈다 — 반복 주기 조절은 P14.1(간격 반복)의 몫이다.
-        // 후보가 목표보다 적으면 있는 만큼만 준다. 이미 배운 단어를 새 단어로 재활용하지 않는다.
         let head = window(preferred, localDate: localDate, count: count)
-        let tail = window(rest, localDate: localDate, count: count - head.count)
-        return VocabularyDailySet(localDate: localDate, entryIDs: (head + tail).map(\.id))
+        return head + window(rest, localDate: localDate, count: count - head.count)
     }
 
     /// 날짜로 정해지는 시작점에서 `count`개를 끊어 온다. 끝을 넘으면 앞으로 돌아오고,
@@ -91,7 +124,7 @@ enum VocabularyDailySetPlanner {
         return (0..<min(count, entries.count)).map { entries[(start + $0) % entries.count] }
     }
 
-    /// 대표 주제 기준 라운드로빈. 시드가 주제별로 뭉쳐 있어도 하루치 10개가
+    /// 대표 주제 기준 라운드로빈. 시드가 주제별로 뭉쳐 있어도 하루치가
     /// 한 주제로만 채워지지 않게 한다.
     static func interleavedByTopic(_ entries: [VocabularyEntry]) -> [VocabularyEntry] {
         var order: [VocabularyTopic?] = []

@@ -1,4 +1,5 @@
 import SwiftUI
+import SwiftData
 
 /// 학습 세션의 종류. 오늘의 단어와 복습은 진행도도 마무리 문구도 섞이지 않는다.
 /// AI 맞춤 세트도 같은 카드·같은 복습 엔진을 쓴다 — 다른 건 제목뿐이다.
@@ -45,6 +46,9 @@ struct VocabularyStudyView: View {
     let timeZone: TimeZone
 
     @Environment(\.dismiss) private var dismiss
+    /// 저장 여부는 카드 안에서 켜고 끌 수 있다(P14.5). 화면이 따로 들고 있지 않고
+    /// 저장소를 그대로 읽는다 — 학습 상태와 같은 기록 하나(`VocabularyStateRecord`)다.
+    @Query private var states: [VocabularyStateRecord]
     @StateObject private var playback = PromptPlaybackService()
     @State private var session: VocabularyStudySession
     @State private var isRevealed = false
@@ -113,15 +117,40 @@ struct VocabularyStudyView: View {
 
     private func termBlock(_ entry: VocabularyEntry) -> some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text(entry.type.label)
-                .font(AppTypography.caption)
-                .foregroundStyle(AppPalette.primary)
+            HStack(alignment: .firstTextBaseline) {
+                Text(entry.type.label)
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.primary)
+                Spacer(minLength: 0)
+                saveButton(entry)
+            }
             Text(entry.term)
                 .font(AppTypography.title)
                 .foregroundStyle(AppPalette.ink)
                 .fixedSize(horizontal: false, vertical: true)
             pronunciationButton(entry)
         }
+    }
+
+    private func isSaved(_ entry: VocabularyEntry) -> Bool {
+        states.first { $0.entryID == entry.id }?.isSaved ?? false
+    }
+
+    /// 카드에서 바로 저장하기(P14.5). 저장은 학습 판정과 **별개 채널**이다 —
+    /// 저장했다고 익힘이 되지 않고, 저장을 풀어도 복습 기록은 그대로 남는다.
+    private func saveButton(_ entry: VocabularyEntry) -> some View {
+        let saved = isSaved(entry)
+        return Button {
+            try? persistence.setVocabularySaved(entryID: entry.id, isSaved: !saved)
+        } label: {
+            Image(systemName: saved ? "heart.fill" : "heart")
+                .font(.title3)
+                .foregroundStyle(AppPalette.primary)
+        }
+        .buttonStyle(PressableButtonStyle())
+        .minimumTouchTarget()
+        .accessibilityLabel(saved ? "저장 해제" : "저장")
+        .accessibilityAddTraits(saved ? [.isSelected] : [])
     }
 
     /// 발음 듣기. 기기 음성이라 무료이고, 반복 재생에 제한이 없다.
@@ -252,10 +281,29 @@ struct VocabularyStudyView: View {
                 summaryCount(title: "알아요", value: session.knownCount)
                 summaryCount(title: "다시 볼 표현", value: session.forgottenCount)
             }
+            if kind == .newWords {
+                extraStudyCTA
+                    .padding(.top, AppSpacing.md)
+            }
             PrimaryButton(title: "단어장으로 돌아가기") { dismiss() }
-                .padding(.top, AppSpacing.md)
+                .padding(.top, kind == .newWords ? 0 : AppSpacing.md)
         }
         .padding(AppSpacing.lg)
+    }
+
+    /// 오늘 몫을 끝낸 뒤의 다음 걸음(P14.5). 이번 단계에서는 **아직 열지 않는다** —
+    /// 누를 수 없는 버튼이라 이 화면에서 AI가 불리는 일도, 데일리 토큰이 나가는 일도 없다.
+    /// 다음 단계에서 여기에 "주제 고르기 → 20개 불러오기"가 붙는다.
+    private var extraStudyCTA: some View {
+        VStack(spacing: AppSpacing.xs) {
+            PrimaryButton(
+                title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기",
+                isDisabled: true
+            ) {}
+            Text("다음 업데이트에서 열려요.")
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+        }
     }
 
     private func summaryCount(title: String, value: Int) -> some View {

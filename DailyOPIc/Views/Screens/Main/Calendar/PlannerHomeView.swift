@@ -20,6 +20,9 @@ struct PlannerHomeView: View {
     let isShowingCachedSettings: Bool
     /// 데일리 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
     let onStartDaily: () -> Void
+    /// 단어장 탭으로 이동(P14.5). 여기서도 플래너는 학습 화면을 따로 만들지 않는다 —
+    /// 오늘의 단어가 아직 없으면 단어장이 주제를 묻고, 있으면 그 묶음을 그대로 이어간다.
+    let onStartVocabulary: () -> Void
 
     /// 날짜를 누르면 알려만 준다. 시트는 플래너 뿌리 한 곳에서만 띄운다.
     let onSelectDate: (String) -> Void
@@ -42,6 +45,7 @@ struct PlannerHomeView: View {
                     tip: OPIcTipCatalog.tip(for: snapshot.today.date, timeZone: settings.timeZone)
                 )
                 todayCard
+                vocabularyCard
                 weekCard
                 plannerStateMessage
                 fullCalendarLink
@@ -145,6 +149,30 @@ struct PlannerHomeView: View {
             }
         }
         .cardStyle()
+    }
+
+    /// 단어 학습 진입점(P14.5). 플래너를 열거나 이 줄을 그리는 것으로는 아무것도
+    /// 만들지 않는다 — 오늘의 단어 배정도, AI 호출도, 토큰 예약도 여기서 일어나지 않는다.
+    private var vocabularyCard: some View {
+        Button(action: onStartVocabulary) {
+            HStack(spacing: AppSpacing.sm) {
+                Image(systemName: "book.closed.fill")
+                    .foregroundStyle(AppPalette.primary)
+                Text("단어 학습하기")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.ink)
+                Spacer(minLength: 0)
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+        .cardStyle()
+        .accessibilityHint("오늘의 단어를 학습합니다")
     }
 
     // MARK: 이번 주

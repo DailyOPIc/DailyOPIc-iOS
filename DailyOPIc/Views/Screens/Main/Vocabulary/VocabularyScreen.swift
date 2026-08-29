@@ -3,6 +3,8 @@ import SwiftData
 
 /// 단어장 탭 안의 이동 경로. 탭이 이미 갖고 있는 NavigationStack을 그대로 쓴다.
 enum VocabularyRoute: Hashable {
+    /// 오늘의 주제 고르기(P14.5). 여기서 고른 뒤에야 오늘의 단어가 배정된다.
+    case todayTopicPicker
     case todayStudy
     case review
     case topic(VocabularyTopic)
@@ -57,12 +59,19 @@ struct VocabularyScreen: View {
         VocabularyCatalog.all + generatedSets.flatMap(\.entries)
     }
 
-    /// 오늘의 새 단어. 배정이 없거나 어제 것이면 화면이 뜰 때 다시 배정한다.
-    private var todayEntries: [VocabularyEntry] {
+    /// 오늘 몫으로 이미 정해진 배정. 어제 것이면 없는 것과 같다.
+    /// 여기가 `nil`인 동안에만 주제를 묻는다 — 있으면 다시 묻지 않고 그대로 쓴다.
+    private var todaySet: VocabularyDailySet? {
         guard let set = preferences.vocabularyDailySet, set.covers(todayLocalDate) else {
-            return []
+            return nil
         }
-        return VocabularyCatalog.entries(ids: set.entryIDs, in: allEntries)
+        return set
+    }
+
+    /// 오늘의 새 단어. 배정은 사용자가 주제를 고른 그 순간에만 만들어진다.
+    private var todayEntries: [VocabularyEntry] {
+        guard let todaySet else { return [] }
+        return VocabularyCatalog.entries(ids: todaySet.entryIDs, in: allEntries)
     }
 
     /// 오늘 한 번이라도 답한 항목 수. "3 / 10"의 분자다.
@@ -124,7 +133,6 @@ struct VocabularyScreen: View {
                 persistence: persistence
             )
         }
-        .onAppear(perform: assignTodayIfNeeded)
         .sheet(isPresented: $isPresentingGeneration) {
             if let generation {
                 VocabularyGenerationSheet(
@@ -172,11 +180,21 @@ struct VocabularyScreen: View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
             Text("오늘의 단어")
                 .font(AppTypography.sectionTitle)
-            if todayEntries.isEmpty {
+            if todaySet == nil {
+                // 하루의 첫 시작 전에는 아무것도 배정하지 않는다(P14.5). 주제는 사용자가 고른다.
+                Text("오늘 공부할 주제를 골라 주세요.")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                NavigationLink(value: VocabularyRoute.todayTopicPicker) {
+                    primaryLabel("주제 고르고 시작하기", systemImage: "square.grid.2x2.fill")
+                }
+                .buttonStyle(PressableButtonStyle())
+            } else if todayEntries.isEmpty {
                 Text("새로 배울 단어를 다 봤어요. 주제별 단어에서 더 골라 보세요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
             } else {
+                todayTopicLine
                 Text("\(todayStudiedCount) / \(todayEntries.count)")
                     .font(AppTypography.title)
                     .accessibilityLabel(
@@ -198,6 +216,22 @@ struct VocabularyScreen: View {
             }
         }
         .cardStyle()
+    }
+
+    /// 오늘의 주제와 구성. 고른 주제만으로 하루 목표를 채우지 못한 날에는 그 사실을
+    /// 그대로 적는다 — 다른 주제에서 채운 단어를 고른 주제인 척 보여주지 않는다.
+    @ViewBuilder
+    private var todayTopicLine: some View {
+        if let topic = todaySet?.topic {
+            let onTopic = todayEntries.filter { $0.topics.contains(topic) }.count
+            Text(
+                onTopic == todayEntries.count
+                ? topic.label
+                : "\(topic.label) \(onTopic)개 · 다른 주제 \(todayEntries.count - onTopic)개"
+            )
+            .font(AppTypography.callout)
+            .foregroundStyle(AppPalette.secondaryInk)
+        }
     }
 
     private var reviewCard: some View {
@@ -393,6 +427,12 @@ struct VocabularyScreen: View {
     @ViewBuilder
     private func destination(_ route: VocabularyRoute) -> some View {
         switch route {
+        case .todayTopicPicker:
+            VocabularyTodayTopicPicker(
+                target: VocabularyDailySet.dailyTarget,
+                availableCounts: availableTopicCounts,
+                onSelect: assignToday
+            )
         case .todayStudy:
             VocabularyStudyView(
                 kind: .newWords,
@@ -452,21 +492,33 @@ struct VocabularyScreen: View {
 
     // MARK: 오늘의 배정
 
-    /// 하루에 한 번만 정한다. 같은 날 다시 들어와도 이미 배정된 목록을 그대로 쓴다 —
-    /// 학습을 시작한 뒤 항목이 조용히 바뀌지 않는다.
+    /// 하루에 한 번, 사용자가 주제를 고른 그 순간에만 정한다. 같은 날 다시 들어오면
+    /// 이미 배정된 목록을 그대로 쓴다 — 주제를 다시 묻지도, 항목이 조용히 바뀌지도 않는다.
     ///
     /// 후보는 **한 번도 학습하지 않은** 항목뿐이다. 이미 배운 단어는 복습 시스템의 몫이라
-    /// 새 단어인 척 돌아오지 않는다. 남은 후보가 10개보다 적으면 그만큼만 준다.
-    private func assignTodayIfNeeded() {
+    /// 새 단어인 척 돌아오지 않는다. 남은 후보가 목표보다 적으면 그만큼만 준다.
+    ///
+    /// 기기 안 계산이다. AI도 네트워크도 데일리 토큰도 쓰지 않는다.
+    private func assignToday(topic: VocabularyTopic) {
         let today = todayLocalDate
         if let existing = preferences.vocabularyDailySet, existing.covers(today) { return }
-        let studied = VocabularyDailyProgress.studiedIDs(states: states)
         preferences.vocabularyDailySet = VocabularyDailySetPlanner.assign(
             localDate: today,
             catalog: VocabularyCatalog.all,
-            excluding: studied,
-            targetLevel: preferences.targetLevel
+            excluding: VocabularyDailyProgress.studiedIDs(states: states),
+            targetLevel: preferences.targetLevel,
+            topic: topic
         )
+    }
+
+    /// 주제별로 오늘 배정될 수 있는 새 단어 수. 이미 학습한 항목은 빼고 센다 —
+    /// 고르기 전에 실제로 몇 개가 나올지 그대로 보여준다.
+    private var availableTopicCounts: [VocabularyTopic: Int] {
+        let studied = VocabularyDailyProgress.studiedIDs(states: states)
+        return VocabularyCatalog.topics.reduce(into: [:]) { counts, topic in
+            counts[topic] = VocabularyCatalog.entries(topic: topic)
+                .filter { !studied.contains($0.id) }.count
+        }
     }
 
     /// `PrimaryButton`은 Button을 직접 만들어서 NavigationLink 라벨로 쓸 수 없다.
@@ -481,5 +533,74 @@ struct VocabularyScreen: View {
         .foregroundStyle(AppPalette.actionOnPrimary)
         .background(AppPalette.primary)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+    }
+}
+
+/// 오늘의 주제 고르기(P14.5). 하루의 첫 시작 전에 딱 한 번 지나는 화면이다.
+///
+/// 주제 목록은 단어장이 이미 쓰는 `VocabularyTopic` 그대로다. 고르는 순간 오늘의
+/// 묶음이 기기에서 정해진다 — 네트워크도 AI도 데일리 토큰도 쓰지 않는다.
+struct VocabularyTodayTopicPicker: View {
+    let target: Int
+    /// 주제별로 오늘 나올 수 있는 새 단어 수. 목표보다 적으면 그 사실을 미리 말한다.
+    let availableCounts: [VocabularyTopic: Int]
+    let onSelect: (VocabularyTopic) -> Void
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        ScrollView {
+            VStack(alignment: .leading, spacing: AppSpacing.md) {
+                Text("오늘 공부할 주제를 골라 주세요.")
+                    .font(AppTypography.body)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                LazyVGrid(
+                    columns: [GridItem(.flexible(), spacing: AppSpacing.sm),
+                              GridItem(.flexible(), spacing: AppSpacing.sm)],
+                    spacing: AppSpacing.sm
+                ) {
+                    ForEach(VocabularyCatalog.topics) { topic in
+                        Button {
+                            onSelect(topic)
+                            dismiss()
+                        } label: {
+                            label(topic)
+                        }
+                        .buttonStyle(PressableButtonStyle())
+                        .accessibilityLabel(accessibilityText(topic))
+                    }
+                }
+            }
+            .padding(AppSpacing.lg)
+        }
+        .navigationTitle("오늘의 주제")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func label(_ topic: VocabularyTopic) -> some View {
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text(topic.label)
+                .font(AppTypography.callout)
+                .foregroundStyle(AppPalette.ink)
+            Text(subtitle(topic))
+                .font(AppTypography.footnote)
+                .foregroundStyle(AppPalette.secondaryInk)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppSpacing.md)
+        .background(AppPalette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+    }
+
+    /// 이 주제만으로 목표를 채우지 못하면 고르기 **전에** 말한다. 고른 뒤에 다른 주제
+    /// 단어를 이 주제인 척 보여주지 않기 위해서다.
+    private func subtitle(_ topic: VocabularyTopic) -> String {
+        let available = availableCounts[topic] ?? 0
+        if available >= target { return "\(target)개" }
+        return "\(available)개 + 다른 주제 \(target - available)개"
+    }
+
+    private func accessibilityText(_ topic: VocabularyTopic) -> String {
+        "\(topic.label), \(subtitle(topic))"
     }
 }

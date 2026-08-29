@@ -11,6 +11,8 @@ struct StudyCalendarScreen: View {
     let persistence: PersistenceService
     /// Daily 탭으로 이동. 플래너는 학습 화면을 따로 갖지 않는다.
     let onStartDaily: () -> Void
+    /// 단어장 탭으로 이동(P14.5). 오늘의 단어 흐름은 단어장 한 곳에만 있다.
+    let onStartVocabulary: () -> Void
 
     @Query(sort: \StudySetCompletionRecord.completedAt, order: .reverse)
     private var completionRecords: [StudySetCompletionRecord]
@@ -63,6 +65,7 @@ struct StudyCalendarScreen: View {
                         planName: viewModel.plan.displayName,
                         isShowingCachedSettings: viewModel.isShowingCachedSettings,
                         onStartDaily: onStartDaily,
+                        onStartVocabulary: onStartVocabulary,
                         onSelectDate: { selectedDate = PlannerSelectedDate($0) }
                     )
                     // 오늘까지의 배정 학습량을 고정해 둔다. 내일 설정을 바꿔도 오늘의 기록은
