@@ -14,7 +14,38 @@ struct VocabularyGenerationSheet: View {
     let existingTerms: [String]
 
     @Environment(\.dismiss) private var dismiss
-    @State private var topic: VocabularyTopic = .cafes
+    /// 아직 아무것도 고르지 않은 상태가 있다. 데일리 질문의 주제를 모를 때 앱이 대신
+    /// 고르지 않기 위해서다(P14.4) — 그때는 사용자가 직접 고른 뒤에야 만들 수 있다.
+    @State private var topic: VocabularyTopic?
+
+    /// 이 화면을 어디서 열었나. 처음 골라 둘 주제가 여기서 갈린다.
+    enum Source: Hashable {
+        /// 단어장 탭(P14.2). 맥락이 없으므로 예전처럼 기본 주제가 골라져 있다.
+        case vocabularyTab
+        /// 데일리 질문에서(P14.4). 질문 주제를 알면 그것, 모르면 고르지 않은 채로 연다.
+        case dailyQuestion(topic: VocabularyTopic?)
+    }
+
+    /// 처음 골라 둘 주제. `nil`이면 "아직 안 고름"이고, 그 상태로는 만들 수 없다.
+    /// 데일리에서 주제를 모른 채 들어왔을 때 아무 주제나 질문의 주제인 척 넣지 않는다.
+    static func initialSelection(_ source: Source) -> VocabularyTopic? {
+        switch source {
+        case .vocabularyTab: .cafes
+        case let .dailyQuestion(topic): topic
+        }
+    }
+
+    init(
+        viewModel: VocabularyGenerationViewModel,
+        targetLevel: OPIcLevel,
+        existingTerms: [String],
+        source: Source = .vocabularyTab
+    ) {
+        self.viewModel = viewModel
+        self.targetLevel = targetLevel
+        self.existingTerms = existingTerms
+        _topic = State(initialValue: Self.initialSelection(source))
+    }
 
     var body: some View {
         NavigationStack {
@@ -42,8 +73,11 @@ struct VocabularyGenerationSheet: View {
                     }
                     PrimaryButton(
                         title: failureMessage == nil ? "30개 만들기" : "다시 시도",
-                        isLoading: viewModel.isGenerating
+                        isLoading: viewModel.isGenerating,
+                        isDisabled: topic == nil
                     ) {
+                        // 주제를 고르지 않았으면 아무것도 시작하지 않는다(토큰도 나가지 않는다).
+                        guard let topic else { return }
                         // 재시도도 같은 조작이다 — 뷰모델이 같은 요청 id를 그대로 쓴다.
                         viewModel.generate(
                             topic: topic,
@@ -125,7 +159,7 @@ struct VocabularyGenerationSheet: View {
     /// 누르기 전에 비용을 말한다. 화폐는 데일리 토큰 하나뿐이라 아이콘도 그것 하나다.
     private var summaryCard: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("\(topic.label) · 목표 \(targetLevel.rawValue)")
+            Text(topic.map { "\($0.label) · 목표 \(targetLevel.rawValue)" } ?? "주제를 골라 주세요")
                 .font(AppTypography.cardTitle)
             Text("30개의 맞춤 단어와 표현을 만들어요.")
                 .font(AppTypography.body)
