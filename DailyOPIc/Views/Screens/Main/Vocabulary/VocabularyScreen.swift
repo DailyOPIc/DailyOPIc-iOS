@@ -12,6 +12,9 @@ enum VocabularyRoute: Hashable {
     case generatedSets
     case generatedSet(setID: String)
     case generatedStudy(setID: String)
+    /// AI 말하기 코치(P14.3). 화면을 여는 것도 녹음·전사도 토큰을 쓰지 않는다 —
+    /// 토큰은 그 안에서 "AI에게 분석받기"를 눌렀을 때만 나간다.
+    case speakingCoach(VocabularyEntry)
 }
 
 /// 단어장 홈. "오늘 뭘 외우지?"에 답하는 것이 이 화면의 전부다.
@@ -21,8 +24,9 @@ enum VocabularyRoute: Hashable {
 /// 부르지 않는다.** 단어 데이터는 앱에 담긴 시드(`VocabularyCatalog`)와 이미 받아 둔
 /// AI 세트이고, 내 상태는 이 기기의 SwiftData다.
 ///
-/// 토큰이 나가는 곳은 "AI 맞춤 단어장" 하나뿐이고, 거기서도 **만들 때 1개**다.
-/// 이미 만든 세트를 다시 여는 것은 공짜다.
+/// 토큰이 나가는 곳은 둘뿐이다: "AI 맞춤 단어장"을 **만들 때 1개**(P14.2)와,
+/// 단어 상세의 "직접 말해보기"에서 **AI 코칭을 요청할 때 1개**(P14.3).
+/// 이미 만든 세트를 다시 여는 것도, 녹음·전사도, 받아 둔 코칭을 다시 보는 것도 공짜다.
 struct VocabularyScreen: View {
     let preferences: AppPreferences
     let persistence: PersistenceService
@@ -425,6 +429,12 @@ struct VocabularyScreen: View {
             if let record = generatedSet(setID) {
                 VocabularyGeneratedSetDetailView(record: record, states: stateByID)
             }
+        case let .speakingCoach(entry):
+            VocabularySpeakingCoachView(
+                entry: entry,
+                environment: environment,
+                targetLevel: preferences.targetLevel
+            )
         case let .generatedStudy(setID):
             // AI 항목도 같은 학습 카드·같은 복습 엔진을 쓴다(별도 알고리즘 없음).
             VocabularyStudyView(

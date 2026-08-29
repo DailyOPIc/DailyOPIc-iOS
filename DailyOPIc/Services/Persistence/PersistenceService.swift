@@ -380,6 +380,55 @@ final class PersistenceService {
         try context.save()
     }
 
+    // MARK: AI 말하기 코치 (P14.3 · 이 기기에만 저장)
+
+    /// 한 항목의 코칭 결과 전부, 최신이 먼저. 저장된 결과를 다시 여는 것은 공짜다 —
+    /// 서버도 AI도 부르지 않는다.
+    func vocabularyCoachResults(entryID: String) throws -> [VocabularySpeakingCoachResult] {
+        guard let context, !entryID.isEmpty else { return [] }
+        let descriptor = FetchDescriptor<VocabularyCoachResultRecord>(
+            predicate: #Predicate { $0.entryID == entryID },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        return try context.fetch(descriptor).compactMap(\.result)
+    }
+
+    /// 같은 항목 · 같은 답변에 대한 코칭이 이미 있는가.
+    ///
+    /// 다시 녹음해도 결국 같은 말을 했다면 이미 값을 치른 결과가 있다는 뜻이다.
+    /// 화면은 이걸 먼저 보고 새 유료 요청을 건너뛴다 — 실수로 두 번 결제되지 않게.
+    func vocabularyCoachResult(
+        entryID: String,
+        transcript: String
+    ) throws -> VocabularySpeakingCoachResult? {
+        guard let context, !entryID.isEmpty else { return nil }
+        let key = VocabularySpeakingPrompt.transcriptKey(transcript)
+        guard !key.isEmpty else { return nil }
+        var descriptor = FetchDescriptor<VocabularyCoachResultRecord>(
+            predicate: #Predicate { $0.entryID == entryID && $0.transcriptKey == key },
+            sortBy: [SortDescriptor(\.createdAt, order: .reverse)]
+        )
+        descriptor.fetchLimit = 1
+        return try context.fetch(descriptor).first?.result
+    }
+
+    /// 받은 코칭을 저장한다. 같은 `resultId`가 이미 있으면 덮어쓰지 않는다 —
+    /// 같은 조작을 재시도해 서버가 같은 결과를 다시 준 경우다.
+    ///
+    /// 사용자가 일부러 다시 분석해 만든 결과는 새 줄로 쌓인다. 이미 값을 치른
+    /// 결과를 조용히 지우지 않는다.
+    func saveVocabularyCoachResult(_ result: VocabularySpeakingCoachResult) throws {
+        guard let context else { return }
+        let resultID = result.resultId
+        var descriptor = FetchDescriptor<VocabularyCoachResultRecord>(
+            predicate: #Predicate { $0.resultID == resultID }
+        )
+        descriptor.fetchLimit = 1
+        guard try context.fetch(descriptor).isEmpty else { return }
+        context.insert(try VocabularyCoachResultRecord(result: result))
+        try context.save()
+    }
+
     private func insertVocabularyState(
         entryID: String,
         context: ModelContext

@@ -272,3 +272,40 @@ final class VocabularyGeneratedSetRecord {
         (try? JSONCoding.decoder.decode([VocabularyEntry].self, from: entriesData)) ?? []
     }
 }
+
+/// AI 말하기 코칭 결과 하나(P14.3). **이 기기에만** 저장한다.
+///
+/// 이미 값을 치른 결과다. 화면을 다시 열거나 앱을 껐다 켰다고 사라지면 사용자가
+/// 토큰을 또 써야 하므로 SwiftData에 남긴다.
+///
+/// 오디오는 담지 않는다 — 코칭에 필요한 것은 텍스트고, 녹음 원본을 저장소에
+/// 쌓아 둘 이유가 없다. 응답은 JSON 한 덩어리로 넣는다(`VocabularyGeneratedSetRecord`와
+/// 같은 방식). 항목의 학습 상태는 여기가 아니라 `VocabularyStateRecord`에 남는다 —
+/// 코칭을 봤다고 저장·익힘·복습 상태가 바뀌지 않는다.
+@Model
+final class VocabularyCoachResultRecord {
+    /// 서버가 준 결과 id. 유니크라 같은 조작을 재시도해 같은 결과가 다시 와도
+    /// 두 줄이 되지 않는다.
+    @Attribute(.unique) var resultID: String
+    /// 시드 항목이든 AI 생성 항목이든 같은 `VocabularyEntry.id`다.
+    var entryID: String
+    var targetTerm: String
+    /// 같은 답변을 실수로 두 번 유료 분석하지 않기 위한 조회 키
+    /// (`VocabularySpeakingPrompt.transcriptKey`).
+    var transcriptKey: String
+    var responseData: Data
+    var createdAt: Date
+
+    init(result: VocabularySpeakingCoachResult) throws {
+        resultID = result.resultId
+        entryID = result.entryId
+        targetTerm = result.targetTerm
+        transcriptKey = VocabularySpeakingPrompt.transcriptKey(result.transcript)
+        responseData = try JSONCoding.encoder.encode(result)
+        createdAt = result.createdAt
+    }
+
+    var result: VocabularySpeakingCoachResult? {
+        try? JSONCoding.decoder.decode(VocabularySpeakingCoachResult.self, from: responseData)
+    }
+}

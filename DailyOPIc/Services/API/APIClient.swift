@@ -122,6 +122,24 @@ actor APIClient {
         )
     }
 
+    /// AI 말하기 코칭 1회. 데일리 토큰 1개를 쓰는 요청이다.
+    ///
+    /// 녹음과 전사는 기기에서 끝나고 여기 오지 않는다 — 이 호출만 과금된다.
+    /// `requestID`가 조작의 신원이다. 응답을 못 받아 다시 보낼 때는 **같은 값**을
+    /// 그대로 보내야 서버가 이미 만든 결과를 돌려준다(추가 차감 없음).
+    func coachVocabulary(
+        request payload: VocabularySpeakingCoachRequest,
+        requestID: UUID
+    ) async throws -> VocabularySpeakingCoachResult {
+        try await sendJSON(
+            path: "/v1/vocabulary/coach",
+            method: "POST",
+            body: payload,
+            requestID: requestID,
+            timeout: RequestTimeout.generation
+        )
+    }
+
     func createMockSession(
         request payload: QuestionSetRequest,
         requestID: UUID

@@ -44,7 +44,9 @@ extension Schema {
             // 단어장 항목별 내 상태(P14). 마찬가지로 추가만 한다.
             VocabularyStateRecord.self,
             // AI 맞춤 단어장 세트(P14.2). 상한 없이 늘어나므로 설정이 아니라 여기다.
-            VocabularyGeneratedSetRecord.self
+            VocabularyGeneratedSetRecord.self,
+            // AI 말하기 코칭 결과(P14.3). 이미 값을 치른 결과라 재열람이 무료여야 한다.
+            VocabularyCoachResultRecord.self
         ])
     }
 }

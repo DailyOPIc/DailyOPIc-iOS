@@ -269,6 +269,8 @@ struct PersistenceSchemaTests {
             "VocabularyStateRecord",
             // P14.2 — AI가 만들어 준 단어장 세트. 역시 추가만 했다.
             "VocabularyGeneratedSetRecord",
+            // P14.3 — 이미 값을 치른 AI 말하기 코칭 결과. 역시 추가만 했다.
+            "VocabularyCoachResultRecord",
         ])
     }
 

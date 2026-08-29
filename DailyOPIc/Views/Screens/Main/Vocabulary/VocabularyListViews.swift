@@ -148,6 +148,7 @@ struct VocabularyEntryDetailView: View {
             VStack(alignment: .leading, spacing: AppSpacing.lg) {
                 header
                 meaning
+                speakingPractice
                 if !entry.collocations.isEmpty { collocations }
                 example
                 tags
@@ -197,6 +198,24 @@ struct VocabularyEntryDetailView: View {
         Text(entry.meaningKo)
             .font(AppTypography.cardTitle)
             .fixedSize(horizontal: false, vertical: true)
+    }
+
+    /// 직접 말해보기(P14.3). 여는 것도 녹음도 전사도 토큰을 쓰지 않는다 —
+    /// 토큰은 그 화면 안에서 "AI에게 분석받기"를 눌렀을 때만 나간다.
+    private var speakingPractice: some View {
+        NavigationLink(value: VocabularyRoute.speakingCoach(entry)) {
+            HStack(spacing: AppSpacing.sm) {
+                Image(systemName: "mic.fill")
+                Text("직접 말해보기").font(.headline)
+            }
+            .frame(maxWidth: .infinity)
+            .frame(height: 54)
+            .foregroundStyle(AppPalette.actionOnPrimary)
+            .background(AppPalette.primary)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel("\(entry.term) 직접 말해보기")
     }
 
     private var collocations: some View {

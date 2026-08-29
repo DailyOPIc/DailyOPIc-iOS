@@ -27,6 +27,7 @@ final class AppPreferences {
         static let studyReminderPreference = "native_study_reminder_preference"
         static let reviewRequestAttempt = "native_review_request_attempted_at"
         static let vocabularyDailySet = "native_vocabulary_daily_set"
+        static let pendingVocabularyCoach = "native_vocabulary_coach_pending"
     }
 
     private let defaults: UserDefaults
@@ -117,6 +118,21 @@ final class AppPreferences {
             }
         }
     }
+
+    /// 시작했지만 아직 결과를 저장하지 못한 AI 말하기 코칭 조작(P14.3.1).
+    /// 요청을 보내기 **전에** 여기 남겨야 앱이 도중에 죽어도 같은 키로 재시도해
+    /// 이미 값을 치른 결과를 되찾을 수 있다. 한 번에 하나뿐이라 목록이 아니다.
+    var pendingVocabularyCoach: PendingVocabularyCoachOperation? {
+        didSet {
+            if let pendingVocabularyCoach,
+               let data = try? JSONCoding.encoder.encode(pendingVocabularyCoach) {
+                defaults.set(data, forKey: Key.pendingVocabularyCoach)
+            } else {
+                defaults.removeObject(forKey: Key.pendingVocabularyCoach)
+            }
+        }
+    }
+
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -183,6 +199,14 @@ final class AppPreferences {
             vocabularyDailySet = try? JSONCoding.decoder.decode(VocabularyDailySet.self, from: data)
         } else {
             vocabularyDailySet = nil
+        }
+        if let data = defaults.data(forKey: Key.pendingVocabularyCoach) {
+            pendingVocabularyCoach = try? JSONCoding.decoder.decode(
+                PendingVocabularyCoachOperation.self,
+                from: data
+            )
+        } else {
+            pendingVocabularyCoach = nil
         }
         if ProcessInfo.processInfo.arguments.contains("-uiTestingNewUser") {
             hasCompletedOnboarding = false
