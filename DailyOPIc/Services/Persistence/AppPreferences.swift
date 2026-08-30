@@ -28,6 +28,7 @@ final class AppPreferences {
         static let reviewRequestAttempt = "native_review_request_attempted_at"
         static let vocabularyDailySet = "native_vocabulary_daily_set"
         static let pendingVocabularyCoach = "native_vocabulary_coach_pending"
+        static let pendingVocabularyExtra = "native_vocabulary_extra_pending"
     }
 
     private let defaults: UserDefaults
@@ -133,6 +134,20 @@ final class AppPreferences {
         }
     }
 
+    /// 시작했지만 아직 저장하지 못한 추가 20개 생성 조작(P14.6). 코칭과 같은 이유로
+    /// 요청을 보내기 **전에** 남긴다 — 앱이 도중에 죽어도 같은 키로 재시도해서
+    /// 이미 값을 치른 세트를 되찾는다.
+    var pendingVocabularyExtra: PendingVocabularyExtraOperation? {
+        didSet {
+            if let pendingVocabularyExtra,
+               let data = try? JSONCoding.encoder.encode(pendingVocabularyExtra) {
+                defaults.set(data, forKey: Key.pendingVocabularyExtra)
+            } else {
+                defaults.removeObject(forKey: Key.pendingVocabularyExtra)
+            }
+        }
+    }
+
     var mockSurvey: BackgroundSurvey? {
         didSet {
             if let mockSurvey,
@@ -207,6 +222,14 @@ final class AppPreferences {
             )
         } else {
             pendingVocabularyCoach = nil
+        }
+        if let data = defaults.data(forKey: Key.pendingVocabularyExtra) {
+            pendingVocabularyExtra = try? JSONCoding.decoder.decode(
+                PendingVocabularyExtraOperation.self,
+                from: data
+            )
+        } else {
+            pendingVocabularyExtra = nil
         }
         if ProcessInfo.processInfo.arguments.contains("-uiTestingNewUser") {
             hasCompletedOnboarding = false

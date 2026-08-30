@@ -432,7 +432,10 @@ final class PersistenceService {
     /// 받은 세트를 저장한다. 같은 `setId`가 이미 있으면 덮어쓰지 않고 그냥 둔다 —
     /// 같은 조작을 재시도해 서버가 같은 세트를 다시 준 경우이고, 그때 학습 기록이
     /// 붙어 있는 항목을 새 항목으로 바꿔칠 이유가 없다.
-    func saveVocabularyGeneratedSet(_ set: VocabularyGeneratedSet) throws {
+    func saveVocabularyGeneratedSet(
+        _ set: VocabularyGeneratedSet,
+        purpose: VocabularyGenerationPurpose = .customSet
+    ) throws {
         guard let context else { return }
         let setID = set.setId
         var descriptor = FetchDescriptor<VocabularyGeneratedSetRecord>(
@@ -440,7 +443,7 @@ final class PersistenceService {
         )
         descriptor.fetchLimit = 1
         guard try context.fetch(descriptor).isEmpty else { return }
-        context.insert(try VocabularyGeneratedSetRecord(set: set))
+        context.insert(try VocabularyGeneratedSetRecord(set: set, purpose: purpose))
         try context.save()
     }
 

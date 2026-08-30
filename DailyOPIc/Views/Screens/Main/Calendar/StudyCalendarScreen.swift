@@ -130,6 +130,7 @@ struct StudyCalendarScreen: View {
                     schedule: snapshot.schedule,
                     completions: completions
                 ),
+                activity: activities[localDate] ?? .empty,
                 isStudyWeekday: settings.isStudyDay(date),
                 isToday: settings.calendar.startOfDay(for: date) == snapshot.today.date,
                 isExamDay: settings.isExamDay(date),

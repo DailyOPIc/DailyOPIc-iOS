@@ -50,6 +50,30 @@ enum LegacyP1451 {
             self.updatedAt = updatedAt
         }
     }
+
+    /// P14.5.2의 `VocabularyGeneratedSetRecord` 그대로 — `purposeRaw`만 없다(P14.6 이전).
+    @Model
+    final class VocabularyGeneratedSetRecord {
+        @Attribute(.unique) var setID: String
+        var topicRaw: String
+        var targetLevelRaw: String
+        var createdAt: Date
+        var entriesData: Data
+
+        init(
+            setID: String,
+            topicRaw: String,
+            targetLevelRaw: String,
+            createdAt: Date,
+            entriesData: Data
+        ) {
+            self.setID = setID
+            self.topicRaw = topicRaw
+            self.targetLevelRaw = targetLevelRaw
+            self.createdAt = createdAt
+            self.entriesData = entriesData
+        }
+    }
 }
 
 @MainActor
@@ -217,6 +241,82 @@ struct SchemaMigrationTests {
         try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
     }
 
+    // MARK: 1-2. P14.5.2 저장소 → P14.6 스키마 (쓰임새 필드 추가)
+
+    /// P14.6이 `VocabularyGeneratedSetRecord`에 `purposeRaw`를 더했다. 예전에 만들어 둔
+    /// 세트는 **이미 값을 치른** 것이라 지우거나 다시 만들 수 없다 — 같은 파일이 그대로
+    /// 열리고, 없던 필드는 예전 의미(`custom_set` = 30개 맞춤 세트)로 읽혀야 한다.
+    @Test func p1452GeneratedSetsOpenAsCustomSets() throws {
+        let url = try makeStoreURL()
+        let entry = VocabularyEntry(
+            id: "ai-old-set-0",
+            term: "crowded",
+            type: .word,
+            meaningKo: "붐비는",
+            exampleEn: "The cafe was crowded.",
+            exampleKo: "카페가 붐볐어요.",
+            collocations: [],
+            topics: [.cafes],
+            usageRoles: [.description],
+            recommendedLevels: [.IH],
+            source: "ai"
+        )
+
+        // (1) P14.6 이전 모양으로 디스크에 쓴다.
+        do {
+            let legacy = try container(
+                Schema([LegacyP1451.VocabularyGeneratedSetRecord.self]), at: url
+            )
+            let context = ModelContext(legacy)
+            context.insert(
+                LegacyP1451.VocabularyGeneratedSetRecord(
+                    setID: "old-set",
+                    topicRaw: VocabularyTopic.cafes.rawValue,
+                    targetLevelRaw: OPIcLevel.IH.rawValue,
+                    createdAt: Date(timeIntervalSince1970: 1_780_000_000),
+                    entriesData: try JSONCoding.encoder.encode([entry])
+                )
+            )
+            try context.save()
+        }
+
+        // (2) 같은 파일을 현재 스키마로 연다. 지우고 다시 만드는 fallback은 없다.
+        let upgraded = try container(Schema.dailyOPIc, at: url)
+        let context = ModelContext(upgraded)
+        let sets = try context.fetch(FetchDescriptor<VocabularyGeneratedSetRecord>())
+
+        #expect(sets.count == 1)
+        let record = try #require(sets.first)
+        #expect(record.setID == "old-set")
+        #expect(record.topic == .cafes)
+        #expect(record.targetLevel == .IH)
+        #expect(record.entries.map(\.id) == ["ai-old-set-0"])
+        // 없던 필드는 예전 의미 그대로다 — 예전 세트가 갑자기 "오늘의 추가"가 되지 않는다.
+        #expect(record.purposeRaw == "custom_set")
+        #expect(record.purpose == .customSet)
+
+        // 옮겨 온 저장소 위에서 P14.6 기능이 그대로 돈다: 추가 묶음이 옆에 쌓인다.
+        let service = PersistenceService()
+        service.configure(context: context)
+        try service.saveVocabularyGeneratedSet(
+            VocabularyGeneratedSet(
+                setId: "extra-set",
+                topic: .cafes,
+                targetLevel: .IH,
+                createdAt: Date(timeIntervalSince1970: 1_780_100_000),
+                entries: [entry],
+                source: "ai"
+            ),
+            purpose: .todayExtra
+        )
+        let after = try service.vocabularyGeneratedSets()
+        #expect(after.count == 2)
+        #expect(after.first { $0.setID == "old-set" }?.purpose == .customSet)
+        #expect(after.first { $0.setID == "extra-set" }?.purpose == .todayExtra)
+
+        try? FileManager.default.removeItem(at: url.deletingLastPathComponent())
+    }
+
     // MARK: 2. 자동 마이그레이션이 기대는 조건
 
     /// P14.5.2가 스키마에 한 일은 **추가뿐**이다. 새 저장 프로퍼티에는 기본값이 있고,
@@ -230,6 +330,11 @@ struct SchemaMigrationTests {
             contentsOf: root.appendingPathComponent("Models/LocalRecords.swift"), encoding: .utf8
         )
         #expect(records.contains("var reviewCount: Int = 0"))
+        #expect(
+            records.contains(
+                "var purposeRaw: String = VocabularyGenerationPurpose.customSet.rawValue"
+            )
+        )
 
         let app = try String(
             contentsOf: root.appendingPathComponent("DailyOPIcApp.swift"), encoding: .utf8

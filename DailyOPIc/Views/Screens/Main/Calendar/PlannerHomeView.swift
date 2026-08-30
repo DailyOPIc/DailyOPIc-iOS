@@ -17,8 +17,9 @@ enum PlannerRoute: Hashable, CaseIterable {
 /// 플래너 홈 = 월간 캘린더(P14.5.2).
 ///
 /// 이 탭이 답하는 질문은 하나다: **"나는 언제 무엇을 했고, 언제 무엇을 하기로 했는가."**
-/// 그래서 화면의 대부분은 달력이고, 달력 위에는 연속 학습 한 줄, 아래에는 고른 날의
-/// 짧은 요약만 둔다. 학습하러 가는 버튼은 없다 — 데일리는 데일리 탭이, 단어는 단어장
+/// 그래서 화면의 거의 전부가 달력이고, 위에 연속 학습 한 줄만 둔다. 날짜를 누르면
+/// 달력 아래에 카드가 자라는 대신 하루 시트가 열린다(P14.6) — 아래에서 카드가 자라면
+/// 달력이 밀려 내려가 정작 달을 훑을 수가 없다. 학습하러 가는 버튼은 없다 — 데일리는 데일리 탭이, 단어는 단어장
 /// 탭이 각자 자기 일을 한다. 플래너를 다른 탭으로 보내는 바로가기 허브로 쓰지 않는다.
 ///
 /// 칸에 찍히는 숫자는 전부 **실제로 한 학습**이다. 계획도 예정도 아니고, 화면에서
@@ -40,9 +41,6 @@ struct PlannerHomeView: View {
     @Query private var events: [PlannerEventRecord]
 
     @State private var monthOffset = 0
-    /// 캘린더 아래 요약에 쓰는 선택 날짜. 탭 한 번은 요약까지고, 자세히 보기는 시트다 —
-    /// 날짜를 볼 때마다 시트가 튀어 오르면 달력을 훑을 수가 없다.
-    @State private var selectedLocalDate: String?
 
     private var calendar: Calendar { settings.calendar }
     private var today: Date { snapshot.today.date }
@@ -88,7 +86,6 @@ struct PlannerHomeView: View {
                 streakHeader
                 monthHeader
                 monthGrid
-                selectedDaySummary
                 plannerStateMessage
             }
             .padding(AppSpacing.lg)
@@ -197,8 +194,9 @@ struct PlannerHomeView: View {
             ForEach(days) { day in
                 let key = LocalCalendarDate.text(from: day.date, timeZone: settings.timeZone)
                 Button {
-                    // 같은 날을 다시 누르면 접는다. 요약이 캘린더를 계속 밀고 있지 않게 한다.
-                    selectedLocalDate = selectedLocalDate == key ? nil : key
+                    // 하루의 자세한 내용은 캘린더 아래가 아니라 시트로 연다(P14.6).
+                    // 아래에서 카드가 자라면 달력이 밀려 내려가 훑을 수가 없다.
+                    onSelectDate(key)
                 } label: {
                     StudyDayCell(
                         day: day,
@@ -208,50 +206,12 @@ struct PlannerHomeView: View {
                         hasEvent: titles[key]?.isEmpty == false,
                         showsWeekday: false,
                         activity: activities[key] ?? .empty,
-                        eventTitles: titles[key] ?? [],
-                        isSelected: selectedLocalDate == key
+                        eventTitles: titles[key] ?? []
                     )
                 }
                 .buttonStyle(.plain)
-                .accessibilityHint("하루 요약을 봅니다")
+                .accessibilityHint("하루 학습과 일정을 봅니다")
             }
-        }
-    }
-
-    // MARK: 고른 하루
-
-    /// 캘린더 **아래**의 짧은 요약. 그날 한 학습과 그날의 일정만 말하고,
-    /// 더 자세한 것(문제 목록·일정 추가)은 예전부터 있던 하루 시트로 넘긴다.
-    @ViewBuilder
-    private var selectedDaySummary: some View {
-        if let key = selectedLocalDate,
-           let date = LocalCalendarDate.date(from: key, timeZone: settings.timeZone) {
-            let activity = activities[key] ?? .empty
-            let titles = eventTitlesByDate[key] ?? []
-            VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text(date.formatted(.dateTime.month().day().weekday()))
-                    .font(AppTypography.sectionTitle)
-                Text(PlannerActivityCalendar.accessibilityText(activity) ?? "학습 기록이 없어요.")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                if !titles.isEmpty {
-                    ForEach(titles.prefix(3), id: \.self) { title in
-                        Label(title, systemImage: "calendar")
-                            .font(AppTypography.footnote)
-                            .lineLimit(1)
-                    }
-                }
-                Button {
-                    onSelectDate(key)
-                } label: {
-                    Label(titles.isEmpty ? "+ 일정 추가" : "자세히 보기", systemImage: "chevron.right")
-                        .labelStyle(.titleOnly)
-                        .font(AppTypography.callout)
-                }
-                .minimumTouchTarget()
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .cardStyle()
         }
     }
 
@@ -301,7 +261,6 @@ struct StudyDayCell: View {
     var activity: PlannerDayActivity = .empty
     /// 그날의 일정 제목. 칸이 좁으므로 최대 두 개만 그리고 나머지는 "+n"으로 접는다.
     var eventTitles: [String] = []
-    var isSelected = false
 
     /// 오늘 테두리는 채우기와 겹치지 않게 한 겹 바깥에 그린다. 글자 크기를 키우면 같이 커진다.
     @ScaledMetric(relativeTo: .footnote) private var fillDiameter: CGFloat = 28
@@ -335,10 +294,6 @@ struct StudyDayCell: View {
         }
         .frame(maxWidth: .infinity, minHeight: 86, alignment: .top)
         .padding(.vertical, AppSpacing.xs)
-        .background(
-            RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous)
-                .fill(isSelected ? AppPalette.primarySoft : .clear)
-        )
         .contentShape(Rectangle())
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(accessibilityText)

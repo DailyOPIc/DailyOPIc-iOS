@@ -187,35 +187,9 @@ enum StudyPlanSetupSection {
             .accessibilityAddTraits(isSelected ? [.isSelected] : [])
         }
     }
-
-    struct PreferredTime: View {
-        @Binding var time: StudyTimeOfDay
-
-        var body: some View {
-            VStack(alignment: .leading, spacing: AppSpacing.md) {
-                Text("언제 공부할까요?")
-                    .font(AppTypography.cardTitle)
-                DatePicker(
-                    "학습 시간",
-                    selection: Binding(
-                        get: { time.date() },
-                        set: { time = StudyTimeOfDay(date: $0) }
-                    ),
-                    displayedComponents: .hourAndMinute
-                )
-                .datePickerStyle(.compact)
-                .font(AppTypography.body)
-                // 권한 요청도, 알림 예약도 하지 않는다. 시각만 저장한다.
-                Text("알림 기능은 학습 계획 설정 이후 사용할 수 있어요.")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-        }
-    }
 }
 
-/// 캘린더 온보딩. 5단계, 각 단계는 질문 하나.
+/// 캘린더 온보딩. 4단계, 각 단계는 질문 하나.
 struct StudyPlanSetupView: View {
     let viewModel: StudyCalendarViewModel
     let onFinished: () -> Void
@@ -224,7 +198,7 @@ struct StudyPlanSetupView: View {
     @State private var draft = StudyPlanSettings.draft
     @State private var step = 0
 
-    private static let stepCount = 5
+    private static let stepCount = 4
 
     var body: some View {
         VStack(alignment: .leading, spacing: AppSpacing.lg) {
@@ -274,14 +248,12 @@ struct StudyPlanSetupView: View {
             )
         case 2:
             StudyPlanSetupSection.Weekdays(weekdays: $draft.studyWeekdays)
-        case 3:
+        default:
             StudyPlanSetupSection.Intensity(
                 intensity: $draft.intensity,
                 dailyCapacity: viewModel.dailyCapacity,
                 planName: viewModel.plan.displayName
             )
-        default:
-            StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
         }
     }
 
@@ -340,8 +312,7 @@ struct PlannerSettingsView: View {
     var body: some View {
         ScrollView {
             VStack(alignment: .leading, spacing: AppSpacing.xl) {
-                // 무엇을 고치러 왔는지 바로 찾도록 세 묶음으로 나눈다:
-                // 학습 목표 · 학습 시간 · 플래너 기능.
+                // 무엇을 고치러 왔는지 바로 찾도록 나눈다: 학습 목표 · 플래너 기능.
                 groupHeader("학습 목표")
                 StudyPlanSetupSection.TargetLevel(
                     targetLevel: viewModel.targetLevel,
@@ -357,10 +328,9 @@ struct PlannerSettingsView: View {
                     dailyCapacity: viewModel.dailyCapacity,
                     planName: viewModel.plan.displayName
                 )
-                groupHeader("학습 시간")
-                StudyPlanSetupSection.PreferredTime(time: $draft.preferredStudyTime)
-                // 토글이 아니라 안내다. 스위치는 앱 설정 화면 한 곳에만 있다.
-                Text("학습 알림은 설정에서 켜고 끌 수 있어요")
+                // 시간을 여기서 또 고르게 하지 않는다. 알림 스위치와 시각은
+                // 플래너 오른쪽 위 종 한 곳에만 있다(P14.6).
+                Text("학습 알림과 시간은 플래너 오른쪽 위 종 아이콘에서 설정해요")
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
                 #if DEBUG

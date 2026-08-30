@@ -254,17 +254,57 @@ struct PlannerCalendarV2Tests {
         #expect(planner.components(separatedBy: "LazyVGrid").count == 2)
     }
 
-    /// 선택한 날 요약은 캘린더 아래 짧은 한 덩어리다 — 카드 더미가 아니다.
-    @Test func theSelectedDaySummaryStaysSmall() throws {
+    /// 캘린더 아래 요약 카드는 없다(P14.6). 하루를 여는 길은 시트 하나뿐이라
+    /// 달력이 계속 화면의 주인이다.
+    @Test func theCalendarKeepsTheScreenToItself() throws {
         let planner = code(try source(plannerPath))
-        #expect(planner.contains("selectedDaySummary"))
-        #expect(planner.contains("+ 일정 추가"))
-        // 요약은 캘린더보다 뒤에 온다.
-        let grid = try #require(planner.range(of: "monthGrid\n"))
-        let summary = try #require(planner.range(of: "selectedDaySummary\n"))
-        #expect(grid.lowerBound < summary.lowerBound)
-        // 카드 스타일은 요약 한 곳뿐이다.
-        #expect(planner.components(separatedBy: ".cardStyle()").count == 2)
+        #expect(!planner.contains("selectedDaySummary"))
+        #expect(!planner.contains("selectedLocalDate"))
+        #expect(!planner.contains("isSelected"))
+        // 카드가 하나도 없다 — 요약 카드가 달력을 밀어내던 자리가 비었다.
+        #expect(!planner.contains(".cardStyle()"))
+    }
+
+    /// 날짜를 누르면 화면을 밀어내지 않고 시트가 뜬다. 시트를 띄우는 곳은 뿌리 한 곳이다.
+    @Test func tappingADayOpensTheModal() throws {
+        let planner = code(try source(plannerPath))
+        #expect(planner.contains("onSelectDate(key)"))
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("selectedDate = PlannerSelectedDate($0)"))
+        #expect(screen.contains(".sheet(item: $selectedDate)"))
+        #expect(screen.contains(".presentationDetents([.medium, .large])"))
+        // 하루를 여는 라우트를 만들지 않았다(밀어내는 화면이 아니다).
+        #expect(Set(PlannerRoute.allCases) == [.settings, .notifications])
+    }
+
+    /// 시트가 말하는 학습 기록은 격자와 **같은** 활동 값이다. 두 번째 계산 경로가 없다.
+    @Test func theDayModalShowsTheSameActivityAsTheGrid() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.contains("activity: activities[localDate] ?? .empty"))
+        let sheet = code(try source("Views/Screens/Main/Calendar/PlannerDaySheet.swift"))
+        #expect(sheet.contains("let activity: PlannerDayActivity"))
+        #expect(sheet.contains("PlannerActivityCalendar.badges(activity)"))
+        #expect(sheet.contains("오늘의 학습"))
+        // 일정 CRUD는 예전 그대로 이 시트 한 곳이다(두 번째 편집 층을 만들지 않는다).
+        #expect(sheet.contains("일정 추가"))
+        #expect(sheet.contains("PlannerEventRecord"))
+    }
+
+    /// 시간을 정하는 곳은 알림 화면 한 곳뿐이다(P14.6). 플래너 설정과 온보딩에서
+    /// 같은 값을 또 고르게 하지 않는다 — 값(`preferredStudyTime`)은 그대로 살아 있다.
+    @Test func studyTimeIsEditedInOnePlaceOnly() throws {
+        let setup = code(try source("Views/Screens/Main/Calendar/StudyPlanSetupViews.swift"))
+        #expect(!setup.contains("언제 공부할까요?"))
+        #expect(!setup.contains("preferredStudyTime"))
+        #expect(!setup.contains("PreferredTime"))
+        // 공부 "요일"은 계획의 일부라 그대로 남는다.
+        #expect(setup.contains("언제 공부할 수 있나요?"))
+        // 시각을 읽고 쓰는 화면은 알림 화면 하나다.
+        let notifications = code(try source(notificationPath))
+        #expect(notifications.contains("draft.preferredStudyTime = time"))
+        #expect(notifications.contains("DatePicker"))
+        // 저장된 값은 지우지 않는다 — 알림 예약이 계속 이 값을 읽는다.
+        #expect(StudyPlanSettings.draft.preferredStudyTime == .evening)
     }
 
     /// 칸 안의 일정은 최대 두 개 + "+n"이다. 세 번째 제목까지 그리면 숫자가 안 보인다.

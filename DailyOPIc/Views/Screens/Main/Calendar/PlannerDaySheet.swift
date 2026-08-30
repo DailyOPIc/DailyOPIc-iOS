@@ -34,6 +34,9 @@ struct PlannerDaySheet: View {
     let localDate: String
     /// 격자와 같은 계산에서 나온 그날의 학습 상태. 여기서 다시 계산하지 않는다.
     let day: StudyDay
+    /// 그날 실제로 한 학습(단어 · 데일리 · 모의). 캘린더 칸의 배지와 **같은 값**이다 —
+    /// 시트가 따로 세면 같은 날이 두 가지 숫자를 갖게 된다.
+    let activity: PlannerDayActivity
     let isStudyWeekday: Bool
     let isToday: Bool
     /// 설정한 OPIc 시험일인지(P12). 캘린더 별과 **같은** 판정(`StudyPlanSettings.isExamDay`)에서 온다.
@@ -58,6 +61,7 @@ struct PlannerDaySheet: View {
     init(
         localDate: String,
         day: StudyDay,
+        activity: PlannerDayActivity,
         isStudyWeekday: Bool,
         isToday: Bool,
         isExamDay: Bool,
@@ -69,6 +73,7 @@ struct PlannerDaySheet: View {
     ) {
         self.localDate = localDate
         self.day = day
+        self.activity = activity
         self.isStudyWeekday = isStudyWeekday
         self.isToday = isToday
         self.isExamDay = isExamDay
@@ -239,11 +244,17 @@ struct PlannerDaySheet: View {
 
     private var studySection: some View {
         VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            Text("학습")
+            Text("오늘의 학습")
                 .font(AppTypography.caption)
                 .foregroundStyle(AppPalette.secondaryInk)
             Text(status.summaryText(day: day, isToday: isToday))
                 .font(AppTypography.body)
+            activityBadges
+            if activity.isVocabularyComplete, day.state == .completed {
+                Label("오늘의 학습 완료", systemImage: "checkmark.circle.fill")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.primary)
+            }
             // 손으로 체크할 수 없다는 사실을 한 줄로 밝힌다.
             Text("학습 기록은 실제 Daily 학습으로만 기록돼요.")
                 .font(AppTypography.footnote)
@@ -251,6 +262,23 @@ struct PlannerDaySheet: View {
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardStyle()
+    }
+
+    /// 칸에 찍힌 것과 같은 배지를 같은 값으로 그린다(`PlannerActivityCalendar`).
+    @ViewBuilder
+    private var activityBadges: some View {
+        let badges = PlannerActivityCalendar.badges(activity)
+        if !badges.isEmpty {
+            HStack(spacing: AppSpacing.md) {
+                ForEach(badges, id: \.label) { badge in
+                    Label("\(badge.label) \(badge.count)", systemImage: badge.symbol)
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
+            }
+            .accessibilityElement(children: .combine)
+            .accessibilityLabel(PlannerActivityCalendar.accessibilityText(activity) ?? "")
+        }
     }
 
     // MARK: 학습한 문제 (P11 · 읽기 전용)

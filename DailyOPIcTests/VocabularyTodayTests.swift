@@ -291,15 +291,17 @@ struct VocabularyTodayTests {
         )
     }
 
-    /// "오늘 20개 더 학습하기"는 자리를 잡아 두되 이번 단계에서는 열지 않는다.
-    /// 눌리지 않으므로 이 화면에서 AI가 불릴 일도, 토큰이 나갈 일도 없다.
-    @Test func extraStudyCTAExistsButSpendsNothingYet() throws {
+    /// 완료 화면의 "오늘 20개 더 학습하기"는 주제 고르기를 여는 신호만 보낸다(P14.6).
+    /// 이 화면은 여전히 아무것도 만들지 않는다 — AI도, 토큰도 여기서는 움직이지 않는다.
+    @Test func extraStudyCTAOnlySignalsThePicker() throws {
         let study = code(try source(studyPath))
         #expect(study.contains("오늘 \\(VocabularyDailySet.dailyTarget)개 더 학습하기"))
-        #expect(study.contains("isDisabled: true"))
+        #expect(study.contains("onRequestExtra?()"))
+        #expect(!study.contains("isDisabled: true"))
         #expect(!study.contains("VocabularyGenerationViewModel"))
+        #expect(!study.contains("VocabularyExtraSheet"))
         #expect(!study.contains("tokenCost"))
-        #expect(!study.contains("generate("))
+        #expect(!study.contains("generateVocabulary"))
         #expect(!study.contains("vocabulary/generate"))
     }
 
@@ -349,8 +351,13 @@ struct VocabularyTodayTests {
         let screen = code(try source(screenPath))
         #expect(screen.contains("Text(\"오늘의 단어\")"))
         #expect(screen.contains("todayCard"))
-        // 홈이 그리는 것은 오늘의 카드 하나뿐이다.
-        #expect(screen.contains("todayCard.padding(AppSpacing.lg)"))
+        // 홈이 그리는 것은 오늘의 카드와 저장한 단어 한 줄, 둘뿐이다.
+        let home = try homeBody(screen)
+        let drawn = home
+            .split(separator: "\n")
+            .map { $0.trimmingCharacters(in: .whitespaces) }
+            .filter { $0 == "todayCard" || $0 == "savedRow" }
+        #expect(drawn == ["todayCard", "savedRow"])
         // 검색은 통째로 사라졌다 — 입력창도, 결과 목록도, 검색 상태도 없다.
         #expect(!screen.contains("단어나 뜻으로 검색"))
         #expect(!screen.contains(".searchable("))
@@ -377,21 +384,49 @@ struct VocabularyTodayTests {
         #expect(!home.contains("VocabularyRoute.review"))
     }
 
-    /// 홈에서 "내 단어"(저장한 단어 · 익힌 단어)를 내렸다. 단어장 홈 = 오늘의 단어다.
+    /// 저장한 단어는 다시 홈에 있다(P14.6). 단, **작은 보조 줄 하나**다 —
+    /// "내 단어" 묶음도, 두 번째 학습 카드도 아니다.
+    @Test func homeShowsSavedWordsAsASmallRow() throws {
+        let screen = code(try source(screenPath))
+        let home = try homeBody(screen)
+        #expect(home.contains("savedRow"))
+        #expect(screen.contains("NavigationLink(value: VocabularyRoute.saved)"))
+        #expect(screen.contains("Text(\"저장한 단어\")"))
+        // 개수는 저장 상태 한 곳에서만 나온다(따로 세지 않는다).
+        #expect(screen.contains("states.filter(\\.isSaved)"))
+        // 카드가 아니라 줄이다: 홈에 cardStyle을 쓰는 곳은 오늘의 카드 하나뿐이다.
+        #expect(home.components(separatedBy: ".cardStyle()").count == 2)
+    }
+
+    /// 저장 여부의 주인은 여전히 `VocabularyStateRecord.isSaved` 하나다.
+    /// 홈의 줄은 그 값을 읽기만 하고, 두 번째 저장 시스템을 만들지 않는다.
+    @Test func savedWordsHaveOneAuthority() throws {
+        let service = try makeService()
+        try service.setVocabularySaved(entryID: "e1", isSaved: true)
+        #expect(try state(service, "e1").isSaved)
+        // 저장을 풀어도 복습 기록은 사라지지 않는다.
+        try service.recordVocabularyAnswer(
+            entryID: "e1", knewIt: true, timeZone: seoul, now: try moment(today)
+        )
+        try service.setVocabularySaved(entryID: "e1", isSaved: false)
+        let after = try state(service, "e1")
+        #expect(!after.isSaved)
+        #expect(after.lastStudiedLocalDate == today)
+    }
+
+    /// 돌아온 것은 저장한 단어뿐이다. "내 단어" 묶음 · 익힌 단어 · 검색 ·
+    /// 오늘 복습 카드 · 주제별 · AI 맞춤 단어장은 홈에 없다.
     @Test func homeHasNoMyWordsSection() throws {
         let screen = code(try source(screenPath))
         #expect(!screen.contains("내 단어"))
         #expect(!screen.contains("myWordsSection"))
         #expect(!screen.contains("myWordsRow"))
-        #expect(!screen.contains("NavigationLink(value: VocabularyRoute.saved)"))
         #expect(!screen.contains("NavigationLink(value: VocabularyRoute.mastered)"))
-        // 홈이 그리는 범위 안에는 저장/익힘 목록도, 그 문구도 없다.
-        // (같은 문구가 남아 있는 곳은 라우트 목적지의 화면 제목뿐이다.)
         let home = try homeBody(screen)
-        #expect(!home.contains("savedEntries"))
         #expect(!home.contains("masteredEntries"))
-        #expect(!home.contains("저장한 단어"))
         #expect(!home.contains("익힌 단어"))
+        #expect(!home.contains("주제별"))
+        #expect(!home.contains("AI 맞춤"))
     }
 
     /// 홈에서 진입점을 내렸다고 복습을 없앤 것이 아니다. 라우트·화면·엔진(1·3·7·14·30일)과
@@ -449,7 +484,7 @@ struct VocabularyTodayTests {
         #expect(screen.contains("case todayLearned"))
         #expect(screen.contains("NavigationLink(value: VocabularyRoute.todayLearned)"))
         #expect(screen.contains("오늘 학습한 단어 보기"))
-        #expect(screen.contains("entries: todayEntries"))
+        #expect(screen.contains("entries: todayLearnedEntries"))
         #expect(screen.contains("showsProgress: true"))
         // 새 목록 화면을 만들지 않고 저장한 단어·익힌 단어와 같은 화면을 나눠 쓴다.
         #expect(screen.contains("VocabularyMyWordsView("))
@@ -466,17 +501,28 @@ struct VocabularyTodayTests {
         #expect(VocabularyEntryRow.progressText(nil) == "새 단어")
     }
 
-    /// 추가 20개는 아직 열지 않았다. 홈의 CTA도 완료 화면과 같은 비활성 상태이고,
-    /// 열릴 때의 값(데일리 토큰 1개)만 미리 밝힌다.
-    @Test func theExtraTwentyStaysClosedAndPriced() throws {
+    /// 추가 20개는 열렸다(P14.6). 홈의 CTA는 값을 먼저 밝히고, 누르면 **주제 고르기**가
+    /// 열릴 뿐이다 — 이 화면에는 생성도 차감도 없다.
+    @Test func theExtraTwentyOpensThePickerAndStatesItsPrice() throws {
         let screen = code(try source(screenPath))
         #expect(screen.contains("오늘 \\(VocabularyDailySet.dailyTarget)개 더 학습하기"))
-        #expect(screen.contains("isDisabled: true"))
         #expect(screen.contains("데일리 토큰 1개"))
-        // 눌러도 부를 것이 없다 — 생성 경로가 이 화면에 아예 없다.
+        #expect(screen.contains("isShowingExtraSheet = true"))
+        #expect(screen.contains("VocabularyExtraSheet("))
+        // 이 화면이 직접 만들지 않는다. 생성은 시트 안의 명시적 실행뿐이다.
         #expect(!screen.contains("VocabularyGenerationViewModel"))
         #expect(!screen.contains("vocabulary/generate"))
         #expect(!screen.contains("VocabularyDailySetPlanner.assign(localDate: today, catalog: VocabularyCatalog.all, excluding: [])"))
+    }
+
+    /// 추가 학습은 기본 20개를 덮어쓰지 않는다. 오늘의 배정(`vocabularyDailySet`)을
+    /// 건드리는 곳은 주제를 고를 때 하나뿐이다.
+    @Test func extraNeverOverwritesTodaysAssignment() throws {
+        let screen = code(try source(screenPath))
+        #expect(screen.components(separatedBy: "preferences.vocabularyDailySet =").count - 1 == 1)
+        let extra = code(try source("Views/Screens/Main/Vocabulary/VocabularyExtraViews.swift"))
+        #expect(!extra.contains("vocabularyDailySet"))
+        #expect(!extra.contains("setVocabularyDailyGoal"))
     }
 
     /// 오늘의 주제 고르기는 남는다 — 이것이 "주제별 단어"와 다른 점이다.

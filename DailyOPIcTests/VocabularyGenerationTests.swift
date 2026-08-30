@@ -368,7 +368,7 @@ struct VocabularyGenerationTests {
         // 선언 1회 + 성공 뒤 교체 1회. 실패 경로에서 새로 만들면 여기서 걸린다.
         #expect(viewModel.components(separatedBy: "operationID = UUID()").count - 1 == 2)
         let afterSuccess = try #require(
-            viewModel.range(of: "try persistence.saveVocabularyGeneratedSet(set)")
+            viewModel.range(of: "try persistence.saveVocabularyGeneratedSet(set")
         )
         let tail = viewModel[afterSuccess.upperBound...]
         #expect(tail.contains("operationID = UUID()"))

@@ -15,12 +15,16 @@ import Observation
 final class VocabularyGenerationViewModel {
     /// 한 세트의 값. 화면 문구와 서버 계약이 어긋나지 않게 여기 한 곳에 둔다.
     static let tokenCost = 1
+    /// 예전 계약(AI 맞춤 단어장 1세트). 서버가 소유하는 값을 화면에 옮겨 적기만 한다.
     static let entryCount = 30
+    /// 오늘의 단어를 끝낸 뒤 더 받는 묶음(P14.6). 기본 20개와 같은 크기다.
+    static let extraEntryCount = VocabularyDailySet.dailyTarget
 
     private let environment: AppEnvironment
     private let api: APIClient
     private let ads: AdService
     private let persistence: PersistenceService
+    private let preferences: AppPreferences
 
     var usage: UsageStatus?
     var operationState: AsyncOperationState = .idle
@@ -38,6 +42,7 @@ final class VocabularyGenerationViewModel {
         api = environment.api
         ads = environment.ads
         persistence = environment.persistence
+        preferences = environment.preferences
     }
 
     var dailyTokenCount: Int? { usage?.totalRemaining }
@@ -51,10 +56,25 @@ final class VocabularyGenerationViewModel {
 
     /// 화면이 CTA를 누른 자리. 이미 돌고 있으면 아무 일도 하지 않는다 —
     /// 연타가 두 번째 조작(=두 번째 차감)이 되지 않게 여기서 막는다.
-    func generate(topic: VocabularyTopic, targetLevel: OPIcLevel, excluding terms: [String]) {
+    ///
+    /// `purpose`가 `nil`이면 예전 계약(30개)이고, `.todayExtra`면 오늘의 추가 20개다.
+    /// 어느 쪽이든 값은 데일리 토큰 1개로 같다 — 개수가 다르다고 과금이 달라지지 않는다.
+    func generate(
+        topic: VocabularyTopic,
+        targetLevel: OPIcLevel,
+        excluding terms: [String],
+        purpose: VocabularyGenerationPurpose? = nil
+    ) {
         guard !isGenerating else { return }
         errorMessage = nil
-        task = Task { await run(topic: topic, targetLevel: targetLevel, excluding: terms) }
+        task = Task {
+            await run(
+                topic: topic,
+                targetLevel: targetLevel,
+                excluding: terms,
+                purpose: purpose
+            )
+        }
     }
 
     func cancel() {
@@ -67,21 +87,37 @@ final class VocabularyGenerationViewModel {
         topic: VocabularyTopic,
         targetLevel: OPIcLevel,
         excluding terms: [String],
+        purpose: VocabularyGenerationPurpose? = nil,
         allowRecovery: Bool = true
     ) async {
         // 잔액이 0이면 서버도 AI도 부르지 않는다. 먼저 토큰을 확보해야 시작한다.
         if hasNoTokens {
             guard allowRecovery, await recoverToken() else { return }
         }
+        // 요청을 보내기 **전에** 조작 신원을 디스크에 남긴다(P14.3.1 코칭과 같은 방식).
+        // 여기서 앱이 죽어도 다시 열어 같은 주제로 시도하면 같은 키가 나가고,
+        // 서버가 이미 만든 세트를 추가 차감 없이 돌려준다.
+        if purpose == .todayExtra {
+            let pending = PendingVocabularyExtraOperation.resume(
+                preferences.pendingVocabularyExtra,
+                topic: topic
+            )
+            preferences.pendingVocabularyExtra = pending
+            operationID = pending.operationID
+        }
         operationState = .running(operationId: operationID, startedAt: .now)
         let payload = VocabularyGenerationRequest(
             topic: topic,
             targetLevel: targetLevel,
-            excludeTerms: Array(terms.prefix(VocabularyGenerationRequest.excludeLimit))
+            excludeTerms: Array(terms.prefix(VocabularyGenerationRequest.excludeLimit)),
+            purpose: purpose
         )
         do {
             let set = try await api.generateVocabulary(request: payload, requestID: operationID)
-            try persistence.saveVocabularyGeneratedSet(set)
+            try persistence.saveVocabularyGeneratedSet(set, purpose: purpose ?? .customSet)
+            // 저장이 끝난 뒤에만 진행 기록을 지운다. 순서가 반대면 저장 전에 죽었을 때
+            // 이미 값을 치른 세트를 되찾을 신원이 사라진다.
+            preferences.pendingVocabularyExtra = nil
             usage = try? await api.usage()
             // 저장까지 끝났을 때만 조작을 닫는다. 다음 생성은 새 조작이고 새 토큰이다.
             operationID = UUID()
@@ -99,6 +135,7 @@ final class VocabularyGenerationViewModel {
                     topic: topic,
                     targetLevel: targetLevel,
                     excluding: terms,
+                    purpose: purpose,
                     allowRecovery: false
                 )
             }

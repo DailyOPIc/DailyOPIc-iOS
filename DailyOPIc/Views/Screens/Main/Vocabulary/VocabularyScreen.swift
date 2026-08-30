@@ -21,9 +21,12 @@ enum VocabularyRoute: Hashable {
     case speakingCoach(VocabularyEntry)
 }
 
-/// 단어장 홈 = **오늘의 단어** 하나다(P14.5.2). 검색·큰 제목·복습 진입점·주제
-/// 둘러보기·내 단어(저장한/익힌 단어)는 홈에서 내렸다 — 통계는 통계 탭이,
-/// 학습 기록은 플래너 캘린더가 이미 그 일을 한다.
+/// 단어장 홈 = **오늘의 단어** + 그 아래 작은 줄 하나(저장한 단어)다.
+/// 검색·큰 제목·복습 진입점·주제 둘러보기·AI 맞춤 단어장·익힌 단어는 홈에서 내렸다 —
+/// 통계는 통계 탭이, 학습 기록은 플래너 캘린더가 이미 그 일을 한다.
+///
+/// 저장한 단어만 돌아온 이유(P14.6): 오늘의 카드에서 **사용자가 직접 ♡를 누른** 단어는
+/// 나중에 다시 찾아볼 수 있어야 한다. 두 번째 학습 카드가 아니라 작은 보조 줄이다.
 ///
 /// 내린 것은 **홈의 진입점뿐이고 기능이 아니다**: 복습 엔진(`VocabularyReviewPolicy` ·
 /// 예정일 · 익힘 · 복습 횟수)도, 저장·익힘 상태와 그 목록 화면도 그대로 살아 있다.
@@ -34,14 +37,18 @@ enum VocabularyRoute: Hashable {
 /// 단어는 앱에 담긴 시드(`VocabularyCatalog`)와 이미 받아 둔 AI 세트이고,
 /// 내 상태는 이 기기의 SwiftData다.
 ///
-/// 토큰이 나가는 곳은 하나뿐이다: 단어 상세의 "직접 말해보기"에서 **AI 코칭을 요청할 때
-/// 1개**(P14.3). 오늘 20개를 더 받는 "추가 20개"는 아직 열지 않았다 —
-/// 열릴 때(P14.6) 데일리 토큰 1개이고, 그전까지 공짜로 배정하지 않는다.
+/// 토큰이 나가는 곳은 둘뿐이고, 둘 다 사용자가 직접 눌러야 시작한다:
+///   - 단어 상세의 "직접 말해보기"에서 AI 코칭을 요청할 때 1개(P14.3)
+///   - 오늘 20개를 **더 만들** 때 1개(P14.6). 만들어 둔 20개를 학습·저장·복습하는 것은 공짜다.
+/// 시드에서 부족분을 뽑아 추가 20개인 척 공짜로 주는 경로는 없다 — 추가 20개는 언제나
+/// 새로 만든 단어다.
 struct VocabularyScreen: View {
     let preferences: AppPreferences
     let persistence: PersistenceService
 
     @Environment(AppEnvironment.self) private var environment
+    /// 추가 20개를 만들 주제를 고르는 화면. 여는 것도 닫는 것도 0 토큰이다.
+    @State private var isShowingExtraSheet = false
     @Query private var states: [VocabularyStateRecord]
     @Query(sort: \VocabularyGeneratedSetRecord.createdAt, order: .reverse)
     private var generatedSets: [VocabularyGeneratedSetRecord]
@@ -105,6 +112,56 @@ struct VocabularyScreen: View {
         return VocabularyCatalog.entries(ids: dueIDs, in: allEntries)
     }
 
+    /// 오늘 만든 추가 세트(P14.6), 최신이 먼저. 기본 20개(`vocabularyDailySet`)와는
+    /// 완전히 별개다 — 추가 학습이 오늘의 배정을 덮어쓰지 않는다.
+    private var todayExtraSets: [VocabularyGeneratedSetRecord] {
+        generatedSets.filter {
+            $0.purpose == .todayExtra
+                && LocalCalendarDate.text(from: $0.createdAt, timeZone: timeZone) == todayLocalDate
+        }
+    }
+
+    /// 지금 이어서 학습할 추가 묶음 = 가장 최근에 만든 것. 진행도는 이 묶음 것이다.
+    private var extraEntries: [VocabularyEntry] { todayExtraSets.first?.entries ?? [] }
+
+    private var extraStudiedCount: Int {
+        VocabularyDailyProgress.attemptedCount(
+            assigned: extraEntries.map(\.id),
+            states: stateByID,
+            today: todayLocalDate
+        )
+    }
+
+    private var extraRemainingCount: Int {
+        VocabularyDailyProgress.remainingIDs(
+            assigned: extraEntries.map(\.id),
+            states: stateByID,
+            today: todayLocalDate
+        ).count
+    }
+
+    /// 오늘 실제로 학습한 단어 전부 = 기본 배정 + 오늘 만든 추가 묶음에서 답한 것.
+    /// 가장 최근 묶음만 보여주지 않는다 — 하루에 추가 20개를 여러 번 했으면 전부 나온다.
+    /// 같은 단어가 두 곳에 있어도 한 줄이다.
+    private var todayLearnedEntries: [VocabularyEntry] {
+        let extras = todayExtraSets.flatMap(\.entries).filter {
+            stateByID[$0.id]?.wasStudied(on: todayLocalDate) == true
+        }
+        var seen = Set<String>()
+        return (todayEntries + extras).filter { seen.insert($0.id).inserted }
+    }
+
+    /// 중복 회피 힌트. 오늘 배정된 기본 단어 → 이미 받아 둔 AI 세트 → 이미 학습한 단어
+    /// 순서로 담는다(상한은 요청 모델이 갖는다). 새 중복 판별 시스템을 만들지 않는다.
+    private var extraExistingTerms: [String] {
+        let studied = VocabularyDailyProgress.studiedIDs(states: states)
+        let ordered = todayEntries
+            + generatedSets.flatMap(\.entries)
+            + allEntries.filter { studied.contains($0.id) }
+        var seen = Set<String>()
+        return ordered.map(\.term).filter { seen.insert($0.lowercased()).inserted }
+    }
+
     private var savedEntries: [VocabularyEntry] {
         VocabularyCatalog.entries(ids: states.filter(\.isSaved).map(\.entryID), in: allEntries)
     }
@@ -118,6 +175,13 @@ struct VocabularyScreen: View {
 
     var body: some View {
         ScrollView { home }
+            .sheet(isPresented: $isShowingExtraSheet) {
+                VocabularyExtraSheet(
+                    environment: environment,
+                    targetLevel: preferences.targetLevel,
+                    existingTerms: extraExistingTerms
+                )
+            }
             .navigationDestination(for: VocabularyRoute.self, destination: destination)
             .navigationDestination(for: VocabularyEntry.self) { entry in
                 VocabularyEntryDetailView(
@@ -131,7 +195,43 @@ struct VocabularyScreen: View {
     // MARK: 홈
 
     private var home: some View {
-        todayCard.padding(AppSpacing.lg)
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            todayCard
+            savedRow
+        }
+        .padding(AppSpacing.lg)
+    }
+
+    /// 오늘의 단어 아래 작은 줄 하나(P14.6). 두 번째 학습 카드가 아니라 "카드에서 내가
+    /// 눌러 저장한 단어를 나중에 다시 찾아보는 길"이다. 익힌 단어 · 주제별 둘러보기 ·
+    /// 검색은 여전히 홈에 없다.
+    private var savedRow: some View {
+        NavigationLink(value: VocabularyRoute.saved) {
+            HStack(spacing: AppSpacing.sm) {
+                Image(systemName: "heart.fill")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.primary)
+                Text("저장한 단어")
+                    .font(AppTypography.callout)
+                    .foregroundStyle(AppPalette.ink)
+                Spacer(minLength: 0)
+                Text("\(savedEntries.count)개")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.caption)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
+            .padding(AppSpacing.md)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(AppPalette.surface)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+        .accessibilityLabel("저장한 단어 \(savedEntries.count)개")
+        .accessibilityHint("저장한 단어를 다시 봅니다")
     }
 
     /// 이 화면의 주인공. 하루의 상태는 셋뿐이다 — 아직 안 골랐다 / 하는 중 / 다 했다.
@@ -189,20 +289,37 @@ struct VocabularyScreen: View {
         }
     }
 
-    /// "오늘 20개 더". **아직 열지 않았다** — 누를 수 없는 버튼이라 여기서 단어가
-    /// 배정되는 일도, AI가 불리는 일도, 토큰이 나가는 일도 없다.
-    /// 열릴 때(P14.6) 데일리 토큰 1개다. 지금 공짜로 배정해 두면 나중에 유료로
-    /// 바꾸는 순간 사용자가 손해 본 것처럼 느낀다.
-    /// (완료 화면의 같은 CTA와 문구·상태를 맞춘다 — 두 곳이 다른 말을 하면 안 된다.)
+    /// "오늘 20개 더"(P14.6). 여기서 값이 나가는 자리는 **새 단어를 만들 때 1개** 하나뿐이다.
+    /// 이 버튼을 누르면 주제를 고르는 화면이 열릴 뿐이고, 만들어 둔 20개를 학습하는 것은
+    /// 기본 20개와 똑같이 공짜다. 기본 20개 완료 표시는 추가 학습과 상관없이 그대로다.
+    @ViewBuilder
     private var extraWordsCTA: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.xs) {
-            PrimaryButton(
-                title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기",
-                isDisabled: true
-            ) {}
+        if let set = todayExtraSets.first, extraRemainingCount > 0 {
+            Text("오늘 추가 학습 \(extraStudiedCount) / \(extraEntries.count)")
+                .font(AppTypography.callout)
+                .foregroundStyle(AppPalette.secondaryInk)
+            NavigationLink(value: VocabularyRoute.generatedStudy(setID: set.setID)) {
+                primaryLabel(
+                    extraStudiedCount > 0 ? "추가 단어 이어 학습하기" : "추가 단어 학습 시작",
+                    systemImage: "sparkles"
+                )
+            }
+            .buttonStyle(PressableButtonStyle())
+        } else {
+            if !extraEntries.isEmpty {
+                Label(
+                    "오늘 추가 학습 \(extraEntries.count) / \(extraEntries.count) 완료",
+                    systemImage: "checkmark.circle.fill"
+                )
+                .font(AppTypography.callout)
+                .foregroundStyle(AppPalette.primary)
+            }
+            PrimaryButton(title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기") {
+                isShowingExtraSheet = true
+            }
             HStack(spacing: AppSpacing.xs) {
                 DailyTokenIcon(size: 16)
-                Text("다음 업데이트에서 열려요. 데일리 토큰 1개")
+                Text("새 단어를 만들 때 데일리 토큰 1개")
                     .font(AppTypography.footnote)
                     .foregroundStyle(AppPalette.secondaryInk)
             }
@@ -241,14 +358,17 @@ struct VocabularyScreen: View {
                 kind: .newWords,
                 entries: todayRemaining,
                 persistence: persistence,
-                timeZone: timeZone
+                timeZone: timeZone,
+                // 완료 화면의 "20개 더"는 홈으로 돌아와 주제 고르기를 연다.
+                // 시트는 이 화면 한 곳에서만 띄운다(두 번째 생성 입구를 만들지 않는다).
+                onRequestExtra: { isShowingExtraSheet = true }
             )
         case .todayLearned:
-            // 오늘 배정된 목록 그 자체가 진실이다 — 다시 세거나 추측하지 않는다.
+            // 오늘 배정된 기본 목록 + 오늘 추가로 학습한 단어. 다시 세거나 추측하지 않는다.
             VocabularyMyWordsView(
                 title: "오늘 학습한 단어",
                 emptyMessage: "오늘 학습한 단어가 아직 없어요.",
-                entries: todayEntries,
+                entries: todayLearnedEntries,
                 states: stateByID,
                 showsProgress: true
             )

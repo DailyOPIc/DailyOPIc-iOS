@@ -264,16 +264,26 @@ final class VocabularyGeneratedSetRecord {
     var targetLevelRaw: String
     var createdAt: Date
     var entriesData: Data
+    /// 무엇으로 만든 세트인가(P14.6). 기본값이 있어 예전에 저장한 세트는 그대로
+    /// `custom_set`으로 읽힌다 — 저장본을 지우거나 옮기지 않는다.
+    var purposeRaw: String = VocabularyGenerationPurpose.customSet.rawValue
 
-    init(set: VocabularyGeneratedSet) throws {
+    init(
+        set: VocabularyGeneratedSet,
+        purpose: VocabularyGenerationPurpose = .customSet
+    ) throws {
         setID = set.setId
         topicRaw = set.topic.rawValue
         targetLevelRaw = set.targetLevel.rawValue
         createdAt = set.createdAt
         entriesData = try JSONCoding.encoder.encode(set.entries)
+        purposeRaw = purpose.rawValue
     }
 
     var topic: VocabularyTopic? { VocabularyTopic(rawValue: topicRaw) }
+    var purpose: VocabularyGenerationPurpose? {
+        VocabularyGenerationPurpose(rawValue: purposeRaw)
+    }
     var targetLevel: OPIcLevel? { OPIcLevel(rawValue: targetLevelRaw) }
     var entries: [VocabularyEntry] {
         (try? JSONCoding.decoder.decode([VocabularyEntry].self, from: entriesData)) ?? []

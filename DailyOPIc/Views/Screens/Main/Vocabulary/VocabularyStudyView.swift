@@ -54,16 +54,21 @@ struct VocabularyStudyView: View {
     @State private var isRevealed = false
     /// 세션이 처음 받은 항목 수. 진행도 표시("3 / 10")의 분모다.
     private let plannedCount: Int
+    /// 완료 화면에서 "20개 더"를 눌렀을 때 단어장 홈에 알리는 길(P14.6).
+    /// 이 화면은 주제도 고르지 않고 아무것도 만들지 않는다 — 신호만 보낸다.
+    private let onRequestExtra: (() -> Void)?
 
     init(
         kind: VocabularyStudyKind,
         entries: [VocabularyEntry],
         persistence: PersistenceService,
-        timeZone: TimeZone
+        timeZone: TimeZone,
+        onRequestExtra: (() -> Void)? = nil
     ) {
         self.kind = kind
         self.persistence = persistence
         self.timeZone = timeZone
+        self.onRequestExtra = onRequestExtra
         plannedCount = entries.count
         _session = State(initialValue: VocabularyStudySession(entries: entries))
     }
@@ -281,7 +286,7 @@ struct VocabularyStudyView: View {
                 summaryCount(title: "알아요", value: session.knownCount)
                 summaryCount(title: "다시 볼 표현", value: session.forgottenCount)
             }
-            if kind == .newWords {
+            if kind == .newWords, onRequestExtra != nil {
                 extraStudyCTA
                     .padding(.top, AppSpacing.md)
             }
@@ -291,18 +296,21 @@ struct VocabularyStudyView: View {
         .padding(AppSpacing.lg)
     }
 
-    /// 오늘 몫을 끝낸 뒤의 다음 걸음(P14.5). 이번 단계에서는 **아직 열지 않는다** —
-    /// 누를 수 없는 버튼이라 이 화면에서 AI가 불리는 일도, 데일리 토큰이 나가는 일도 없다.
-    /// 다음 단계에서 여기에 "주제 고르기 → 20개 불러오기"가 붙는다.
+    /// 오늘 몫을 끝낸 뒤의 다음 걸음(P14.6). 누르면 단어장 홈으로 돌아가 **주제 고르기**가
+    /// 열린다. 여기서는 아무것도 만들지 않고 값도 나가지 않는다 — 주제를 고르고
+    /// 확인 화면에서 직접 "생성하기"를 눌러야 그때 데일리 토큰 1개가 나간다.
     private var extraStudyCTA: some View {
         VStack(spacing: AppSpacing.xs) {
-            PrimaryButton(
-                title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기",
-                isDisabled: true
-            ) {}
-            Text("다음 업데이트에서 열려요.")
-                .font(AppTypography.footnote)
-                .foregroundStyle(AppPalette.secondaryInk)
+            PrimaryButton(title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기") {
+                dismiss()
+                onRequestExtra?()
+            }
+            HStack(spacing: AppSpacing.xs) {
+                DailyTokenIcon(size: 16)
+                Text("새 단어를 만들 때 데일리 토큰 1개")
+                    .font(AppTypography.footnote)
+                    .foregroundStyle(AppPalette.secondaryInk)
+            }
         }
     }
 
