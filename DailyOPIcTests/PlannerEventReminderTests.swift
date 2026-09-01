@@ -362,7 +362,10 @@ struct PlannerEventReminderSchedulingTests {
 
         let pending = await harness.service.pendingEventSnapshot()
         #expect(pending.count == 1)
-        #expect(pending.nextLocalDate == id.uuidString)
+        // `nextLocalDate`는 `nextTriggerDate()`(=진짜 지금 기준)로 고른 값이라 픽스처 날짜가
+        // 지나면 nil이 된다. 교체됐다는 사실은 저장된 식별자로 본다 — 시계에 묶지 않는다.
+        #expect(harness.center.eventReminderIdentifiers
+            == [PlannerEventReminderPolicy.identifier(eventID: id)])
         // 교체된 예약이 **새 시각**을 들고 있는지는 저장된 트리거로 본다.
         // (`pending.nextTriggerDate`는 실제 지금을 기준으로 계산돼 픽스처 날짜에 묶을 수 없다.)
         let stored = harness.center.pending.first {
