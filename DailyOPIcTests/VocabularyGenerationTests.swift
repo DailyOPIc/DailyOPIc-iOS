@@ -3,7 +3,7 @@ import SwiftData
 import Testing
 @testable import DailyOPIc
 
-/// AI 맞춤 단어장(P14.2). 서버 응답 디코딩 · 기기 저장 · 기존 학습 엔진 재사용,
+/// 단어 만들기(P14.6). 서버 응답 디코딩 · 기기 저장 · 기존 학습 엔진 재사용,
 /// 그리고 "조작 1회 = 데일리 토큰 1개"라는 과금 배선을 고정한다.
 ///
 /// `AppEnvironment.api`는 프로토콜이 아니라 구체 `actor APIClient`라 가짜 서버를
@@ -24,16 +24,13 @@ struct VocabularyGenerationTests {
     ) -> Data {
         let types: [(String, [String])] = [
             ("word", ["crowded", "cozy", "spacious", "brew", "aroma",
-                      "refill", "seasonal", "chilly", "loyal", "affordable"]),
+                      "refill", "seasonal"]),
             ("phrase", ["grab a coffee", "hang out", "wind down", "catch up with",
-                        "drop by", "kill time", "stop by", "settle in",
-                        "run into", "take a break"]),
+                        "drop by", "kill time", "stop by"]),
             ("pattern", ["I usually go there when", "What I like about it is",
                          "The reason I keep going back is", "If I had to pick one",
                          "It has become part of my routine to",
-                         "Compared to other places", "One thing that changed is",
-                         "Whenever I get the chance", "The last time I went",
-                         "That is why I would say"])
+                         "Compared to other places"])
         ]
         var entries: [String] = []
         var index = 0
@@ -102,7 +99,7 @@ struct VocabularyGenerationTests {
 
     // MARK: 1. 응답 디코딩
 
-    /// 서버가 준 30개짜리 세트를 그대로 읽는다. 날짜는 마이크로초 6자리로 온다.
+    /// 서버가 준 20개짜리 세트를 그대로 읽는다. 날짜는 마이크로초 6자리로 온다.
     @Test func decodesGeneratedSetResponse() throws {
         let set = try makeSet()
 
@@ -111,7 +108,7 @@ struct VocabularyGenerationTests {
         #expect(set.topic == .cafes)
         #expect(set.targetLevel == .IH)
         #expect(set.source == "ai")
-        #expect(set.entries.count == VocabularyGenerationViewModel.entryCount)
+        #expect(set.entries.count == VocabularyGenerationViewModel.extraEntryCount)
         // 마이크로초 6자리를 읽어 낸다(파이썬이 내는 형식). 밀리초 아래는 버려도 된다.
         let formatter = ISO8601DateFormatter()
         formatter.formatOptions = [.withInternetDateTime]
@@ -132,7 +129,7 @@ struct VocabularyGenerationTests {
     // MARK: 2. 저장 (앱을 껐다 켜도 남는다)
 
     /// 메모리 저장소가 아니라 파일 저장소로 컨테이너를 두 번 연다.
-    /// 앱 재시작을 흉내 내는 유일한 방법이고, 세트가 통째로(30개 전부) 살아남아야 한다.
+    /// 앱 재시작을 흉내 내는 유일한 방법이고, 세트가 통째로(20개 전부) 살아남아야 한다.
     @Test func generatedSetSurvivesContainerRestart() throws {
         let url = URL(fileURLWithPath: NSTemporaryDirectory())
             .appendingPathComponent("vocab-generation-\(UUID().uuidString).store")
@@ -152,7 +149,7 @@ struct VocabularyGenerationTests {
         #expect(record.setID == set.setId)
         #expect(record.topic == .cafes)
         #expect(record.targetLevel == .IH)
-        #expect(record.entries.count == VocabularyGenerationViewModel.entryCount)
+        #expect(record.entries.count == VocabularyGenerationViewModel.extraEntryCount)
         #expect(record.entries.map(\.id) == set.entries.map(\.id))
         #expect(record.entries.map(\.term) == set.entries.map(\.term))
     }
@@ -179,7 +176,7 @@ struct VocabularyGenerationTests {
         try service.saveVocabularyGeneratedSet(second)
 
         let ids = try service.vocabularyGeneratedSets().flatMap { $0.entries.map(\.id) }
-        #expect(ids.count == 2 * VocabularyGenerationViewModel.entryCount)
+        #expect(ids.count == 2 * VocabularyGenerationViewModel.extraEntryCount)
         #expect(Set(ids).count == ids.count)
         #expect(Set(ids).isDisjoint(with: Set(VocabularyCatalog.all.map(\.id))))
         #expect(ids.allSatisfy { $0.hasPrefix("ai-") })
@@ -202,25 +199,23 @@ struct VocabularyGenerationTests {
         let sets = try service.vocabularyGeneratedSets()
         #expect(sets.map(\.setID) == ["newest", "middle", "older"])
 
-        let record = try #require(sets.first)
-        #expect(VocabularyGeneratedSetRecord.title(for: record) == "카페 · IH")
-        #expect(VocabularyGeneratedSetRecord.dateText(record.createdAt).count == 10)
     }
 
     // MARK: 5. 상세 구성
 
-    /// 서버가 정한 구성(단어 10 · 표현 10 · 패턴 10)이 화면이 세는 방식 그대로 나온다.
+    /// 서버가 정한 구성(단어 7 · 표현 7 · 패턴 6)이 화면이 세는 방식 그대로 나온다.
     @Test func setDetailSplitsEntriesByType() throws {
+        let expected: [VocabularyItemType: Int] = [.word: 7, .phrase: 7, .pattern: 6]
         let set = try makeSet()
         for type in VocabularyItemType.allCases {
-            #expect(set.entries(of: type).count == 10)
+            #expect(set.entries(of: type).count == expected[type])
         }
 
         let service = makeService(try makeMemoryContainer())
         try service.saveVocabularyGeneratedSet(set)
         let record = try #require(try service.vocabularyGeneratedSets().first)
         for type in VocabularyItemType.allCases {
-            #expect(record.entries.filter { $0.type == type }.count == 10)
+            #expect(record.entries.filter { $0.type == type }.count == expected[type])
         }
     }
 
@@ -322,12 +317,12 @@ struct VocabularyGenerationTests {
     /// 비용은 1이며, 그 숫자가 CTA 문구에 그대로 실린다.
     @Test func generationCostsExactlyOneDailyToken() throws {
         #expect(VocabularyGenerationViewModel.tokenCost == 1)
-        #expect(VocabularyGenerationViewModel.entryCount == 30)
+        #expect(VocabularyGenerationViewModel.extraEntryCount == 20)
 
-        let sheet = try source("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift")
+        let sheet = try source("Views/Screens/Main/Vocabulary/VocabularyExtraViews.swift")
         #expect(sheet.contains("데일리 토큰 \\(VocabularyGenerationViewModel.tokenCost)개를 사용해요"))
         #expect(sheet.contains("DailyTokenIcon("))
-        #expect(sheet.contains("30개 만들기"))
+        #expect(sheet.contains("\\(count)개 만들기"))
         // 새 화폐·새 구매 경로를 만들지 않았다.
         #expect(!sheet.contains("단어 토큰"))
         #expect(!sheet.contains("Purchase"))
@@ -340,21 +335,18 @@ struct VocabularyGenerationTests {
 
     // MARK: 10. 이미 만든 세트를 여는 것은 공짜
 
-    /// 목록 · 상세 · 학습은 저장된 항목을 읽을 뿐이다. AI를 부르는 자리는
-    /// 앱 전체에서 뷰모델 한 곳뿐이고, 단어장 화면에는 없다.
+    /// 만들어 둔 세트를 여는 것 · 학습하는 것은 저장된 항목을 읽을 뿐이다. AI를 부르는
+    /// 자리는 앱 전체에서 뷰모델 한 곳뿐이고, 단어장 화면에는 없다.
     @Test func viewingAnExistingSetNeverRequestsAI() throws {
         let callSites = try runtimeSources()
             .map { try String(contentsOf: $0, encoding: .utf8) }
-            .filter { $0.contains("api.generateVocabulary(") }
+            .filter { $0.contains("api.generateTodayVocabulary(") }
         #expect(callSites.count == 1)
 
         let screen = try source("Views/Screens/Main/Vocabulary/VocabularyScreen.swift")
-        #expect(!screen.contains("generateVocabulary"))
+        #expect(!screen.contains("generateTodayVocabulary"))
         // 세트를 여는 경로는 저장된 레코드를 찾는 것뿐이다.
         #expect(screen.contains("generatedSets.first { $0.setID == setID }"))
-
-        let views = try source("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift")
-        #expect(!views.contains("generateVocabulary"))
     }
 
     // MARK: 11. 재시도는 같은 조작
@@ -398,13 +390,13 @@ struct VocabularyGenerationTests {
         let start = try #require(viewModel.range(of: "private func run("))
         let body = viewModel[start.upperBound...]
         let precheck = try #require(body.range(of: "if hasNoTokens {"))
-        let request = try #require(body.range(of: "api.generateVocabulary("))
+        let request = try #require(body.range(of: "api.generateTodayVocabulary("))
         // 잔액 확인이 요청보다 먼저다. 확보에 실패하면 요청까지 가지 않는다.
         #expect(precheck.lowerBound < request.lowerBound)
         #expect(body[precheck.upperBound...].contains("guard allowRecovery, await recoverToken() else { return }"))
 
-        let sheet = try source("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift")
-        #expect(sheet.contains("AI 맞춤 단어 생성을 위해 데일리 토큰 1개가 필요합니다."))
+        let sheet = try source("Views/Screens/Main/Vocabulary/VocabularyExtraViews.swift")
+        #expect(sheet.contains("데일리 토큰 1개가 필요합니다."))
     }
 
     // MARK: 13. 탭 구성은 그대로

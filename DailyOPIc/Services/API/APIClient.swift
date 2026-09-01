@@ -105,16 +105,16 @@ actor APIClient {
         )
     }
 
-    /// AI 맞춤 단어장 1세트. 데일리 토큰 1개를 쓰는 요청이다.
+    /// 단어 20개 1세트. 데일리 토큰 1개를 쓰는 요청이다.
     ///
     /// `requestID`가 조작의 신원이다. 응답을 못 받아 다시 보낼 때는 **같은 값**을
     /// 그대로 보내야 서버가 이미 만든 세트를 돌려준다(추가 차감 없음).
-    func generateVocabulary(
-        request payload: VocabularyGenerationRequest,
+    func generateTodayVocabulary(
+        request payload: TodayVocabularyGenerationRequest,
         requestID: UUID
     ) async throws -> VocabularyGeneratedSet {
         try await sendJSON(
-            path: "/v1/vocabulary/generate",
+            path: "/v1/vocabulary/today/generate",
             method: "POST",
             body: payload,
             requestID: requestID,

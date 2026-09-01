@@ -72,7 +72,7 @@ struct DailyVocabularyIsolationTests {
     /// 질문에 답하는 화면에 있으면 안 된다.
     @Test func theQuestionScreenNoLongerOffersWordGeneration() throws {
         let screen = code(try source(screenPath))
-        #expect(!screen.contains("VocabularyGenerationSheet"))
+        #expect(!screen.contains("VocabularyExtraSheet"))
         #expect(!screen.contains("VocabularyGenerationViewModel"))
         #expect(!screen.contains("DailyTokenIcon"))
     }
@@ -112,22 +112,20 @@ struct DailyVocabularyIsolationTests {
         #expect(try source(screenPath).contains("SetupView(preferences: preferences)"))
     }
 
-    // MARK: 3. 생성 아키텍처는 지우지 않았다
+    // MARK: 3. 생성은 단어장 탭에만 있다
 
-    /// 데일리에서 CTA만 뺐고 P14.2 생성 자체는 그대로 있다(P14.6에서 다시 쓴다).
-    /// 값도 그대로 1개다 — 지금은 부르는 화면이 없을 뿐이다.
-    @Test func generationArchitectureStaysIntactButUncalled() throws {
+    /// 데일리에서 CTA만 뺐고 생성 자체는 단어장 탭에 그대로 있다. 값도 그대로 1개다.
+    @Test func generationLivesOnlyInTheVocabularyTab() throws {
         #expect(VocabularyGenerationViewModel.tokenCost == 1)
-        #expect(exists("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift"))
         let generators = try runtimeSources()
             .map { try String(contentsOf: $0, encoding: .utf8) }
             .filter { $0.contains("class VocabularyGenerationViewModel") }
         #expect(generators.count == 1)
-        // 자동으로 부르는 곳이 생기면 안 된다. 생성은 언제나 사용자가 시작한다.
+        // 생성 시트를 여는 곳은 단어장 화면 하나뿐이다. 생성은 언제나 사용자가 시작한다.
         let callers = try runtimeSources()
-            .map { try String(contentsOf: $0, encoding: .utf8) }
-            .filter { code($0).contains("VocabularyGenerationSheet(") }
-        #expect(callers.isEmpty)
+            .filter { code(try String(contentsOf: $0, encoding: .utf8)).contains("VocabularyExtraSheet(") }
+            .map { $0.lastPathComponent }
+        #expect(callers == ["VocabularyScreen.swift"])
     }
 
     // MARK: 4. 탭 구성은 그대로

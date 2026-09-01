@@ -291,11 +291,11 @@ struct VocabularyTodayTests {
         )
     }
 
-    /// 완료 화면의 "오늘 20개 더 학습하기"는 주제 고르기를 여는 신호만 보낸다(P14.6).
+    /// 완료 화면의 "단어 20개 만들기"는 주제 고르기를 여는 신호만 보낸다(P14.6.1).
     /// 이 화면은 여전히 아무것도 만들지 않는다 — AI도, 토큰도 여기서는 움직이지 않는다.
     @Test func extraStudyCTAOnlySignalsThePicker() throws {
         let study = code(try source(studyPath))
-        #expect(study.contains("오늘 \\(VocabularyDailySet.dailyTarget)개 더 학습하기"))
+        #expect(study.contains("VocabularyCreateButton {"))
         #expect(study.contains("onRequestExtra?()"))
         #expect(!study.contains("isDisabled: true"))
         #expect(!study.contains("VocabularyGenerationViewModel"))
@@ -337,7 +337,7 @@ struct VocabularyTodayTests {
         #expect(!screen.contains("topicsSection"))
     }
 
-    /// 홈에서 "AI 맞춤 단어장 만들기"를 내렸다. 홈에서 P14.2 생성 시트를 여는 길이 없다.
+    /// "AI 맞춤 단어장"은 이름도 화면도 사라졌다(P14.6.2).
     @Test func homeNoLongerOffersAIGeneration() throws {
         let screen = code(try source(screenPath))
         #expect(!screen.contains("AI 맞춤 단어장"))
@@ -505,8 +505,8 @@ struct VocabularyTodayTests {
     /// 열릴 뿐이다 — 이 화면에는 생성도 차감도 없다.
     @Test func theExtraTwentyOpensThePickerAndStatesItsPrice() throws {
         let screen = code(try source(screenPath))
-        #expect(screen.contains("오늘 \\(VocabularyDailySet.dailyTarget)개 더 학습하기"))
-        #expect(screen.contains("데일리 토큰 1개"))
+        #expect(screen.contains("VocabularyCreateButton { isShowingExtraSheet = true }"))
+        #expect(screen.contains("VocabularyExtraSheet("))
         #expect(screen.contains("isShowingExtraSheet = true"))
         #expect(screen.contains("VocabularyExtraSheet("))
         // 이 화면이 직접 만들지 않는다. 생성은 시트 안의 명시적 실행뿐이다.
@@ -552,16 +552,15 @@ struct VocabularyTodayTests {
         #expect(counts.values.allSatisfy { $0 > 0 })
     }
 
-    /// 홈에서 내렸다고 구현을 지우지 않았다. P14.2 생성 아키텍처와 토큰 계약은 그대로다.
+    /// 홈에서 큰 CTA만 내렸을 뿐 생성 아키텍처와 토큰 계약은 그대로다.
     @Test func generationArchitectureStaysIntact() throws {
         let viewModel = try source("ViewModels/VocabularyGenerationViewModel.swift")
         #expect(viewModel.contains("tokenCost"))
         #expect(VocabularyGenerationViewModel.tokenCost == 1)
-        #expect(try source("Services/API/APIClient.swift").contains("/v1/vocabulary/generate"))
-        // 화면·라우트도 그대로 있다. P14.5.2에서 마지막 진입점(데일리 질문 CTA)이
-        // 사라져 지금은 부르는 곳이 없지만, P14.6이 여기에 다시 붙는다.
-        let sheet = code(try source("Views/Screens/Main/Vocabulary/VocabularyGenerationViews.swift"))
-        #expect(sheet.contains("struct VocabularyGenerationSheet"))
+        #expect(try source("Services/API/APIClient.swift").contains("/v1/vocabulary/today/generate"))
+        // 진입점은 단어장 탭의 만들기 시트 하나뿐이다.
+        let sheet = code(try source("Views/Screens/Main/Vocabulary/VocabularyExtraViews.swift"))
+        #expect(sheet.contains("struct VocabularyExtraSheet"))
         #expect(sheet.contains("VocabularyGenerationViewModel"))
     }
 

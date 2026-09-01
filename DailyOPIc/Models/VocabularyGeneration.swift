@@ -1,26 +1,26 @@
 import Foundation
 
-/// 세트 하나의 쓰임새(P14.6). 개수 · 구성은 **서버가 소유한다** — 앱은 어느
-/// 쓰임새인지만 말하고, 서버가 정해 둔 구성 중 하나가 골라진다.
+/// 저장된 세트가 어느 경로에서 만들어졌는지 구분하는 **로컬 표식**.
+///
+/// 서버로 나가지 않는다 — 어떤 세트를 만들지는 요청 필드가 아니라 endpoint가 정한다.
+/// 저장된 기록을 읽을 때만 쓰이므로 raw 값을 바꾸면 기존 저장분이 깨진다.
 enum VocabularyGenerationPurpose: String, Codable, Sendable {
-    /// 예전 계약(30개 = 10/10/10). 이 값을 보내지 않는 요청도 여기로 간다.
+    /// P14.2에서 만들어 둔 세트. 만드는 경로는 P14.6.2에서 없앴고, 예전 기기에
+    /// 남아 있을 수 있는 기록을 읽기 위해 raw 값만 그대로 둔다.
     case customSet = "custom_set"
-    /// 오늘의 단어 20개를 끝낸 뒤 더 받는 20개.
+    /// 오늘의 단어 만들기 20개(P14.6).
     case todayExtra = "today_extra"
 }
 
-/// AI 맞춤 단어장 생성 요청(P14.2).
+/// 단어 만들기 요청(P14.6). 앱이 단어를 만드는 **유일한** 요청이다.
 ///
-/// 개수 · 구성 · 모델 · 내부 보충 횟수는 **서버가 정한다.** 앱이 보내는 것은 주제 ·
-/// 목표 등급 · 쓰임새, 그리고 "이건 이미 있으니 빼 달라"는 제외 힌트뿐이다.
-struct VocabularyGenerationRequest: Encodable, Sendable {
+/// 개수(20 = 7/7/6) · 구성 · 모델 · 내부 보충 횟수는 **서버가 소유한다**. 앱이 보내는
+/// 것은 주제 · 목표 등급, 그리고 "이건 이미 있으니 빼 달라"는 제외 힌트뿐이다.
+struct TodayVocabularyGenerationRequest: Encodable, Sendable {
     let topic: VocabularyTopic
     let targetLevel: OPIcLevel
     /// 중복 회피용 힌트. 시드 카탈로그 전체를 보내지 않는다 — 서버에도 상한이 있다.
     let excludeTerms: [String]
-    /// 비우면 서버의 예전 기본값(30개)이다. 값을 아는 서버에만 의미가 있으므로
-    /// 필요할 때만 실어 보낸다.
-    var purpose: VocabularyGenerationPurpose?
 
     /// 프롬프트에 실을 만큼만. 최근에 만든 세트의 표현을 앞에서부터 자른다.
     static let excludeLimit = 120

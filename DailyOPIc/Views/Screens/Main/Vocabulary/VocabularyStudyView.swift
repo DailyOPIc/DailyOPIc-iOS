@@ -2,7 +2,9 @@ import SwiftUI
 import SwiftData
 
 /// 학습 세션의 종류. 오늘의 단어와 복습은 진행도도 마무리 문구도 섞이지 않는다.
-/// AI 맞춤 세트도 같은 카드·같은 복습 엔진을 쓴다 — 다른 건 제목뿐이다.
+/// 만들어 둔 세트도 같은 카드·같은 복습 엔진을 쓴다 — 다른 건 제목뿐이다.
+/// 만들어 둔 세트도 사용자에게는 그냥 "오늘의 단어"다 — 별도 제품 이름을 두지
+/// 않는다(P14.6.1). 내부 이름(`aiSet`)만 그대로 둔다.
 enum VocabularyStudyKind {
     case newWords
     case review
@@ -12,7 +14,7 @@ enum VocabularyStudyKind {
         switch self {
         case .newWords: "오늘의 단어"
         case .review: "오늘 복습"
-        case .aiSet: "AI 맞춤 단어"
+        case .aiSet: "오늘의 단어"
         }
     }
 
@@ -20,7 +22,7 @@ enum VocabularyStudyKind {
         switch self {
         case .newWords: "오늘의 단어 완료"
         case .review: "오늘 복습 완료"
-        case .aiSet: "AI 맞춤 단어 완료"
+        case .aiSet: "학습 완료"
         }
     }
 
@@ -28,7 +30,7 @@ enum VocabularyStudyKind {
         switch self {
         case .newWords: "\(count)개의 단어와 표현을 학습했어요."
         case .review: "\(count)개의 표현을 복습했어요."
-        case .aiSet: "\(count)개의 맞춤 단어와 표현을 학습했어요."
+        case .aiSet: "\(count)개의 단어와 표현을 학습했어요."
         }
     }
 }
@@ -52,9 +54,11 @@ struct VocabularyStudyView: View {
     @StateObject private var playback = PromptPlaybackService()
     @State private var session: VocabularyStudySession
     @State private var isRevealed = false
+    /// 저장을 누른 횟수. 값이 바뀔 때만 촉각 신호가 울린다.
+    @State private var saveFeedback = 0
     /// 세션이 처음 받은 항목 수. 진행도 표시("3 / 10")의 분모다.
     private let plannedCount: Int
-    /// 완료 화면에서 "20개 더"를 눌렀을 때 단어장 홈에 알리는 길(P14.6).
+    /// 완료 화면에서 "단어 20개 만들기"를 눌렀을 때 단어장 홈에 알리는 길(P14.6).
     /// 이 화면은 주제도 고르지 않고 아무것도 만들지 않는다 — 신호만 보낸다.
     private let onRequestExtra: (() -> Void)?
 
@@ -113,11 +117,22 @@ struct VocabularyStudyView: View {
     }
 
     /// 다시 나온 카드는 진행도를 되돌리지 않는다 — 이미 답한 개수를 센다.
+    /// 숫자와 막대를 함께 둔다. 숫자만으로는 "얼마나 남았는지"가 한눈에 오지 않는다.
     private var progressLine: some View {
-        Text("\(session.attemptedCount) / \(plannedCount)")
-            .font(AppTypography.footnote)
-            .foregroundStyle(AppPalette.secondaryInk)
-            .accessibilityLabel("\(plannedCount)개 중 \(session.attemptedCount)개 완료")
+        VStack(alignment: .leading, spacing: AppSpacing.xs) {
+            Text("\(session.attemptedCount) / \(plannedCount)")
+                .font(AppTypography.callout)
+                .foregroundStyle(AppPalette.secondaryInk)
+                .contentTransition(.numericText())
+            ProgressView(
+                value: Double(session.attemptedCount),
+                total: Double(max(plannedCount, 1))
+            )
+            .tint(AppPalette.primary)
+            .animation(.easeOut(duration: 0.3), value: session.attemptedCount)
+        }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel("\(plannedCount)개 중 \(session.attemptedCount)개 완료")
     }
 
     private func termBlock(_ entry: VocabularyEntry) -> some View {
@@ -147,14 +162,20 @@ struct VocabularyStudyView: View {
         let saved = isSaved(entry)
         return Button {
             try? persistence.setVocabularySaved(entryID: entry.id, isSaved: !saved)
+            saveFeedback += 1
         } label: {
             Image(systemName: saved ? "heart.fill" : "heart")
                 .font(.title3)
                 .foregroundStyle(AppPalette.primary)
+                // 채워지고 비워지는 것이 눌린 그 자리에서 바로 보인다.
+                .contentTransition(.symbolEffect(.replace))
         }
         .buttonStyle(PressableButtonStyle())
         .minimumTouchTarget()
+        // 새 햅틱 관리자를 만들지 않는다 — 앱이 이미 쓰는 방식 그대로다.
+        .sensoryFeedback(.selection, trigger: saveFeedback)
         .accessibilityLabel(saved ? "저장 해제" : "저장")
+        .accessibilityValue(saved ? "저장됨" : "저장 안 됨")
         .accessibilityAddTraits(saved ? [.isSelected] : [])
     }
 
@@ -248,7 +269,7 @@ struct VocabularyStudyView: View {
             Text(title)
                 .font(.headline)
                 .frame(maxWidth: .infinity)
-                .frame(height: 54)
+                .frame(minHeight: 54)
                 .foregroundStyle(isPrimary ? AppPalette.actionOnPrimary : AppPalette.primary)
                 .background(isPrimary ? AppPalette.primary : AppPalette.primarySoft)
                 .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
@@ -298,19 +319,11 @@ struct VocabularyStudyView: View {
 
     /// 오늘 몫을 끝낸 뒤의 다음 걸음(P14.6). 누르면 단어장 홈으로 돌아가 **주제 고르기**가
     /// 열린다. 여기서는 아무것도 만들지 않고 값도 나가지 않는다 — 주제를 고르고
-    /// 확인 화면에서 직접 "생성하기"를 눌러야 그때 데일리 토큰 1개가 나간다.
+    /// 확인 화면에서 직접 "만들기"를 눌러야 그때 데일리 토큰 1개가 나간다.
     private var extraStudyCTA: some View {
-        VStack(spacing: AppSpacing.xs) {
-            PrimaryButton(title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기") {
-                dismiss()
-                onRequestExtra?()
-            }
-            HStack(spacing: AppSpacing.xs) {
-                DailyTokenIcon(size: 16)
-                Text("새 단어를 만들 때 데일리 토큰 1개")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
+        VocabularyCreateButton {
+            dismiss()
+            onRequestExtra?()
         }
     }
 

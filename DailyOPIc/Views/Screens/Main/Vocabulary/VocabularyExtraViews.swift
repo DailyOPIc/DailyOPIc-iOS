@@ -1,19 +1,55 @@
 import SwiftUI
 
-/// 오늘의 단어를 다 끝낸 뒤 20개를 **더** 받는 자리(P14.6).
+/// 오늘의 단어 20개를 만드는 버튼(P14.6.1). 사용자-facing 생성 입구는 이 하나뿐이라
+/// 문구도 값도 여기 한 곳에 둔다 — 화면마다 다른 말로 적히면 값이 달라 보인다.
+///
+/// 채움 버튼이 아니라 옅은 버튼이다. 오늘 몫을 끝낸 사람에게 가장 큰 버튼이
+/// 매번 "토큰 쓰기"면 학습 화면이 결제 화면이 된다 — 값은 분명히 적되 조용히 둔다.
+struct VocabularyCreateButton: View {
+    /// 화면에 실제로 찍히는 문구. 테스트도 사람도 같은 값을 본다.
+    static let title = "단어 \(VocabularyGenerationViewModel.extraEntryCount)개 만들기"
+
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: AppSpacing.sm) {
+                Text(Self.title)
+                    .font(.headline)
+                DailyTokenIcon(size: 18)
+                Text("\(VocabularyGenerationViewModel.tokenCost)")
+                    .font(.headline.monospacedDigit())
+            }
+            .frame(maxWidth: .infinity)
+            // 고정 높이가 아니라 최소 높이다. 큰 글자에서도 문구가 잘리지 않는다.
+            .frame(minHeight: 54)
+            .foregroundStyle(AppPalette.primary)
+            .background(AppPalette.primarySoft)
+            .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        }
+        .buttonStyle(PressableButtonStyle())
+        .accessibilityLabel(
+            "\(Self.title), 데일리 토큰 \(VocabularyGenerationViewModel.tokenCost)개 사용"
+        )
+    }
+}
+
+/// 오늘의 단어 20개를 만드는 화면(P14.6).
 ///
 /// 화면 순서가 곧 과금 경계다:
 ///   1. 이 화면을 여는 것 · 주제 목록을 보는 것 — 0 토큰
 ///   2. 주제를 고르는 것 · 고른 주제를 바꾸는 것 · 닫는 것 — 0 토큰
-///   3. [20개 생성하기] — **데일리 토큰 1개.** 사용자가 직접 눌러야만 시작한다.
+///   3. [20개 만들기] — **데일리 토큰 1개.** 사용자가 직접 눌러야만 시작한다.
 ///
 /// `.task`가 하는 일은 잔액을 읽는 것뿐이다. 화면이 그려졌다는 이유로 AI를 부르거나
-/// 토큰이 나가는 경로는 없다. 기본 20개(시드 카탈로그)는 지금도 그대로 공짜다 —
+/// 토큰이 나가는 경로는 없다. 오늘의 기본 20개(시드 카탈로그)는 지금도 그대로 공짜다 —
 /// 값이 붙는 것은 **새 단어를 만드는 행위**뿐이다.
 struct VocabularyExtraSheet: View {
     let targetLevel: OPIcLevel?
     /// 이미 가진 표현들. 중복을 피해 달라는 힌트로만 쓰인다(상한은 요청 모델이 갖는다).
     let existingTerms: [String]
+    /// 만들어진 세트 id를 알린다. 별도 완료 화면 없이 곧장 학습으로 이어 주기 위한 길이다.
+    var onCreated: ((String) -> Void)?
     @State private var viewModel: VocabularyGenerationViewModel
     /// 고르지 않은 상태로 시작한다 — 앱이 아무 주제나 대신 고르지 않는다.
     @State private var topic: VocabularyTopic?
@@ -22,10 +58,12 @@ struct VocabularyExtraSheet: View {
     init(
         environment: AppEnvironment,
         targetLevel: OPIcLevel?,
-        existingTerms: [String]
+        existingTerms: [String],
+        onCreated: ((String) -> Void)? = nil
     ) {
         self.targetLevel = targetLevel
         self.existingTerms = existingTerms
+        self.onCreated = onCreated
         _viewModel = State(
             initialValue: VocabularyGenerationViewModel(environment: environment)
         )
@@ -47,30 +85,31 @@ struct VocabularyExtraSheet: View {
                     topicPicker
                     confirmation
                     messages
-                    PrimaryButton(
-                        title: failureMessage == nil ? "\(count)개 생성하기" : "다시 시도",
-                        isLoading: viewModel.isGenerating,
-                        isDisabled: topic == nil
-                    ) {
-                        // 주제를 고르지 않았으면 아무것도 시작하지 않는다(토큰도 나가지 않는다).
-                        guard let topic else { return }
-                        // 재시도도 같은 조작이다 — 뷰모델이 같은 요청 id를 그대로 쓴다.
-                        viewModel.generate(
-                            topic: topic,
-                            targetLevel: targetLevel ?? .IM2,
-                            excluding: existingTerms,
-                            purpose: .todayExtra
-                        )
+                    VStack(spacing: AppSpacing.sm) {
+                        PrimaryButton(
+                            title: failureMessage == nil ? "\(count)개 만들기" : "다시 시도",
+                            isLoading: viewModel.isGenerating,
+                            isDisabled: topic == nil
+                        ) {
+                            // 주제를 고르지 않았으면 아무것도 시작하지 않는다(토큰도 나가지 않는다).
+                            guard let topic else { return }
+                            // 재시도도 같은 조작이다 — 뷰모델이 같은 요청 id를 그대로 쓴다.
+                            viewModel.generate(
+                                topic: topic,
+                                targetLevel: targetLevel ?? .IM2,
+                                excluding: existingTerms
+                            )
+                        }
+                        costLine
                     }
-                    costLine
                 }
                 .padding(AppSpacing.lg)
             }
-            .navigationTitle("오늘 \(count)개 더")
+            .navigationTitle(VocabularyCreateButton.title)
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .topBarLeading) {
-                    Button("닫기") { dismiss() }
+                    Button("취소") { dismiss() }
                         .disabled(viewModel.isGenerating)
                 }
             }
@@ -88,9 +127,10 @@ struct VocabularyExtraSheet: View {
         // 잔액을 읽을 뿐이다. 이 자리에서 생성이 시작되지 않는다.
         .task { await viewModel.refreshUsage() }
         .onChange(of: viewModel.finishedSetID) { _, setID in
-            // 세트는 이미 저장됐다. 닫으면 오늘의 단어 카드에 "오늘 추가 학습 0 / 20"이 뜬다.
-            guard setID != nil else { return }
+            // 세트는 이미 저장됐다. 축하 화면을 하나 더 세우지 않고 그대로 학습으로 보낸다.
+            guard let setID else { return }
             viewModel.finishedSetID = nil
+            onCreated?(setID)
             dismiss()
         }
         .sheet(isPresented: Bindable(viewModel).showsPaywall) {
@@ -98,10 +138,10 @@ struct VocabularyExtraSheet: View {
         }
     }
 
-    /// 주제는 오늘의 단어와 **같은 목록**이다. 추가 학습 전용 주제를 새로 만들지 않는다.
+    /// 주제는 오늘의 단어와 **같은 목록**이다. 새 단어 전용 주제를 따로 만들지 않는다.
     private var topicPicker: some View {
         VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Text("어떤 주제로 더 공부할까요?")
+            Text("어떤 주제로 만들까요?")
                 .font(AppTypography.sectionTitle)
             LazyVGrid(
                 columns: [GridItem(.flexible(), spacing: AppSpacing.sm),
@@ -109,42 +149,56 @@ struct VocabularyExtraSheet: View {
                 spacing: AppSpacing.sm
             ) {
                 ForEach(VocabularyCatalog.topics) { candidate in
-                    Button { topic = candidate } label: {
-                        Text(candidate.label)
-                            .font(AppTypography.callout)
-                            .foregroundStyle(
-                                candidate == topic ? AppPalette.actionOnPrimary : AppPalette.ink
-                            )
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(AppSpacing.md)
-                            .background(
-                                candidate == topic ? AppPalette.primary : AppPalette.surface
-                            )
-                            .clipShape(
-                                RoundedRectangle(
-                                    cornerRadius: AppRadius.control,
-                                    style: .continuous
-                                )
-                            )
-                    }
-                    .buttonStyle(PressableButtonStyle())
-                    .accessibilityAddTraits(candidate == topic ? [.isSelected] : [])
+                    Button { topic = candidate } label: { topicLabel(candidate) }
+                        .buttonStyle(PressableButtonStyle())
+                        .accessibilityLabel(candidate.label)
+                        .accessibilityAddTraits(candidate == topic ? [.isSelected] : [])
                 }
             }
         }
     }
 
-    /// 누르기 전에 무엇을 얼마에 받는지 말한다. 고른 주제가 그대로 실린다.
+    /// 고른 칸은 색만이 아니라 체크로도 말한다 — 색만으로 상태를 전하지 않는다(§26).
+    private func topicLabel(_ candidate: VocabularyTopic) -> some View {
+        let isSelected = candidate == topic
+        return HStack(spacing: AppSpacing.xs) {
+            Text(candidate.label)
+                .font(AppTypography.callout)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+            if isSelected {
+                Image(systemName: "checkmark")
+                    .font(AppTypography.caption)
+            }
+        }
+        .foregroundStyle(isSelected ? AppPalette.actionOnPrimary : AppPalette.ink)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(AppSpacing.md)
+        // 큰 글자에서도 두 줄까지 늘어날 수 있게 최소 높이만 잡는다.
+        .frame(minHeight: 56, alignment: .leading)
+        .background(isSelected ? AppPalette.primary : AppPalette.surface)
+        .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
+        .contentShape(Rectangle())
+    }
+
+    /// 누르기 전에 무엇을 얼마에 받는지 말한다. 고른 주제와 지금 잔액이 그대로 실린다.
     @ViewBuilder
     private var confirmation: some View {
         if let topic {
             VStack(alignment: .leading, spacing: AppSpacing.sm) {
-                Text("\(topic.label) 단어 \(count)개를 더 학습할까요?")
+                Text("\(topic.label) 단어 \(count)개를 만들까요?")
                     .font(AppTypography.cardTitle)
-                Text("새로운 단어를 만드는 데 데일리 토큰 1개를 사용해요.")
+                    .fixedSize(horizontal: false, vertical: true)
+                Text("데일리 토큰 \(VocabularyGenerationViewModel.tokenCost)개를 사용해요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
+                // 잔액은 이미 읽어 둔 값이다. 이걸 보여주려고 새로 부르지 않는다.
+                if let balance = viewModel.dailyTokenCount {
+                    Text("현재 데일리 토큰 \(balance)개")
+                        .font(AppTypography.footnote)
+                        .foregroundStyle(AppPalette.secondaryInk)
+                }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .cardStyle()
@@ -154,7 +208,7 @@ struct VocabularyExtraSheet: View {
     @ViewBuilder
     private var messages: some View {
         if viewModel.hasNoTokens {
-            Text("새 단어 \(count)개를 만들려면 데일리 토큰 1개가 필요합니다.")
+            Text("단어 \(count)개를 만들려면 데일리 토큰 1개가 필요합니다.")
                 .font(AppTypography.footnote)
                 .foregroundStyle(AppPalette.secondaryInk)
                 .fixedSize(horizontal: false, vertical: true)
@@ -173,12 +227,13 @@ struct VocabularyExtraSheet: View {
         }
     }
 
-    /// 화폐는 데일리 토큰 하나뿐이라 아이콘도 그것 하나다.
+    /// 화폐는 데일리 토큰 하나뿐이라 아이콘도 그것 하나다. 버튼 바로 아래에 둔다.
+    /// 문장이 아니라 값표다 — 같은 말을 확인 카드가 이미 한 번 했다.
     private var costLine: some View {
         HStack(spacing: AppSpacing.xs) {
             DailyTokenIcon(size: 18)
-            Text("데일리 토큰 \(VocabularyGenerationViewModel.tokenCost)개를 사용해요.")
-                .font(AppTypography.callout)
+            Text("\(VocabularyGenerationViewModel.tokenCost)")
+                .font(AppTypography.callout.monospacedDigit())
                 .foregroundStyle(AppPalette.secondaryInk)
         }
         .accessibilityElement(children: .combine)

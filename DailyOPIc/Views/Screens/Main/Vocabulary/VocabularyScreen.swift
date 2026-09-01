@@ -12,9 +12,7 @@ enum VocabularyRoute: Hashable {
     case topic(VocabularyTopic)
     case saved
     case mastered
-    /// AI 맞춤 단어장(P14.2). 여는 것도 학습하는 것도 토큰을 쓰지 않는다.
-    case generatedSets
-    case generatedSet(setID: String)
+    /// 만들어 둔 세트 학습(P14.6). 여는 것도 학습하는 것도 토큰을 쓰지 않는다.
     case generatedStudy(setID: String)
     /// AI 말하기 코치(P14.3). 화면을 여는 것도 녹음·전사도 토큰을 쓰지 않는다 —
     /// 토큰은 그 안에서 "AI에게 분석받기"를 눌렀을 때만 나간다.
@@ -22,7 +20,7 @@ enum VocabularyRoute: Hashable {
 }
 
 /// 단어장 홈 = **오늘의 단어** + 그 아래 작은 줄 하나(저장한 단어)다.
-/// 검색·큰 제목·복습 진입점·주제 둘러보기·AI 맞춤 단어장·익힌 단어는 홈에서 내렸다 —
+/// 검색·큰 제목·복습 진입점·주제 둘러보기·익힌 단어는 홈에서 내렸다 —
 /// 통계는 통계 탭이, 학습 기록은 플래너 캘린더가 이미 그 일을 한다.
 ///
 /// 저장한 단어만 돌아온 이유(P14.6): 오늘의 카드에서 **사용자가 직접 ♡를 누른** 단어는
@@ -47,8 +45,13 @@ struct VocabularyScreen: View {
     let persistence: PersistenceService
 
     @Environment(AppEnvironment.self) private var environment
-    /// 추가 20개를 만들 주제를 고르는 화면. 여는 것도 닫는 것도 0 토큰이다.
+    /// 20개를 만들 주제를 고르는 화면. 여는 것도 닫는 것도 0 토큰이다.
     @State private var isShowingExtraSheet = false
+    /// 방금 만든 세트. 시트가 닫히면 이 값이 학습 화면을 밀어 올린다 —
+    /// 만들고 나서 "잘 만들어졌어요" 화면을 한 장 더 보여주지 않는다(P14.6.1 §11).
+    @State private var createdSetID: String?
+    /// 아직 시트가 떠 있는 동안 받아 둔 값. 닫힌 뒤에 밀어야 이동이 씹히지 않는다.
+    @State private var pendingCreatedSetID: String?
     @Query private var states: [VocabularyStateRecord]
     @Query(sort: \VocabularyGeneratedSetRecord.createdAt, order: .reverse)
     private var generatedSets: [VocabularyGeneratedSetRecord]
@@ -112,8 +115,8 @@ struct VocabularyScreen: View {
         return VocabularyCatalog.entries(ids: dueIDs, in: allEntries)
     }
 
-    /// 오늘 만든 추가 세트(P14.6), 최신이 먼저. 기본 20개(`vocabularyDailySet`)와는
-    /// 완전히 별개다 — 추가 학습이 오늘의 배정을 덮어쓰지 않는다.
+    /// 오늘 만든 세트(P14.6), 최신이 먼저. 기본 20개(`vocabularyDailySet`)와는
+    /// 완전히 별개다 — 만든 세트가 오늘의 배정을 덮어쓰지 않는다.
     private var todayExtraSets: [VocabularyGeneratedSetRecord] {
         generatedSets.filter {
             $0.purpose == .todayExtra
@@ -176,13 +179,20 @@ struct VocabularyScreen: View {
     var body: some View {
         ScrollView { home }
             .sheet(isPresented: $isShowingExtraSheet) {
+                createdSetID = pendingCreatedSetID
+                pendingCreatedSetID = nil
+            } content: {
                 VocabularyExtraSheet(
                     environment: environment,
                     targetLevel: preferences.targetLevel,
-                    existingTerms: extraExistingTerms
+                    existingTerms: extraExistingTerms,
+                    onCreated: { pendingCreatedSetID = $0 }
                 )
             }
             .navigationDestination(for: VocabularyRoute.self, destination: destination)
+            .navigationDestination(item: $createdSetID) { setID in
+                destination(.generatedStudy(setID: setID))
+            }
             .navigationDestination(for: VocabularyEntry.self) { entry in
                 VocabularyEntryDetailView(
                     entry: entry,
@@ -235,95 +245,165 @@ struct VocabularyScreen: View {
     }
 
     /// 이 화면의 주인공. 하루의 상태는 셋뿐이다 — 아직 안 골랐다 / 하는 중 / 다 했다.
+    /// 홈에서 가장 큰 카드이고, 다른 어떤 것도 이 카드보다 크지 않다.
     private var todayCard: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
             Text("오늘의 단어")
                 .font(AppTypography.sectionTitle)
+                .foregroundStyle(AppPalette.secondaryInk)
             if todaySet == nil {
-                // 하루의 첫 시작 전에는 아무것도 배정하지 않는다(P14.5). 주제는 사용자가 고른다.
-                Text("오늘 공부할 주제를 골라 주세요.")
-                    .font(AppTypography.body)
-                    .foregroundStyle(AppPalette.secondaryInk)
-                NavigationLink(value: VocabularyRoute.todayTopicPicker) {
-                    primaryLabel("주제 고르고 시작하기", systemImage: "square.grid.2x2.fill")
-                }
-                .buttonStyle(PressableButtonStyle())
+                todayFresh
             } else if todayEntries.isEmpty {
                 Text("오늘 배정할 새 단어가 더 없어요.")
                     .font(AppTypography.body)
                     .foregroundStyle(AppPalette.secondaryInk)
+            } else if todayRemaining.isEmpty {
+                todayComplete
             } else {
-                todayTopicLine
-                Text("\(todayStudiedCount) / \(todayEntries.count)")
-                    .font(AppTypography.title)
-                    .accessibilityLabel(
-                        "오늘의 단어 \(todayEntries.count)개 중 \(todayStudiedCount)개 완료"
-                    )
-                if todayRemaining.isEmpty {
-                    todayDoneActions
-                } else {
-                    NavigationLink(value: VocabularyRoute.todayStudy) {
-                        primaryLabel(
-                            todayStudiedCount > 0 ? "이어 학습하기" : "오늘의 단어 시작",
-                            systemImage: "book.closed.fill"
-                        )
-                    }
-                    .buttonStyle(PressableButtonStyle())
-                }
+                todayProgress
             }
         }
         .cardStyle()
     }
 
-    /// 오늘 몫을 다 끝낸 뒤. 방금 한 것을 되돌아보는 길과, 더 하고 싶을 때의 길을 함께 둔다.
-    private var todayDoneActions: some View {
-        VStack(alignment: .leading, spacing: AppSpacing.sm) {
-            Label("오늘 학습 완료", systemImage: "checkmark.circle.fill")
-                .font(AppTypography.callout)
-                .foregroundStyle(AppPalette.primary)
+    /// 하루의 첫 시작 전에는 아무것도 배정하지 않는다(P14.5). 주제는 사용자가 고른다.
+    private var todayFresh: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            Text("오늘은 어떤 주제로\n\(VocabularyDailySet.dailyTarget)개를 배워볼까요?")
+                .font(AppTypography.cardTitle)
+                .foregroundStyle(AppPalette.ink)
+                .fixedSize(horizontal: false, vertical: true)
+            NavigationLink(value: VocabularyRoute.todayTopicPicker) {
+                primaryLabel("주제 선택하기", systemImage: "square.grid.2x2.fill")
+            }
+            .buttonStyle(PressableButtonStyle())
+        }
+    }
+
+    /// 하는 중. 숫자 하나보다 "얼마나 남았는지"가 먼저 읽히게 막대를 함께 둔다.
+    private var todayProgress: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            countLine(todayStudiedCount, of: todayEntries.count)
+            progressBar(todayStudiedCount, of: todayEntries.count)
+            Text("\(todayRemaining.count)개 남았어요")
+                .font(AppTypography.body)
+                .foregroundStyle(AppPalette.secondaryInk)
+            todayTopicLine
+            NavigationLink(value: VocabularyRoute.todayStudy) {
+                primaryLabel(
+                    todayStudiedCount > 0 ? "이어 학습하기" : "오늘의 단어 시작",
+                    systemImage: "book.closed.fill"
+                )
+            }
+            .buttonStyle(PressableButtonStyle())
+        }
+    }
+
+    /// 오늘 몫을 다 끝낸 뒤. 먼저 뿌듯하게 확인시키고, 그다음에 다음 걸음을 준다.
+    ///
+    /// 채움 버튼은 **하나뿐**이고 그 자리는 언제나 공짜 학습이다 — 새 단어 만들기는
+    /// 값이 분명히 적힌 옅은 버튼으로 옆에 둔다. 오늘 몫을 끝낼 때마다 가장 큰 버튼이
+    /// "토큰 쓰기"면 학습 화면이 결제 화면이 된다.
+    private var todayComplete: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.md) {
+            countLine(todayEntries.count, of: todayEntries.count)
+            progressBar(todayEntries.count, of: todayEntries.count)
+            completionBadge("오늘 학습 완료")
+            Text("오늘의 \(todayEntries.count)개를 모두 학습했어요.")
+                .font(AppTypography.body)
+                .foregroundStyle(AppPalette.secondaryInk)
+                .fixedSize(horizontal: false, vertical: true)
+            newWordsSection
+        }
+    }
+
+    /// 오늘 만들어 둔 단어(P14.6). 별도 제품이 아니라 오늘의 단어를 이어 하는 것이라
+    /// 이름 대신 진행도만 말한다(P14.6.1). 다만 진행도는 **따로** 센다 —
+    /// 만든 단어를 학습한다고 오늘의 단어가 20/20에서 되돌아가지 않는다.
+    @ViewBuilder
+    private var newWordsSection: some View {
+        if let set = todayExtraSets.first, extraRemainingCount > 0 {
+            newWordsProgress
+            NavigationLink(value: VocabularyRoute.generatedStudy(setID: set.setID)) {
+                primaryLabel(
+                    extraStudiedCount > 0
+                        ? "\(extraStudiedCount) / \(extraEntries.count) 이어 학습하기"
+                        : "만든 단어 학습",
+                    systemImage: "book.closed.fill"
+                )
+            }
+            .buttonStyle(PressableButtonStyle())
+            learnedWordsLink
+        } else {
+            if !extraEntries.isEmpty {
+                completionBadge("\(extraEntries.count)개 학습 완료")
+            }
             NavigationLink(value: VocabularyRoute.todayLearned) {
                 primaryLabel("오늘 학습한 단어 보기", systemImage: "list.bullet")
             }
             .buttonStyle(PressableButtonStyle())
-            extraWordsCTA
+            VocabularyCreateButton { isShowingExtraSheet = true }
         }
     }
 
-    /// "오늘 20개 더"(P14.6). 여기서 값이 나가는 자리는 **새 단어를 만들 때 1개** 하나뿐이다.
-    /// 이 버튼을 누르면 주제를 고르는 화면이 열릴 뿐이고, 만들어 둔 20개를 학습하는 것은
-    /// 기본 20개와 똑같이 공짜다. 기본 20개 완료 표시는 추가 학습과 상관없이 그대로다.
-    @ViewBuilder
-    private var extraWordsCTA: some View {
-        if let set = todayExtraSets.first, extraRemainingCount > 0 {
-            Text("오늘 추가 학습 \(extraStudiedCount) / \(extraEntries.count)")
+    /// 만든 단어의 진행도. 오늘의 단어 카드 안의 작은 두 번째 줄이고,
+    /// 자기 제목을 가진 별도 구역이 아니다(P14.6.1 §12).
+    private var newWordsProgress: some View {
+        VStack(alignment: .leading, spacing: AppSpacing.sm) {
+            Text("만든 단어 \(extraStudiedCount) / \(extraEntries.count)")
                 .font(AppTypography.callout)
                 .foregroundStyle(AppPalette.secondaryInk)
-            NavigationLink(value: VocabularyRoute.generatedStudy(setID: set.setID)) {
-                primaryLabel(
-                    extraStudiedCount > 0 ? "추가 단어 이어 학습하기" : "추가 단어 학습 시작",
-                    systemImage: "sparkles"
-                )
-            }
-            .buttonStyle(PressableButtonStyle())
-        } else {
-            if !extraEntries.isEmpty {
-                Label(
-                    "오늘 추가 학습 \(extraEntries.count) / \(extraEntries.count) 완료",
-                    systemImage: "checkmark.circle.fill"
-                )
-                .font(AppTypography.callout)
-                .foregroundStyle(AppPalette.primary)
-            }
-            PrimaryButton(title: "오늘 \(VocabularyDailySet.dailyTarget)개 더 학습하기") {
-                isShowingExtraSheet = true
-            }
-            HStack(spacing: AppSpacing.xs) {
-                DailyTokenIcon(size: 16)
-                Text("새 단어를 만들 때 데일리 토큰 1개")
-                    .font(AppTypography.footnote)
-                    .foregroundStyle(AppPalette.secondaryInk)
-            }
+            progressBar(extraStudiedCount, of: extraEntries.count)
         }
+        .padding(.top, AppSpacing.xs)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel(
+            "만든 단어 \(extraEntries.count)개 중 \(extraStudiedCount)개 완료"
+        )
+    }
+
+    /// 만든 단어를 아직 하는 중일 때도 오늘 학습한 단어로 가는 길은 남긴다.
+    /// 채움 버튼이 두 개가 되지 않게 여기서는 작은 줄이다.
+    private var learnedWordsLink: some View {
+        NavigationLink(value: VocabularyRoute.todayLearned) {
+            HStack(spacing: AppSpacing.xs) {
+                Text("오늘 학습한 단어 보기")
+                    .font(AppTypography.callout)
+                Image(systemName: "chevron.right")
+                    .font(AppTypography.caption)
+            }
+            .foregroundStyle(AppPalette.primary)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .minimumTouchTarget()
+    }
+
+    /// "7 / 20". 큰 숫자는 진행도이고, 분모는 오늘 배정된 개수다.
+    private func countLine(_ done: Int, of total: Int) -> some View {
+        Text("\(done) / \(total)")
+            .font(AppTypography.title)
+            .foregroundStyle(AppPalette.ink)
+            .contentTransition(.numericText())
+            .accessibilityLabel("\(total)개 중 \(done)개 완료")
+    }
+
+    /// 진행 막대. 새 스타일을 만들지 않고 기본 `ProgressView`에 강조색만 준다.
+    private func progressBar(_ done: Int, of total: Int) -> some View {
+        ProgressView(value: Double(done), total: Double(max(total, 1)))
+            .tint(AppPalette.primary)
+            .animation(.easeOut(duration: 0.3), value: done)
+            .accessibilityHidden(true)
+    }
+
+    /// 완료 표시. 캘린더의 완료 배지와 같은 말(체크)을 쓴다 — 폭죽은 없다.
+    private func completionBadge(_ title: String) -> some View {
+        Label(title, systemImage: "checkmark.circle.fill")
+            .font(AppTypography.callout)
+            .foregroundStyle(AppPalette.primary)
+            .padding(.horizontal, AppSpacing.md)
+            .padding(.vertical, AppSpacing.sm)
+            .background(AppPalette.primarySoft, in: Capsule())
     }
 
     /// 주제와 구성. 고른 주제만으로 하루 목표를 채우지 못한 날에는 그 사실을
@@ -395,12 +475,6 @@ struct VocabularyScreen: View {
                 entries: masteredEntries,
                 states: stateByID
             )
-        case .generatedSets:
-            VocabularyGeneratedSetListView(sets: generatedSets)
-        case let .generatedSet(setID):
-            if let record = generatedSet(setID) {
-                VocabularyGeneratedSetDetailView(record: record, states: stateByID)
-            }
         case let .speakingCoach(entry):
             VocabularySpeakingCoachView(
                 entry: entry,
@@ -408,7 +482,7 @@ struct VocabularyScreen: View {
                 targetLevel: preferences.targetLevel
             )
         case let .generatedStudy(setID):
-            // AI 항목도 같은 학습 카드·같은 복습 엔진을 쓴다(별도 알고리즘 없음).
+            // 만든 항목도 같은 학습 카드·같은 복습 엔진을 쓴다(별도 알고리즘 없음).
             VocabularyStudyView(
                 kind: .aiSet,
                 entries: generatedSet(setID)?.entries ?? [],
@@ -464,7 +538,7 @@ struct VocabularyScreen: View {
             Text(title).font(.headline)
         }
         .frame(maxWidth: .infinity)
-        .frame(height: 54)
+        .frame(minHeight: 54)
         .foregroundStyle(AppPalette.actionOnPrimary)
         .background(AppPalette.primary)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))

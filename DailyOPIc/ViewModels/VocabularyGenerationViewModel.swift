@@ -1,7 +1,7 @@
 import Foundation
 import Observation
 
-/// AI 맞춤 단어장 생성(P14.2)의 앱 쪽 진행 상태.
+/// 단어 만들기(P14.6)의 앱 쪽 진행 상태.
 ///
 /// 과금 규칙은 P13 그대로다: **사용자 조작 1회 = 데일리 토큰 1개**. 강제는 서버가
 /// 하고, 앱의 몫은 넷이다 — 누르기 전에 비용을 보여주고, 잔액이 0이면 요청을
@@ -15,9 +15,7 @@ import Observation
 final class VocabularyGenerationViewModel {
     /// 한 세트의 값. 화면 문구와 서버 계약이 어긋나지 않게 여기 한 곳에 둔다.
     static let tokenCost = 1
-    /// 예전 계약(AI 맞춤 단어장 1세트). 서버가 소유하는 값을 화면에 옮겨 적기만 한다.
-    static let entryCount = 30
-    /// 오늘의 단어를 끝낸 뒤 더 받는 묶음(P14.6). 기본 20개와 같은 크기다.
+    /// 한 번에 만드는 단어 수. 기본 오늘의 단어와 같은 크기다.
     static let extraEntryCount = VocabularyDailySet.dailyTarget
 
     private let environment: AppEnvironment
@@ -56,24 +54,15 @@ final class VocabularyGenerationViewModel {
 
     /// 화면이 CTA를 누른 자리. 이미 돌고 있으면 아무 일도 하지 않는다 —
     /// 연타가 두 번째 조작(=두 번째 차감)이 되지 않게 여기서 막는다.
-    ///
-    /// `purpose`가 `nil`이면 예전 계약(30개)이고, `.todayExtra`면 오늘의 추가 20개다.
-    /// 어느 쪽이든 값은 데일리 토큰 1개로 같다 — 개수가 다르다고 과금이 달라지지 않는다.
     func generate(
         topic: VocabularyTopic,
         targetLevel: OPIcLevel,
-        excluding terms: [String],
-        purpose: VocabularyGenerationPurpose? = nil
+        excluding terms: [String]
     ) {
         guard !isGenerating else { return }
         errorMessage = nil
         task = Task {
-            await run(
-                topic: topic,
-                targetLevel: targetLevel,
-                excluding: terms,
-                purpose: purpose
-            )
+            await run(topic: topic, targetLevel: targetLevel, excluding: terms)
         }
     }
 
@@ -87,7 +76,6 @@ final class VocabularyGenerationViewModel {
         topic: VocabularyTopic,
         targetLevel: OPIcLevel,
         excluding terms: [String],
-        purpose: VocabularyGenerationPurpose? = nil,
         allowRecovery: Bool = true
     ) async {
         // 잔액이 0이면 서버도 AI도 부르지 않는다. 먼저 토큰을 확보해야 시작한다.
@@ -97,24 +85,25 @@ final class VocabularyGenerationViewModel {
         // 요청을 보내기 **전에** 조작 신원을 디스크에 남긴다(P14.3.1 코칭과 같은 방식).
         // 여기서 앱이 죽어도 다시 열어 같은 주제로 시도하면 같은 키가 나가고,
         // 서버가 이미 만든 세트를 추가 차감 없이 돌려준다.
-        if purpose == .todayExtra {
-            let pending = PendingVocabularyExtraOperation.resume(
-                preferences.pendingVocabularyExtra,
-                topic: topic
-            )
-            preferences.pendingVocabularyExtra = pending
-            operationID = pending.operationID
-        }
-        operationState = .running(operationId: operationID, startedAt: .now)
-        let payload = VocabularyGenerationRequest(
-            topic: topic,
-            targetLevel: targetLevel,
-            excludeTerms: Array(terms.prefix(VocabularyGenerationRequest.excludeLimit)),
-            purpose: purpose
+        let pending = PendingVocabularyExtraOperation.resume(
+            preferences.pendingVocabularyExtra,
+            topic: topic
         )
+        preferences.pendingVocabularyExtra = pending
+        operationID = pending.operationID
+        operationState = .running(operationId: operationID, startedAt: .now)
+        let excluded = Array(terms.prefix(TodayVocabularyGenerationRequest.excludeLimit))
         do {
-            let set = try await api.generateVocabulary(request: payload, requestID: operationID)
-            try persistence.saveVocabularyGeneratedSet(set, purpose: purpose ?? .customSet)
+            // 경로가 곧 쓰임새다. 요청에 개수·쓰임새를 고르는 필드를 얹지 않는다.
+            let set = try await api.generateTodayVocabulary(
+                request: TodayVocabularyGenerationRequest(
+                    topic: topic,
+                    targetLevel: targetLevel,
+                    excludeTerms: excluded
+                ),
+                requestID: operationID
+            )
+            try persistence.saveVocabularyGeneratedSet(set, purpose: .todayExtra)
             // 저장이 끝난 뒤에만 진행 기록을 지운다. 순서가 반대면 저장 전에 죽었을 때
             // 이미 값을 치른 세트를 되찾을 신원이 사라진다.
             preferences.pendingVocabularyExtra = nil
@@ -135,22 +124,25 @@ final class VocabularyGenerationViewModel {
                     topic: topic,
                     targetLevel: targetLevel,
                     excluding: terms,
-                    purpose: purpose,
                     allowRecovery: false
                 )
             }
         } catch let error as APIClientError where error.isAIUnavailable {
-            // 서버가 이미 환불했다. 같은 조작 id로 다시 시도할 수 있다.
+            // 서버가 실패를 확정하고 **이미 환불했다**(`fail_request`, 503 ai_unavailable).
+            // 돌려줬다고 말할 수 있는 경우는 이것 하나뿐이다.
             usage = try? await api.usage()
             operationState = .recoverableFailure(
                 operationId: operationID,
-                message: "맞춤 단어를 만들지 못했어요. 잠시 후 다시 시도해 주세요."
+                message: "단어를 만들지 못했어요. 토큰은 다시 돌려드렸어요."
             )
         } catch {
+            // 여기서는 서버가 어디까지 갔는지 알 수 없다(끊김·시간 초과·해석 실패).
+            // 환불됐다고도, 만들어졌다고도 단정하지 않는다 — 같은 조작 id로 다시
+            // 물어보면 서버가 이미 만든 결과를 추가 차감 없이 그대로 돌려준다.
             usage = try? await api.usage()
             operationState = .recoverableFailure(
                 operationId: operationID,
-                message: error.localizedDescription
+                message: "단어를 만들지 못했어요. 요청 상태를 확인한 뒤 다시 시도해 주세요."
             )
         }
     }

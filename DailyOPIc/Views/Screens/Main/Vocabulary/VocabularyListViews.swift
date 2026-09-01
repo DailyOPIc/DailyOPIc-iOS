@@ -15,6 +15,9 @@ struct VocabularyEntryRow: View {
         return reviews > 0 ? "\(status.label) · 복습 \(reviews)회" : status.label
     }
 
+    /// 한 줄이 한꺼번에 말하는 것은 넷을 넘지 않는다(P14.6.1): 단어 · 뜻 · 종류 ·
+    /// (켰을 때) 상태 한 줄. 저장·익힘을 아이콘으로 또 한 번 반복하지 않는다 —
+    /// 상태 줄이 켜져 있으면 그 줄이 익힘까지 말하고, 꺼져 있으면 아이콘이 말한다.
     var body: some View {
         HStack(alignment: .top, spacing: AppSpacing.sm) {
             VStack(alignment: .leading, spacing: AppSpacing.xs) {
@@ -23,13 +26,10 @@ struct VocabularyEntryRow: View {
                         .font(AppTypography.callout)
                         .foregroundStyle(AppPalette.ink)
                         .fixedSize(horizontal: false, vertical: true)
-                    if state?.isSaved == true {
-                        Image(systemName: "bookmark.fill")
-                            .font(.caption)
-                            .foregroundStyle(AppPalette.primary)
-                            .accessibilityLabel("저장함")
+                    if !showsProgress, state?.isSaved == true {
+                        savedIcon
                     }
-                    if state?.status == .mastered {
+                    if !showsProgress, state?.status == .mastered {
                         Image(systemName: "checkmark.seal.fill")
                             .font(.caption)
                             .foregroundStyle(AppPalette.primary)
@@ -41,9 +41,14 @@ struct VocabularyEntryRow: View {
                     .foregroundStyle(AppPalette.secondaryInk)
                     .fixedSize(horizontal: false, vertical: true)
                 if showsProgress {
-                    Text(Self.progressText(state))
-                        .font(AppTypography.caption)
-                        .foregroundStyle(AppPalette.secondaryInk)
+                    HStack(spacing: AppSpacing.xs) {
+                        Text(Self.progressText(state))
+                            .font(AppTypography.caption)
+                            .foregroundStyle(AppPalette.secondaryInk)
+                        if state?.isSaved == true {
+                            savedIcon
+                        }
+                    }
                 }
             }
             Spacer(minLength: 0)
@@ -59,6 +64,13 @@ struct VocabularyEntryRow: View {
         .background(AppPalette.surface)
         .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))
         .contentShape(Rectangle())
+    }
+
+    private var savedIcon: some View {
+        Image(systemName: "bookmark.fill")
+            .font(.caption)
+            .foregroundStyle(AppPalette.primary)
+            .accessibilityLabel("저장함")
     }
 }
 
@@ -231,7 +243,8 @@ struct VocabularyEntryDetailView: View {
                 Text("직접 말해보기").font(.headline)
             }
             .frame(maxWidth: .infinity)
-            .frame(height: 54)
+            // 고정 높이가 아니라 최소 높이다. 큰 글자에서도 문구가 잘리지 않는다.
+            .frame(minHeight: 54)
             .foregroundStyle(AppPalette.actionOnPrimary)
             .background(AppPalette.primary)
             .clipShape(RoundedRectangle(cornerRadius: AppRadius.control, style: .continuous))

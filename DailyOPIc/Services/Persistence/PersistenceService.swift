@@ -416,7 +416,7 @@ final class PersistenceService {
         return try context.fetch(descriptor).first
     }
 
-    // MARK: AI 맞춤 단어장 (P14.2 · 이 기기에만 저장)
+    // MARK: 만든 단어 세트 (P14.6 · 이 기기에만 저장)
 
     /// 만든 세트 전부, 최신이 먼저. 세트를 다시 여는 것은 공짜다 — 저장된 항목을
     /// 읽을 뿐 서버도 AI도 부르지 않는다.

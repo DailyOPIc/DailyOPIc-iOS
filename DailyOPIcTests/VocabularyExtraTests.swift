@@ -7,7 +7,7 @@ import Testing
 ///
 /// 이 파일이 지키는 약속은 하나다: **새 단어를 만드는 행위만 값을 치른다.**
 /// 화면을 열고 주제를 고르고 확인 문구를 읽고 닫는 것은 전부 0 토큰이고,
-/// 값이 나가는 순간은 사용자가 직접 [20개 생성하기]를 누른 그 한 번뿐이다.
+/// 값이 나가는 순간은 사용자가 직접 [20개 만들기]를 누른 그 한 번뿐이다.
 /// 그리고 그 한 번은 앱이 도중에 죽어도 두 번 결제되지 않는다.
 ///
 /// `AppEnvironment.api`가 구체 타입이라 가짜 서버를 넣을 수 없다. 그래서 뷰모델 쪽
@@ -72,12 +72,10 @@ struct VocabularyExtraTests {
 
     // MARK: 1. 계약은 정확히 20개다
 
-    /// 추가 묶음은 기본 20개와 같은 크기다. 30개를 만들어서 10개를 버리지 않는다.
+    /// 만든 묶음은 기본 20개와 같은 크기다. 더 만들어서 남는 것을 버리지 않는다.
     @Test func theExtraContractIsExactlyTwenty() throws {
         #expect(VocabularyGenerationViewModel.extraEntryCount == 20)
         #expect(VocabularyGenerationViewModel.extraEntryCount == VocabularyDailySet.dailyTarget)
-        // 예전 계약(30개)은 그대로 살아 있다 — 두 계약은 서로를 바꾸지 않는다.
-        #expect(VocabularyGenerationViewModel.entryCount == 30)
         // 앱이 받은 목록을 잘라 20개인 척하지 않는다.
         let viewModel = code(try source(viewModelPath))
         #expect(!viewModel.contains("entries.prefix"))
@@ -86,40 +84,51 @@ struct VocabularyExtraTests {
         #expect(!sheet.contains("entries.prefix"))
     }
 
-    /// 서버가 개수를 소유한다. 앱은 "어느 쓰임새인지"만 말한다.
-    @Test func theAppSendsAPurposeNotACount() throws {
-        let request = VocabularyGenerationRequest(
+    /// 서버가 개수를 소유한다. 앱은 **어느 경로로 보내는지**로만 말한다 —
+    /// 요청 본문에는 쓰임새도 개수도 없다(P14.6.1).
+    @Test func theTodayRequestCarriesNoPurposeAndNoCount() throws {
+        let request = TodayVocabularyGenerationRequest(
             topic: .cafes,
             targetLevel: .IH,
-            excludeTerms: [],
-            purpose: .todayExtra
-        )
-        let json = try #require(
-            try JSONSerialization.jsonObject(with: JSONCoding.encoder.encode(request))
-                as? [String: Any]
-        )
-        #expect(json["purpose"] as? String == "today_extra")
-        #expect(json["count"] == nil)
-        #expect(json["size"] == nil)
-    }
-
-    /// 쓰임새를 싣지 않은 요청은 예전 그대로다 — 필드 자체가 나가지 않는다.
-    /// 서버는 필드가 없는 요청을 30개(`custom_set`)로 읽는다.
-    @Test func oldRequestsStayExactlyAsTheyWere() throws {
-        let request = VocabularyGenerationRequest(
-            topic: .cafes,
-            targetLevel: .IH,
-            excludeTerms: ["coffee"]
+            excludeTerms: []
         )
         let json = try #require(
             try JSONSerialization.jsonObject(with: JSONCoding.encoder.encode(request))
                 as? [String: Any]
         )
         #expect(json["purpose"] == nil)
-        #expect(json["topic"] as? String == "cafes")
-        #expect(json["targetLevel"] as? String == "IH")
-        #expect(json["excludeTerms"] as? [String] == ["coffee"])
+        #expect(json["count"] == nil)
+        #expect(json["size"] == nil)
+        #expect(Set(json.keys) == ["topic", "targetLevel", "excludeTerms"])
+    }
+
+    /// 단어를 만드는 경로는 앱 전체에서 하나뿐이다(P14.6.2). 예전 30개 경로는 없다.
+    @Test func theOnlyCreationEndpointIsTheTodayOne() throws {
+        let api = code(try source("Services/API/APIClient.swift"))
+        #expect(api.contains("path: \"/v1/vocabulary/today/generate\""))
+        #expect(!api.contains("path: \"/v1/vocabulary/generate\""))
+        #expect(api.contains("func generateTodayVocabulary("))
+        #expect(api.contains("request payload: TodayVocabularyGenerationRequest"))
+        #expect(!api.contains("func generateVocabulary("))
+
+        let viewModel = code(try source(viewModelPath))
+        #expect(viewModel.contains("api.generateTodayVocabulary("))
+        #expect(viewModel.contains("request: TodayVocabularyGenerationRequest("))
+        // 요청 타입도 하나뿐이라 섞일 갈림길 자체가 없다.
+        #expect(!viewModel.contains(": VocabularyGenerationRequest("))
+        #expect(!viewModel.contains("if purpose == "))
+    }
+
+    /// 저장 표식은 로컬 전용이라 endpoint를 지웠다고 같이 지우지 않는다(P14.6.2 §10).
+    /// 예전 기기에 남아 있는 세트가 `custom_set`으로 저장돼 있고, 그 값을 읽어야 한다.
+    @Test func theLocalPurposeMarkerSurvivesTheEndpointRemoval() throws {
         #expect(VocabularyGenerationPurpose.customSet.rawValue == "custom_set")
+        #expect(VocabularyGenerationPurpose.todayExtra.rawValue == "today_extra")
+        let records = code(try source("Models/LocalRecords.swift"))
+        #expect(records.contains("var purposeRaw: String = VocabularyGenerationPurpose.customSet.rawValue"))
+        // 서버로는 나가지 않는다 — 요청 본문에 쓰임새 필드가 없다.
+        let models = code(try source("Models/VocabularyGeneration.swift"))
+        #expect(!models.contains("let purpose"))
     }
 
     // MARK: 2. 과금 경계
@@ -140,7 +149,7 @@ struct VocabularyExtraTests {
         #expect(picker.lowerBound < confirmation.lowerBound)
         #expect(confirmation.lowerBound < button.lowerBound)
         #expect(button.lowerBound < call.lowerBound)
-        #expect(sheet.contains("어떤 주제로 더 공부할까요?"))
+        #expect(sheet.contains("어떤 주제로 만들까요?"))
         // 주제를 고르지 않으면 실행 자체가 없다.
         #expect(sheet.contains("isDisabled: topic == nil"))
         #expect(sheet.contains("guard let topic else { return }"))
@@ -149,9 +158,12 @@ struct VocabularyExtraTests {
     /// 누르기 전에 무엇을 얼마에 받는지 말한다. 값은 데일리 토큰 1개다.
     @Test func theConfirmationStatesWhatAndHowMuch() throws {
         let sheet = code(try source(sheetPath))
-        #expect(sheet.contains("단어 \\(count)개를 더 학습할까요?"))
-        #expect(sheet.contains("새로운 단어를 만드는 데 데일리 토큰 1개를 사용해요."))
-        #expect(sheet.contains("\\(count)개 생성하기"))
+        #expect(sheet.contains("\\(topic.label) 단어 \\(count)개를 만들까요?"))
+        #expect(sheet.contains("데일리 토큰 \\(VocabularyGenerationViewModel.tokenCost)개를 사용해요."))
+        #expect(sheet.contains("\\(count)개 만들기"))
+        // 지금 잔액도 함께 말한다. 그 값은 이미 읽어 둔 것이고 새 출처를 만들지 않는다.
+        #expect(sheet.contains("현재 데일리 토큰 \\(balance)개"))
+        #expect(sheet.contains("viewModel.dailyTokenCount"))
         #expect(VocabularyGenerationViewModel.tokenCost == 1)
     }
 
@@ -170,7 +182,7 @@ struct VocabularyExtraTests {
     @Test func zeroTokensBlocksBeforeTheRequest() throws {
         let viewModel = code(try source(viewModelPath))
         let guardIndex = try #require(viewModel.range(of: "if hasNoTokens {"))
-        let request = try #require(viewModel.range(of: "api.generateVocabulary("))
+        let request = try #require(viewModel.range(of: "api.generateTodayVocabulary("))
         #expect(guardIndex.lowerBound < request.lowerBound)
         // 광고·페이월은 기존 부족 UX 그대로다(새 결제 흐름을 만들지 않는다).
         #expect(viewModel.contains("recoverToken()"))
@@ -239,14 +251,15 @@ struct VocabularyExtraTests {
     @Test func thePendingRecordIsWrittenBeforeTheRequest() throws {
         let viewModel = code(try source(viewModelPath))
         let write = try #require(viewModel.range(of: "preferences.pendingVocabularyExtra = pending"))
-        let request = try #require(viewModel.range(of: "api.generateVocabulary("))
+        let request = try #require(viewModel.range(of: "api.generateTodayVocabulary("))
         let save = try #require(viewModel.range(of: "persistence.saveVocabularyGeneratedSet("))
         let clear = try #require(viewModel.range(of: "preferences.pendingVocabularyExtra = nil"))
         #expect(write.lowerBound < request.lowerBound)
         #expect(request.lowerBound < save.lowerBound)
         #expect(save.lowerBound < clear.lowerBound)
-        // 진행 기록을 남기는 곳은 추가 20개일 때뿐이다(예전 30개 흐름은 그대로다).
-        #expect(viewModel.contains("if purpose == .todayExtra {"))
+        // 만드는 길이 하나뿐이라 기록을 남기는 데 조건이 없다 — 언제나 남긴다.
+        #expect(viewModel.contains("PendingVocabularyExtraOperation.resume("))
+        #expect(!viewModel.contains("if purpose == "))
         // 새 복구 체계를 만들지 않았다 — 말하기 코치와 같은 자리, 같은 방식이다.
         #expect(code(try source("Services/Persistence/AppPreferences.swift"))
             .contains("var pendingVocabularyCoach: PendingVocabularyCoachOperation?"))
