@@ -126,6 +126,14 @@ actor AuthenticationService {
     }
     #endif
 
+    /// 앱 안 웹 화면이 서버를 부를 때 쓰는 토큰(웹이 요청마다 받아 간다).
+    func webHeaders() async throws -> [String: String] {
+        [
+            "authorization": "Bearer \(try await firebaseIDToken(forceRefresh: false))",
+            "appCheck": try await appCheckToken()
+        ]
+    }
+
     func headers(forceRefreshAuthToken: Bool = false) async throws -> [String: String] {
         var values = [
             "X-DailyOPIc-User-ID": try installationID(),

@@ -39,6 +39,8 @@
 	<string>$(DAILYOPIC_API_BASE_URL)</string>
 	<key>DAILYOPIC_PRIVACY_POLICY_URL</key>
 	<string>$(DAILYOPIC_PRIVACY_POLICY_URL)</string>
+	<key>DAILYOPIC_WEB_URL</key>
+	<string>$(DAILYOPIC_WEB_URL)</string>
 	<key>DAILYOPIC_TERMS_URL</key>
 	<string>$(DAILYOPIC_TERMS_URL)</string>
 	<key>GADApplicationIdentifier</key>

@@ -12,3 +12,5 @@ DAILYOPIC_TERMS_URL =
 
 // RevenueCat public SDK key (App Store). 대시보드 > API Keys 에서 발급.
 REVENUECAT_API_KEY = appl_PIFuXXinTfXfrLCVtTNFQMEArcd
+// 앱 화면 = 이 주소의 웹앱(WKWebView). dev TestFlight는 archive 때 dev 주소로 덮어쓴다.
+DAILYOPIC_WEB_URL = https:/$()/www.dailyopic.link/study
