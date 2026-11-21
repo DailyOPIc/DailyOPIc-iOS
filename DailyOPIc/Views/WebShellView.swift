@@ -12,8 +12,19 @@ struct WebShellView: View {
     @State private var model = WebShellModel()
 
     var body: some View {
-        WebView(model: model)
-            .ignoresSafeArea(edges: .bottom)
+        VStack(spacing: 0) {
+            if environment.showsAds {
+                // 무료 플랜: 웹 화면 아래(하단 탭 밑)에 배너. 유료는 서버 정책으로 숨는다.
+                WebView(model: model)
+                BannerAdView()
+                    .frame(height: 50)
+                    .environmentObject(environment.ads)
+                    .environment(environment)
+            } else {
+                WebView(model: model)
+                    .ignoresSafeArea(edges: .bottom)
+            }
+        }
             .overlay {
                 if let error = model.loadError {
                     VStack(spacing: AppSpacing.md) {
@@ -136,6 +147,15 @@ final class WebShellModel: NSObject {
         let survey: BackgroundSurvey
     }
 
+    private static func adErrorMessage(_ error: Error) -> String {
+        if let api = error as? APIClientError, api.isRewardQuotaExhausted {
+            return "오늘 광고로 받을 수 있는 토큰을 모두 받았어요. 내일 다시 받을 수 있어요."
+        }
+        if let ad = error as? AdService.AdError, case .notEarned = ad { return "광고를 끝까지 보면 토큰을 받을 수 있어요." }
+        if let ad = error as? AdService.AdError { return ad.localizedDescription }
+        return "광고를 불러오지 못했어요. 잠시 후 다시 시도해 주세요."
+    }
+
     private static func jsonString(_ value: String) -> String {
         let data = (try? JSONEncoder().encode(value)) ?? Data("\"\"".utf8)
         return String(data: data, encoding: .utf8) ?? "\"\""
@@ -174,6 +194,18 @@ extension WebShellModel: WKScriptMessageHandlerWithReply {
                     replyHandler(try await environment.authentication.webHeaders(), nil)
                 } catch {
                     replyHandler(nil, error.localizedDescription)
+                }
+            }
+        case "watchAd":
+            // 보상형 광고 → 서버가 AdMob 검증 후 오늘 쓸 보너스 토큰 1개를 준다(기존 앱 흐름 그대로).
+            Task {
+                do {
+                    let intent = try await environment.api.createRewardIntent(purpose: .practiceCredits, requestID: UUID())
+                    try await environment.ads.showRewardedAd(userIdentifier: intent.userIdentifier, customData: intent.customData)
+                    _ = try await environment.api.waitForReward(nonce: intent.nonce)
+                    replyHandler(true, nil)
+                } catch {
+                    replyHandler(nil, Self.adErrorMessage(error))
                 }
             }
         case "openPaywall", "openAccount":
@@ -216,6 +248,35 @@ extension WebShellModel: WKNavigationDelegate, WKUIDelegate {
         type: WKMediaCaptureType
     ) async -> WKPermissionDecision {
         origin.host == AppConfiguration.webAppURL.host ? .grant : .deny
+    }
+
+    /// 웹의 window.alert / window.confirm. WKWebView는 이걸 직접 그려 줘야 하고,
+    /// 안 그리면 confirm()이 곧바로 false가 돼 "새 세트 받기" 같은 확인이 조용히 취소된다.
+    func webView(_ webView: WKWebView, runJavaScriptAlertPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async {
+        await withCheckedContinuation { (done: CheckedContinuation<Void, Never>) in
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in done.resume() })
+            Self.present(alert) { done.resume() }
+        }
+    }
+
+    func webView(_ webView: WKWebView, runJavaScriptConfirmPanelWithMessage message: String, initiatedByFrame frame: WKFrameInfo) async -> Bool {
+        await withCheckedContinuation { (done: CheckedContinuation<Bool, Never>) in
+            let alert = UIAlertController(title: nil, message: message, preferredStyle: .alert)
+            alert.addAction(UIAlertAction(title: "취소", style: .cancel) { _ in done.resume(returning: false) })
+            alert.addAction(UIAlertAction(title: "확인", style: .default) { _ in done.resume(returning: true) })
+            Self.present(alert) { done.resume(returning: false) }
+        }
+    }
+
+    /// 맨 위 화면에 띄운다. 띄울 곳이 없으면 `fallback`으로 바로 답한다.
+    private static func present(_ controller: UIViewController, fallback: () -> Void) {
+        var top = UIApplication.shared.connectedScenes
+            .compactMap { ($0 as? UIWindowScene)?.keyWindow }
+            .first?.rootViewController
+        while let presented = top?.presentedViewController { top = presented }
+        guard let top else { return fallback() }
+        top.present(controller, animated: true)
     }
 
     /// target=_blank 링크는 같은 화면에서 연다.

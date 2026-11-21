@@ -119,6 +119,8 @@ final class AppEnvironment {
         }
         capabilities = try? await api.capabilities()
         await configureStore()
+        // 광고(무료 플랜의 배너 · 보상형 광고). 동의(UMP) · 추적 권한 확인 후 AdMob 시작.
+        await ads.prepare()
     }
 
     /// 구매/복원 후 서버 엔타이틀먼트가 반영됐을 수 있으므로 capabilities를 재조회.
