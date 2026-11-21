@@ -52,6 +52,9 @@ struct WebShellView: View {
                 .environment(environment)
             }
             .task { await model.start(environment: environment) }
+            // 웹앱은 늘 밝은 테마다. 기기가 다크 모드여도 상태바 뒤가 검게 비지 않고 글자도 어둡게.
+            .background(Color.white.ignoresSafeArea())
+            .preferredColorScheme(.light)
     }
 }
 
