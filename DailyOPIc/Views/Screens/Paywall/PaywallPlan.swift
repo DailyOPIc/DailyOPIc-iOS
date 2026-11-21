@@ -37,16 +37,17 @@ struct PaywallPlanCopy: Identifiable, Sendable {
 
     var id: String { plan.rawValue }
 
+    // 앱 화면이 웹앱으로 바뀌면서(2.3.0) 광고 · 학습 캘린더 자동화 · 일정 알림은 없어졌다.
+    // 여기는 지금 실제로 쓸 수 있는 것만 말한다(토큰 수 · 모의고사 횟수는 서버 plans.py가 진실).
+    // 랜덤 스피킹 · 오픽게임의 무료 하루 한도(각 5회)는 웹 src/lib/limits.ts.
     static let free = PaywallPlanCopy(
         plan: .free,
         tagline: "가볍게 시작해 보기",
         benefits: [
-            "매일 데일리 토큰 1개 (광고 시청으로 1개 더)",
+            "매일 데일리 토큰 1개",
             "예상 등급 · 강점 · 개선점 · 5영역 피드백",
-            "모의고사 1회 체험 (광고 시청)",
-            "학습 캘린더 · 진행률 · 연속 학습",
-            "정한 공부 시간에 매일 학습 알림",
-            "광고 포함",
+            "모의고사 1회 체험",
+            "랜덤 스피킹 · 오픽게임 하루 5회씩",
         ]
     )
 
@@ -59,9 +60,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "매일 데일리 토큰 3개",
                 "결과 전체 해제 — 교정 답안 · 모범 답안 · 목표 등급까지",
                 "모의고사 매일 1회",
-                "놓친 학습을 반영한 자동 일정 재조정",
-                "개인 일정 시작 전 알림",
-                "광고 없음",
+                "랜덤 스피킹 · 오픽게임 무제한",
             ]
         ),
         PaywallPlanCopy(
@@ -71,9 +70,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "매일 데일리 토큰 10개",
                 "베이직의 결과 분석 그대로",
                 "모의고사 하루 3회",
-                "최근 평가를 반영한 학습 계획",
-                "시험일까지 역산한 일정 조정",
-                "광고 없음",
+                "랜덤 스피킹 · 오픽게임 무제한",
             ]
         ),
         PaywallPlanCopy(
@@ -83,8 +80,7 @@ struct PaywallPlanCopy: Identifiable, Sendable {
                 "매일 데일리 토큰 20개",
                 "플러스의 결과 분석 그대로",
                 "모의고사 하루 5회",
-                "플러스의 학습 일정 기능 그대로",
-                "광고 없음",
+                "랜덤 스피킹 · 오픽게임 무제한",
             ]
         ),
     ]
@@ -104,18 +100,10 @@ struct PaywallComparisonRow: Identifiable, Sendable {
     /// 플랜별로 **실제로 다른** 항목만 넣는다. 차이가 없는 줄은 비교표를 길게 할 뿐
     /// 결정에 도움이 되지 않는다.
     static let all: [PaywallComparisonRow] = [
-        PaywallComparisonRow(title: "데일리 토큰", values: ["1 (+광고 1)", "3", "10", "20"]),
+        PaywallComparisonRow(title: "데일리 토큰", values: ["1", "3", "10", "20"]),
         PaywallComparisonRow(title: "AI 결과 분석", values: ["요약", "전체", "전체", "전체"]),
         PaywallComparisonRow(title: "모의고사", values: ["1회 체험", "매일 1회", "하루 3회", "하루 5회"]),
-        // 캘린더 자체는 전 플랜이 쓴다. 다른 것은 자동화 깊이뿐이다.
-        PaywallComparisonRow(
-            title: "학습 일정 자동화",
-            values: ["기본 캘린더", "자동 재조정", "평가 반영 · 시험일 역산", "평가 반영 · 시험일 역산"]
-        ),
-        // 매일 학습 알림은 전 플랜 공통이라 비교할 것이 없어 줄 자체를 두지 않는다.
-        // 기기에서 보내는 로컬 알림이고, 유료 플랜 사이에는 차이가 없다.
-        PaywallComparisonRow(title: "개인 일정 알림", values: ["없음", "있음", "있음", "있음"]),
-        PaywallComparisonRow(title: "광고", values: ["있음", "없음", "없음", "없음"]),
+        PaywallComparisonRow(title: "랜덤 스피킹 · 오픽게임", values: ["하루 5회씩", "무제한", "무제한", "무제한"]),
     ]
 
     static let planColumns: [PlanEntitlement] = [.free, .basic, .plus, .pro]

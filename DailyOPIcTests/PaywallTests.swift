@@ -42,30 +42,17 @@ struct PaywallTests {
         }
     }
 
-    /// 캘린더 문구는 각 플랜이 **실제로 켜는** 자동화만 말한다.
-    @Test func calendarCopyMatchesEachPlanCapabilities() {
-        func lines(_ copy: PaywallPlanCopy) -> String { copy.benefits.joined(separator: "\n") }
-
-        // 무료: 캘린더를 쓴다고만 말하고 자동화를 약속하지 않는다.
-        let free = lines(.free)
-        #expect(free.contains("학습 캘린더"))
-        #expect(!free.contains("자동"))
-        #expect(!free.contains("역산"))
-
-        // 베이직: 자동 재조정 하나만.
-        let basic = lines(PaywallPlanCopy.copy(for: .basic))
-        #expect(basic.contains("자동 일정 재조정"))
-        #expect(!basic.contains("역산"))
-        #expect(!basic.contains("최근 평가"))
-
-        // 플러스: 평가 반영 + 시험일 역산.
-        let plus = lines(PaywallPlanCopy.copy(for: .plus))
-        #expect(plus.contains("최근 평가를 반영한 학습 계획"))
-        #expect(plus.contains("시험일까지 역산한 일정 조정"))
-
-        // 프로: 플러스와 같은 일정 기능이라고만 말한다. 프로 전용 일정 기능은 없다.
-        let pro = lines(PaywallPlanCopy.copy(for: .pro))
-        #expect(pro.contains("플러스의 학습 일정 기능 그대로"))
+    /// 앱 화면이 웹앱으로 바뀐 뒤 없어진 기능(광고 · 캘린더 자동화 · 일정 알림)은 어떤 플랜도 약속하지 않는다.
+    @Test func copyNeverPromisesRemovedNativeFeatures() {
+        let removed = ["광고", "캘린더", "역산", "재조정", "알림", "학습 계획"]
+        let allCopy = (PaywallPlanCopy.paid + [PaywallPlanCopy.free])
+            .flatMap { [$0.tagline] + $0.benefits }
+            + PaywallComparisonRow.all.flatMap { [$0.title] + $0.values }
+        for line in allCopy {
+            for word in removed {
+                #expect(!line.contains(word), "\(line) 이 앱에 없는 '\(word)'를 약속한다")
+            }
+        }
     }
 
     /// 구현이 없는 취약점 기반 일정은 어떤 플랜 문구에도 나오지 않는다.
