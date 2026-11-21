@@ -22,6 +22,12 @@ enum AppConfiguration {
         resolvedAPIBaseURL.source
     }
 
+    /// 앱 화면으로 띄우는 웹앱 주소(xcconfig DAILYOPIC_WEB_URL). 비어 있으면 운영 웹.
+    nonisolated static var webAppURL: URL {
+        configuredURL(Bundle.main.object(forInfoDictionaryKey: "DAILYOPIC_WEB_URL") as? String)
+            ?? URL(string: "https://www.dailyopic.link/study")!
+    }
+
     nonisolated static var rewardedAdUnitID: String? {
         configuredString(Bundle.main.object(forInfoDictionaryKey: "GADRewardedAdUnitID") as? String)
     }

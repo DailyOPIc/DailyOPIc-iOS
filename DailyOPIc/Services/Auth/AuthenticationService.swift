@@ -29,6 +29,28 @@ actor AuthenticationService {
         }
     }
 
+    /// 설정 화면의 계정 상태. 익명이면 아직 로그인 전이다.
+    struct AccountSummary: Sendable, Equatable {
+        let isAnonymous: Bool
+        let providerIDs: [String]
+        let email: String?
+
+        var hasApple: Bool { providerIDs.contains("apple.com") }
+        var hasGoogle: Bool { providerIDs.contains("google.com") }
+    }
+
+    enum LinkOutcome: Sendable {
+        /// 지금 계정(uid 그대로)에 로그인 수단이 붙었다. 기록·구독이 그대로 남는다.
+        case linked
+        /// 이 로그인 수단은 이미 다른 계정(예: 웹에서 먼저 가입)에 쓰이고 있다.
+        /// 사용자가 동의하면 `switchToExistingAccount()`로 그 계정으로 옮긴다.
+        case accountExists
+    }
+
+    /// 이미 쓰이는 로그인 수단을 사용자 확인까지 잠시 보관한다(Apple 자격은 재사용이 안 돼
+    /// Firebase가 돌려준 갱신 자격을 쓴다).
+    private var pendingCredential: AuthCredential?
+
     private let keychainService = "com.mark.opicmobile.dailyopic"
     private let installationIDAccount = "installation_id"
 
@@ -41,6 +63,75 @@ actor AuthenticationService {
     /// RevenueCat 등에서 서버와 동일한 사용자 식별자(Firebase uid)로 로그인하기 위한 접근자.
     func currentUserID() async throws -> String {
         try await firebaseUserID()
+    }
+
+    func accountSummary() -> AccountSummary? {
+        #if canImport(FirebaseAuth)
+        guard let user = Auth.auth().currentUser else { return nil }
+        let providers = user.providerData.map(\.providerID)
+        return AccountSummary(
+            isAnonymous: user.isAnonymous,
+            providerIDs: providers,
+            // Apple 로그인 이메일(가리기 주소 포함)은 화면에 보여 주지 않는다. Google 이메일만 표시.
+            email: user.providerData.first { $0.providerID == "google.com" }?.email
+        )
+        #else
+        return nil
+        #endif
+    }
+
+    #if canImport(FirebaseAuth)
+    func linkApple(idToken: String, rawNonce: String, fullName: PersonNameComponents?) async throws -> LinkOutcome {
+        try await link(OAuthProvider.appleCredential(withIDToken: idToken, rawNonce: rawNonce, fullName: fullName))
+    }
+
+    func linkGoogle(idToken: String, accessToken: String) async throws -> LinkOutcome {
+        try await link(GoogleAuthProvider.credential(withIDToken: idToken, accessToken: accessToken))
+    }
+
+    /// 익명 계정에 로그인 수단을 붙인다. uid가 바뀌지 않으므로 서버 기록·RevenueCat 구독이 그대로다.
+    private func link(_ credential: AuthCredential) async throws -> LinkOutcome {
+        _ = try await firebaseUserID()
+        guard let user = Auth.auth().currentUser else { throw AuthError.firebaseAuthUnavailable }
+        do {
+            _ = try await user.link(with: credential)
+            pendingCredential = nil
+            return .linked
+        } catch let error as NSError where error.code == AuthErrorCode.providerAlreadyLinked.rawValue {
+            return .linked
+        } catch let error as NSError where error.code == AuthErrorCode.credentialAlreadyInUse.rawValue
+            || error.code == AuthErrorCode.emailAlreadyInUse.rawValue {
+            pendingCredential = error.userInfo[AuthErrorUserInfoUpdatedCredentialKey] as? AuthCredential ?? credential
+            return .accountExists
+        }
+    }
+
+    /// 이미 있는 계정으로 옮긴다. 이 기기의 익명 계정(uid)은 버려지고 새 uid를 돌려준다.
+    func switchToExistingAccount() async throws -> String {
+        guard let credential = pendingCredential else { throw AuthError.firebaseAuthUnavailable }
+        let result = try await Auth.auth().signIn(with: credential)
+        pendingCredential = nil
+        return result.user.uid
+    }
+
+    /// Sign in with Apple로 연결된 계정을 지울 때 Apple 토큰을 폐기한다(App Store 요구 사항).
+    func revokeAppleToken(authorizationCode: String) async throws {
+        try await Auth.auth().revokeToken(withAuthorizationCode: authorizationCode)
+    }
+
+    /// 계정 삭제 뒤 로그아웃. 다음 요청에서 새 익명 계정이 만들어진다.
+    func signOutAfterDeletion() throws {
+        pendingCredential = nil
+        try Auth.auth().signOut()
+    }
+    #endif
+
+    /// 앱 안 웹 화면이 서버를 부를 때 쓰는 토큰(웹이 요청마다 받아 간다).
+    func webHeaders() async throws -> [String: String] {
+        [
+            "authorization": "Bearer \(try await firebaseIDToken(forceRefresh: false))",
+            "appCheck": try await appCheckToken()
+        ]
     }
 
     func headers(forceRefreshAuthToken: Bool = false) async throws -> [String: String] {

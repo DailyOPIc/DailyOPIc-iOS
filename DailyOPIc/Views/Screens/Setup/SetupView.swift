@@ -60,6 +60,7 @@ struct SetupView: View {
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
+                    AccountSection()
                     Section("구독") {
                         subscriptionRows
                     }

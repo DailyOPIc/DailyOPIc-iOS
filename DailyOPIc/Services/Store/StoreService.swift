@@ -99,6 +99,31 @@ final class StoreService {
         startCustomerInfoObserver()
     }
 
+    /// 계정이 바뀌었을 때(기존 계정으로 전환·계정 삭제) RevenueCat 사용자를 Firebase uid에 맞춘다.
+    func logIn(userId: String) async {
+        guard isConfigured else { return configure(userId: userId) }
+        do {
+            let (info, _) = try await Purchases.shared.logIn(userId)
+            updateLocalEntitlement(from: info)
+        } catch {
+            print("[DailyOPIc][Store] logIn failed: \(error)")
+        }
+        refreshAppUserID()
+    }
+
+    /// 이 기기의 App Store 구매를 지금 사용자로 다시 보낸다(Apple 로그인 창 없음).
+    /// RevenueCat 대시보드의 이전 설정이 "새 App User ID로 이전"이면 익명 계정의 구독이
+    /// 전환한 계정으로 옮겨지고, 서버는 TRANSFER 웹훅으로 두 계정의 플랜을 다시 맞춘다.
+    func syncPurchases() async {
+        guard isConfigured else { return }
+        do {
+            let info = try await Purchases.shared.syncPurchases()
+            updateLocalEntitlement(from: info)
+        } catch {
+            print("[DailyOPIc][Store] syncPurchases failed: \(error)")
+        }
+    }
+
     /// RevenueCat CustomerInfo 변경(구매·갱신·해지·만료)을 실시간으로 반영.
     private func startCustomerInfoObserver() {
         infoObserverTask?.cancel()
@@ -243,6 +268,8 @@ final class StoreService {
     func configure(userId: String) {}
     func refresh() async {}
     func refreshCustomerInfo() async {}
+    func logIn(userId: String) async {}
+    func syncPurchases() async {}
     func purchase(_ package: StorePackage) async throws { throw StoreError.notConfigured }
     func restore() async throws { throw StoreError.notConfigured }
     func manageSubscriptions() async throws { throw StoreError.notConfigured }

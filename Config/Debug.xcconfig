@@ -27,3 +27,5 @@ REVENUECAT_API_KEY = appl_PIFuXXinTfXfrLCVtTNFQMEArcd
 // 여기 아래에서 재정의한 값이 최종값이 된다 (xcconfig 는 나중 대입이 이긴다).
 // Release 빌드는 이 include 를 갖지 않는다. 프로덕션 설정은 절대 오버라이드되지 않는다.
 #include? "Debug.local.xcconfig"
+// 앱 화면 = 이 주소의 웹앱(WKWebView). dev TestFlight는 archive 때 dev 주소로 덮어쓴다.
+DAILYOPIC_WEB_URL = https:/$()/dev.dailyopic.link/study

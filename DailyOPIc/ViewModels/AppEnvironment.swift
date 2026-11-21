@@ -1,5 +1,9 @@
 import Foundation
 import Observation
+import UserNotifications
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
 
 @MainActor
 @Observable
@@ -37,15 +41,25 @@ final class AppEnvironment {
     /// 오디오 자원을 잡지 않으므로 생성 비용은 사실상 없다.
     @ObservationIgnored private(set) lazy var studyCalendarViewModel = StudyCalendarViewModel(environment: self)
 
-    /// 현재 유효 플랜.
-    /// RevenueCat(StoreService)가 설정돼 있으면 Apple의 실제 활성 엔타이틀먼트를
-    /// 그대로 따른다(업그레이드·다운그레이드·해지·만료가 즉시 반영). 미설정 시에만
-    /// 서버 capabilities로 폴백한다. 서버 쿼터 강제는 여전히 서버가 권위.
+    /// 현재 유효 플랜 = App Store 구독(RevenueCat)과 서버 플랜 중 높은 쪽.
+    ///
+    /// RevenueCat은 구매 · 업그레이드를 서버 웹훅보다 먼저 알고, 서버 플랜은 웹에서 산
+    /// 30일 이용권(토스)까지 합친 값이다. 앱 구독만 보면 웹 이용권 구매자가 앱에서 무료로
+    /// 보이고, 서버만 보면 방금 결제한 사용자가 웹훅이 올 때까지 무료로 보인다.
+    /// 서버 쿼터 강제는 여전히 서버가 권위.
+    /// ponytail: 웹 이용권만 있는 프로 사용자에게도 설정의 "구독 관리"(Apple 화면)가 보인다.
+    ///           웹 이용권 사용자가 늘면 플랜 출처를 capabilities로 받아 버튼을 나눈다.
     var currentPlan: PlanEntitlement {
-        if store.isConfigured {
-            return store.localEntitlement
-        }
-        return PlanEntitlement(from: capabilities?.plan)
+        Self.effectivePlan(
+            storePlan: store.isConfigured ? store.localEntitlement : nil,
+            serverPlan: capabilities?.plan
+        )
+    }
+
+    nonisolated static func effectivePlan(storePlan: PlanEntitlement?, serverPlan: String?) -> PlanEntitlement {
+        let server = PlanEntitlement(from: serverPlan)
+        guard let storePlan else { return server }
+        return max(storePlan, server)
     }
 
     /// 플랜을 **실제로 확인했는가**. `currentPlan`은 확인 전에도 기본값 `.free`를 말하므로
@@ -94,17 +108,23 @@ final class AppEnvironment {
             launchState = .ready
             return
         }
-        Task { await ads.prepare() }
         do {
             try AppConfiguration.validateForLaunch()
-            try await authentication.prepareForLaunch()
-            capabilities = try await api.capabilities()
-            await configureStore()
-            try await Task.sleep(for: .milliseconds(450))
+            // 화면(웹앱)에 필요한 건 계정 ID뿐이다. 익명 로그인까지만 기다리고 바로 띄운다.
+            // App Check · 플랜 · 결제 준비는 화면이 뜬 뒤 이어서 한다(웹은 요청할 때 토큰을 받아 간다).
+            _ = try await authentication.currentUserID()
             launchState = .ready
+            // 이전 버전(네이티브 플래너)이 최대 30일 치 미리 예약해 둔 학습 알림을 지운다.
+            // 새 화면에는 플래너가 없어 알림을 눌러도 갈 곳이 없다.
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         } catch {
             launchState = .failed(error.localizedDescription)
+            return
         }
+        capabilities = try? await api.capabilities()
+        await configureStore()
+        // 광고(무료 플랜의 배너 · 보상형 광고). 동의(UMP) · 추적 권한 확인 후 AdMob 시작.
+        await ads.prepare()
     }
 
     /// 구매/복원 후 서버 엔타이틀먼트가 반영됐을 수 있으므로 capabilities를 재조회.
@@ -116,6 +136,32 @@ final class AppEnvironment {
     func refreshEntitlements() async {
         await store.refreshCustomerInfo()
         await refreshCapabilities()
+    }
+
+    /// 로그인 수단 연결 후 기존 계정으로 옮겼거나 계정을 지웠을 때: 새 uid 기준으로
+    /// RevenueCat 사용자와 서버 플랜을 다시 읽는다.
+    /// ponytail: 이미 불러온 오늘의 세트·모의고사 ViewModel은 이전 uid 것을 그대로 들고 있다.
+    ///           전환이 드문 경로라 다음 앱 실행에서 맞춰진다. 바로 맞춰야 하면 ViewModel 재생성.
+    /// `transferPurchases`: 이미 있는 계정으로 전환했을 때 이 기기의 구독을 그 계정으로 옮긴다.
+    func accountDidChange(transferPurchases: Bool = false) async {
+        guard let userID = try? await authentication.currentUserID() else { return }
+        await store.logIn(userId: userID)
+        if transferPurchases { await store.syncPurchases() }
+        await refreshCapabilities()
+    }
+
+    /// 계정 삭제: (Apple 연결 시 토큰 폐기) → 서버 데이터·Firebase 사용자 삭제 → 기기 기록 삭제 → 새 익명 계정.
+    /// 구독은 Apple이 관리하므로 여기서 해지되지 않는다(화면에서 안내).
+    func deleteAccount(appleAuthorizationCode: String?) async throws {
+        #if canImport(FirebaseAuth)
+        if let appleAuthorizationCode {
+            try await authentication.revokeAppleToken(authorizationCode: appleAuthorizationCode)
+        }
+        try await api.deleteAccount()
+        try? persistence.deleteAllHistory()
+        try await authentication.signOutAfterDeletion()
+        await accountDidChange()
+        #endif
     }
 
     private func configureStore() async {
