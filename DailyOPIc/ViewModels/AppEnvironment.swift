@@ -40,15 +40,25 @@ final class AppEnvironment {
     /// 오디오 자원을 잡지 않으므로 생성 비용은 사실상 없다.
     @ObservationIgnored private(set) lazy var studyCalendarViewModel = StudyCalendarViewModel(environment: self)
 
-    /// 현재 유효 플랜.
-    /// RevenueCat(StoreService)가 설정돼 있으면 Apple의 실제 활성 엔타이틀먼트를
-    /// 그대로 따른다(업그레이드·다운그레이드·해지·만료가 즉시 반영). 미설정 시에만
-    /// 서버 capabilities로 폴백한다. 서버 쿼터 강제는 여전히 서버가 권위.
+    /// 현재 유효 플랜 = App Store 구독(RevenueCat)과 서버 플랜 중 높은 쪽.
+    ///
+    /// RevenueCat은 구매 · 업그레이드를 서버 웹훅보다 먼저 알고, 서버 플랜은 웹에서 산
+    /// 30일 이용권(토스)까지 합친 값이다. 앱 구독만 보면 웹 이용권 구매자가 앱에서 무료로
+    /// 보이고, 서버만 보면 방금 결제한 사용자가 웹훅이 올 때까지 무료로 보인다.
+    /// 서버 쿼터 강제는 여전히 서버가 권위.
+    /// ponytail: 웹 이용권만 있는 프로 사용자에게도 설정의 "구독 관리"(Apple 화면)가 보인다.
+    ///           웹 이용권 사용자가 늘면 플랜 출처를 capabilities로 받아 버튼을 나눈다.
     var currentPlan: PlanEntitlement {
-        if store.isConfigured {
-            return store.localEntitlement
-        }
-        return PlanEntitlement(from: capabilities?.plan)
+        Self.effectivePlan(
+            storePlan: store.isConfigured ? store.localEntitlement : nil,
+            serverPlan: capabilities?.plan
+        )
+    }
+
+    nonisolated static func effectivePlan(storePlan: PlanEntitlement?, serverPlan: String?) -> PlanEntitlement {
+        let server = PlanEntitlement(from: serverPlan)
+        guard let storePlan else { return server }
+        return max(storePlan, server)
     }
 
     /// 플랜을 **실제로 확인했는가**. `currentPlan`은 확인 전에도 기본값 `.free`를 말하므로
