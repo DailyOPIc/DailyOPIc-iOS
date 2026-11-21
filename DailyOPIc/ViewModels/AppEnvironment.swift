@@ -1,5 +1,6 @@
 import Foundation
 import Observation
+import UserNotifications
 #if canImport(FirebaseAuth)
 import FirebaseAuth
 #endif
@@ -113,6 +114,9 @@ final class AppEnvironment {
             // App Check · 플랜 · 결제 준비는 화면이 뜬 뒤 이어서 한다(웹은 요청할 때 토큰을 받아 간다).
             _ = try await authentication.currentUserID()
             launchState = .ready
+            // 이전 버전(네이티브 플래너)이 최대 30일 치 미리 예약해 둔 학습 알림을 지운다.
+            // 새 화면에는 플래너가 없어 알림을 눌러도 갈 곳이 없다.
+            UNUserNotificationCenter.current().removeAllPendingNotificationRequests()
         } catch {
             launchState = .failed(error.localizedDescription)
             return
