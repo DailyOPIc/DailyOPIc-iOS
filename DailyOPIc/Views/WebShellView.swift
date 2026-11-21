@@ -31,7 +31,7 @@ struct WebShellView: View {
                     }
                     .padding(AppSpacing.lg)
                     .frame(maxWidth: .infinity, maxHeight: .infinity)
-                    .background(Color(.systemBackground))
+                    .background(Color.white)
                 }
             }
             .sheet(isPresented: $model.showsPaywall, onDismiss: { model.sheetClosed(environment: environment) }) {
@@ -79,7 +79,7 @@ final class WebShellModel: NSObject {
         view.allowsBackForwardNavigationGestures = true
         view.scrollView.contentInsetAdjustmentBehavior = .never
         view.isOpaque = false
-        view.backgroundColor = .systemBackground
+        view.backgroundColor = .white
         #if DEBUG
         if #available(iOS 16.4, *) { view.isInspectable = true }
         #endif

@@ -107,17 +107,18 @@ final class AppEnvironment {
             launchState = .ready
             return
         }
-        Task { await ads.prepare() }
         do {
             try AppConfiguration.validateForLaunch()
-            try await authentication.prepareForLaunch()
-            capabilities = try await api.capabilities()
-            await configureStore()
-            try await Task.sleep(for: .milliseconds(450))
+            // 화면(웹앱)에 필요한 건 계정 ID뿐이다. 익명 로그인까지만 기다리고 바로 띄운다.
+            // App Check · 플랜 · 결제 준비는 화면이 뜬 뒤 이어서 한다(웹은 요청할 때 토큰을 받아 간다).
+            _ = try await authentication.currentUserID()
             launchState = .ready
         } catch {
             launchState = .failed(error.localizedDescription)
+            return
         }
+        capabilities = try? await api.capabilities()
+        await configureStore()
     }
 
     /// 구매/복원 후 서버 엔타이틀먼트가 반영됐을 수 있으므로 capabilities를 재조회.

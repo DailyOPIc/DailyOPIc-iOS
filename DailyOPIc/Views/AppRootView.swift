@@ -9,7 +9,9 @@ struct AppRootView: View {
         Group {
             switch environment.launchState {
             case .launching:
-                SplashView()
+                // 계정 ID만 준비되면 바로 웹 화면을 띄운다(보통 한순간). 따로 로딩 화면을 그리지 않고
+                // 시스템 실행 화면과 같은 흰 바탕을 둔다(웹앱도 늘 밝은 테마).
+                Color.white.ignoresSafeArea()
             case let .failed(message):
                 AuthRecoveryView(message: message) {
                     Task { await environment.initialize() }
