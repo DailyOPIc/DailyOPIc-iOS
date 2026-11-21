@@ -72,7 +72,8 @@ actor AuthenticationService {
         return AccountSummary(
             isAnonymous: user.isAnonymous,
             providerIDs: providers,
-            email: user.email ?? user.providerData.compactMap(\.email).first
+            // Apple 로그인 이메일(가리기 주소 포함)은 화면에 보여 주지 않는다. Google 이메일만 표시.
+            email: user.providerData.first { $0.providerID == "google.com" }?.email
         )
         #else
         return nil
