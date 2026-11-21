@@ -242,6 +242,17 @@ actor APIClient {
         )
     }
 
+    /// 계정 삭제(서버 데이터 + Firebase 사용자). 본문 없는 204라 execute를 거치지 않는다.
+    func deleteAccount() async throws {
+        var request = URLRequest(url: baseURL.appending(path: "/v1/users/me"))
+        request.httpMethod = "DELETE"
+        request.timeoutInterval = RequestTimeout.read
+        try await addAuthentication(to: &request)
+        let (data, response) = try await session.data(for: request)
+        guard let http = response as? HTTPURLResponse else { throw APIClientError.invalidResponse }
+        guard 200..<300 ~= http.statusCode else { throw Self.makeError(status: http.statusCode, data: data) }
+    }
+
     func operation(id: UUID) async throws -> OperationResult {
         try await send(path: "/v1/operations/\(id.uuidString)", method: "GET", body: nil)
     }

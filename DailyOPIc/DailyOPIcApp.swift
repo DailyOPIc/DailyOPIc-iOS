@@ -1,6 +1,9 @@
 import SwiftUI
 import SwiftData
 import UserNotifications
+#if canImport(GoogleSignIn)
+import GoogleSignIn
+#endif
 
 final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCenterDelegate {
     func application(
@@ -71,6 +74,9 @@ struct DailyOPIcApp: App {
             if let modelContainer {
                 AppRootView(environment: environment)
                     .modelContainer(modelContainer)
+                    #if canImport(GoogleSignIn)
+                    .onOpenURL { GIDSignIn.sharedInstance.handle($0) }
+                    #endif
                     .onChange(of: scenePhase) { _, phase in
                         // 포그라운드 복귀 시 구독 상태(해지/갱신/만료)를 즉시 최신화.
                         if phase == .active {

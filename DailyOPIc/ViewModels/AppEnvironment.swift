@@ -1,5 +1,8 @@
 import Foundation
 import Observation
+#if canImport(FirebaseAuth)
+import FirebaseAuth
+#endif
 
 @MainActor
 @Observable
@@ -116,6 +119,32 @@ final class AppEnvironment {
     func refreshEntitlements() async {
         await store.refreshCustomerInfo()
         await refreshCapabilities()
+    }
+
+    /// 로그인 수단 연결 후 기존 계정으로 옮겼거나 계정을 지웠을 때: 새 uid 기준으로
+    /// RevenueCat 사용자와 서버 플랜을 다시 읽는다.
+    /// ponytail: 이미 불러온 오늘의 세트·모의고사 ViewModel은 이전 uid 것을 그대로 들고 있다.
+    ///           전환이 드문 경로라 다음 앱 실행에서 맞춰진다. 바로 맞춰야 하면 ViewModel 재생성.
+    /// `transferPurchases`: 이미 있는 계정으로 전환했을 때 이 기기의 구독을 그 계정으로 옮긴다.
+    func accountDidChange(transferPurchases: Bool = false) async {
+        guard let userID = try? await authentication.currentUserID() else { return }
+        await store.logIn(userId: userID)
+        if transferPurchases { await store.syncPurchases() }
+        await refreshCapabilities()
+    }
+
+    /// 계정 삭제: (Apple 연결 시 토큰 폐기) → 서버 데이터·Firebase 사용자 삭제 → 기기 기록 삭제 → 새 익명 계정.
+    /// 구독은 Apple이 관리하므로 여기서 해지되지 않는다(화면에서 안내).
+    func deleteAccount(appleAuthorizationCode: String?) async throws {
+        #if canImport(FirebaseAuth)
+        if let appleAuthorizationCode {
+            try await authentication.revokeAppleToken(authorizationCode: appleAuthorizationCode)
+        }
+        try await api.deleteAccount()
+        try? persistence.deleteAllHistory()
+        try await authentication.signOutAfterDeletion()
+        await accountDidChange()
+        #endif
     }
 
     private func configureStore() async {
