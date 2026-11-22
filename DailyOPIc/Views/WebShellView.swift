@@ -1,3 +1,4 @@
+import Combine
 import SwiftUI
 import UIKit
 import WebKit
@@ -6,6 +7,7 @@ import WebKit
 /// - 로그인: 앱의 Firebase 계정(익명 → Google/Apple 연결)을 그대로 쓴다. 웹은 요청마다 `headers`로 토큰을 받는다.
 /// - 결제: 요금제는 앱의 인앱결제 화면(`openPaywall`). 웹의 토스 결제 · 토큰 구매는 앱 안에서 보이지 않는다.
 /// - 계정: 로그인 연결 · 계정 삭제(Apple 토큰 폐기 포함)는 앱의 계정 화면(`openAccount`).
+/// - 녹음 · 전사: 앱의 음성 인식(`speechStart` / `speechStop`). 웹 음성 인식을 쓰면 WebKit이 실행마다 마이크 허용을 따로 묻는다.
 /// 웹 쪽 짝은 DailyOPIc-FE src/lib/native.ts.
 struct WebShellView: View {
     let environment: AppEnvironment
@@ -81,6 +83,9 @@ final class WebShellModel: NSObject {
     @ObservationIgnored private var uid: String?
     /// 결제 · 계정 화면을 연 웹 요청. 화면이 닫히면 답한다(웹은 그때 플랜을 다시 읽는다).
     @ObservationIgnored private var pendingReply: ((Any?, String?) -> Void)?
+    /// 처음 녹음할 때 만든다(오디오 세션 · 인터럽션 옵저버를 미리 잡지 않게).
+    @ObservationIgnored private var speech: SpeechRecognitionService?
+    @ObservationIgnored private var speechText: AnyCancellable?
 
     fileprivate func makeWebView() -> WKWebView {
         let config = WKWebViewConfiguration()
@@ -130,7 +135,7 @@ final class WebShellModel: NSObject {
 
     /// 웹이 앱 안임을 알게 하고, 기존 앱 사용자는 단계 · 설문을 다시 고르지 않게 웹 설정으로 옮겨 준다(웹에 없을 때만).
     private static func bootstrapScript(uid: String, preferences: AppPreferences) -> String {
-        var script = "window.DailyOPIcNative = { uid: \(jsonString(uid)) };"
+        var script = "window.DailyOPIcNative = { uid: \(jsonString(uid)), speech: true };"
         if let level = preferences.initialLevel?.rawValue,
            let survey = preferences.mockSurvey,
            survey.leisure.count + survey.hobbies.count + survey.sports.count + survey.travel.count >= 3,
@@ -159,6 +164,21 @@ final class WebShellModel: NSObject {
     private static func jsonString(_ value: String) -> String {
         let data = (try? JSONEncoder().encode(value)) ?? Data("\"\"".utf8)
         return String(data: data, encoding: .utf8) ?? "\"\""
+    }
+
+    /// 인식 중인 문장을 웹에 실시간으로 넘긴다(웹은 `dailyopic:speech` 이벤트로 받는다).
+    private func speechService() -> SpeechRecognitionService {
+        if let speech { return speech }
+        let service = SpeechRecognitionService()
+        speechText = service.$transcript
+            .dropFirst()
+            .removeDuplicates()
+            .sink { [weak self] text in
+                let js = "window.dispatchEvent(new CustomEvent('dailyopic:speech', { detail: \(Self.jsonString(text)) }))"
+                self?.webView?.evaluateJavaScript(js)
+            }
+        speech = service
+        return service
     }
 
     func sheetClosed(environment: AppEnvironment) {
@@ -208,6 +228,38 @@ extension WebShellModel: WKScriptMessageHandlerWithReply {
                     replyHandler(nil, Self.adErrorMessage(error))
                 }
             }
+        case "speechStart":
+            let speech = speechService()
+            Task {
+                do {
+                    try await speech.start()
+                    replyHandler(true, nil)
+                } catch {
+                    replyHandler(nil, error.localizedDescription)
+                }
+            }
+        case "speechStop":
+            // 답: { transcript, audio(base64 m4a) }. 아무 말도 인식되지 않았으면 빈 전사 · 오디오 없음.
+            guard let speech, speech.isListening else {
+                replyHandler(["transcript": ""], nil)
+                return
+            }
+            Task {
+                do {
+                    let result = try await speech.stop()
+                    defer { try? FileManager.default.removeItem(at: result.audioURL) }
+                    let audio = try Data(contentsOf: result.audioURL).base64EncodedString()
+                    replyHandler(["transcript": result.transcript, "audio": audio], nil)
+                } catch SpeechRecognitionService.SpeechError.noSpeech {
+                    replyHandler(["transcript": ""], nil)
+                } catch {
+                    speech.cancel()
+                    replyHandler(nil, error.localizedDescription)
+                }
+            }
+        case "speechCancel":
+            speech?.cancel()
+            replyHandler(true, nil)
         case "openPaywall", "openAccount":
             pendingReply?(false, nil)
             pendingReply = replyHandler
