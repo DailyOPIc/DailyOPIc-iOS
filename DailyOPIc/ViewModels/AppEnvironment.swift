@@ -112,7 +112,8 @@ final class AppEnvironment {
             try AppConfiguration.validateForLaunch()
             // 화면(웹앱)에 필요한 건 계정 ID뿐이다. 익명 로그인까지만 기다리고 바로 띄운다.
             // App Check · 플랜 · 결제 준비는 화면이 뜬 뒤 이어서 한다(웹은 요청할 때 토큰을 받아 간다).
-            _ = try await authentication.currentUserID()
+            // 익명 로그인이 응답 없이 멈추면(네트워크 · App Check) 흰 화면에 갇힌다. 20초 뒤엔 다시 시도 화면을 띄운다.
+            _ = try await Self.withTimeout(seconds: 20) { [authentication] in try await authentication.currentUserID() }
             launchState = .ready
             // 이전 버전(네이티브 플래너)이 최대 30일 치 미리 예약해 둔 학습 알림을 지운다.
             // 새 화면에는 플래너가 없어 알림을 눌러도 갈 곳이 없다.
@@ -125,6 +126,38 @@ final class AppEnvironment {
         await configureStore()
         // 광고(무료 플랜의 배너 · 보상형 광고). 동의(UMP) · 추적 권한 확인 후 AdMob 시작.
         await ads.prepare()
+    }
+
+    struct LaunchTimeout: LocalizedError {
+        var errorDescription: String? { "연결이 오래 걸리고 있어요. 네트워크를 확인하고 다시 시도해 주세요." }
+    }
+
+    /// 작업이 seconds 안에 끝나지 않으면 LaunchTimeout을 던진다. Firebase 콜백은 취소되지 않아서
+    /// TaskGroup으로 묶으면 끝날 때까지 기다리게 된다. 그래서 먼저 끝난 쪽 하나만 이어 준다.
+    nonisolated static func withTimeout<T: Sendable>(seconds: Double, _ work: @escaping @Sendable () async throws -> T) async throws -> T {
+        try await withCheckedThrowingContinuation { continuation in
+            let once = ResumeOnce(continuation)
+            Task {
+                do { once.resume(.success(try await work())) } catch { once.resume(.failure(error)) }
+            }
+            Task {
+                try? await Task.sleep(for: .seconds(seconds))
+                once.resume(.failure(LaunchTimeout()))
+            }
+        }
+    }
+
+    private final class ResumeOnce<T: Sendable>: @unchecked Sendable {
+        private let lock = NSLock()
+        private var continuation: CheckedContinuation<T, Error>?
+        init(_ continuation: CheckedContinuation<T, Error>) { self.continuation = continuation }
+        func resume(_ result: Result<T, Error>) {
+            lock.lock()
+            let pending = continuation
+            continuation = nil
+            lock.unlock()
+            pending?.resume(with: result)
+        }
     }
 
     /// 구매/복원 후 서버 엔타이틀먼트가 반영됐을 수 있으므로 capabilities를 재조회.
