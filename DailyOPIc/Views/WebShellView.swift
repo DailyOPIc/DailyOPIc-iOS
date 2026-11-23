@@ -14,17 +14,17 @@ struct WebShellView: View {
     @State private var model = WebShellModel()
 
     var body: some View {
+        // 웹 화면은 하나로 둔다. 배너 유무(플랜 · 서버 정책이 실행 중에 정해진다)에 따라 웹 화면을
+        // if/else로 나누면 SwiftUI가 웹 화면을 새로 만들어, 아무것도 불러오지 않은 흰 화면이 된다.
         VStack(spacing: 0) {
+            WebView(model: model)
+                .ignoresSafeArea(edges: environment.showsAds ? [] : .bottom)
             if environment.showsAds {
                 // 무료 플랜: 웹 화면 아래(하단 탭 밑)에 배너. 유료는 서버 정책으로 숨는다.
-                WebView(model: model)
                 BannerAdView()
                     .frame(height: 50)
                     .environmentObject(environment.ads)
                     .environment(environment)
-            } else {
-                WebView(model: model)
-                    .ignoresSafeArea(edges: .bottom)
             }
         }
             .overlay {
@@ -87,7 +87,9 @@ final class WebShellModel: NSObject {
     @ObservationIgnored private var speech: SpeechRecognitionService?
     @ObservationIgnored private var speechText: AnyCancellable?
 
+    /// 웹 화면은 한 번만 만든다. SwiftUI가 뷰를 다시 만들어도 같은 웹 화면(불러온 페이지 그대로)을 돌려준다.
     fileprivate func makeWebView() -> WKWebView {
+        if let webView { return webView }
         let config = WKWebViewConfiguration()
         config.allowsInlineMediaPlayback = true
         config.mediaTypesRequiringUserActionForPlayback = []
@@ -118,7 +120,9 @@ final class WebShellModel: NSObject {
 
     /// 지금 앱 계정(uid)을 웹에 알려 주고 웹앱을 연다. 계정이 바뀌면 다시 부른다.
     private func loadForCurrentUser() async {
-        guard let environment, let webView else { return }
+        // .task가 화면(makeUIView)보다 먼저 돌 수 있다. 웹 화면이 아직 없으면 여기서 만든다.
+        guard let environment else { return }
+        let webView = makeWebView()
         guard let uid = try? await environment.authentication.currentUserID() else {
             loadError = "네트워크 연결을 확인해 주세요."
             return
